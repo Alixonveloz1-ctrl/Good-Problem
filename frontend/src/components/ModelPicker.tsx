@@ -109,9 +109,8 @@ export function ModelPicker({
           </p>
           {kind === 'video' && (
             <p className="muted" style={{ margin: 0 }}>
-              Todas las escenas duran 8 segundos. «Alarga tomas» significa que ese modelo puede
-              continuar un plano ya generado, +7 s cada vez, hasta unos 148 s; «Solo 8 s» que no
-              puede. El estudio todavia no usa esa funcion, asi que hoy la diferencia no te afecta.
+              Los tres modelos hacen lo mismo: un plano de 8 segundos a partir de la imagen
+              aprobada. Lo unico que cambia entre ellos es el precio y la nitidez.
             </p>
           )}
           {models.map((model) => (
@@ -174,15 +173,6 @@ function capabilityBadge(model: ModelSpec) {
     if (characters > 0) {
       return <span className="badge approved">{characters} personajes</span>
     }
-  }
-  if (model.kind === 'video') {
-    // "Extension" no le dice nada a nadie: lo que cambia es si el modelo puede
-    // continuar un plano mas alla de los 8 segundos.
-    return model.capabilities.supports_extend ? (
-      <span className="badge">Alarga tomas</span>
-    ) : (
-      <span className="badge">Solo 8 s</span>
-    )
   }
   return null
 }
