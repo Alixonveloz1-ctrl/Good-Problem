@@ -1,0 +1,225 @@
+"""Export Package (PRD 49).
+
+Everything a launch needs, in the folder layout the PRD specifies, written under
+``/universes/{id}/exports/`` and downloadable from the phone into Files.
+
+A zip is produced when the package is small enough to build in memory;
+otherwise the manifest of signed URLs is the deliverable and the files are
+downloaded one by one. Either way nothing has to be assembled on a computer.
+"""
+
+from __future__ import annotations
+
+import io
+import json
+import logging
+import zipfile
+from typing import Any
+
+from ..clock import now_iso
+from ..db.repositories import CONTENT, EXPORTS, SONGS, VIDEO_PROJECTS, Repository
+from ..domain.enums import CanonStatus, ContentKind
+from ..errors import Conflict
+from ..ids import new_id, slugify
+from ..providers.storage import export_path
+
+logger = logging.getLogger("aaus.exports")
+
+MAX_ZIP_BYTES = 200 * 1024 * 1024
+
+
+def build_package(studio, universe_id: str, song_id: str) -> dict[str, Any]:
+    universe = studio.orchestrator.require_universe(universe_id)
+    song = Repository(studio.db, universe_id, SONGS).require(song_id)
+    if song.get("status") != CanonStatus.APPROVED.value:
+        raise Conflict("Solo se exportan canciones aprobadas.")
+
+    artist = slugify(universe.get("name") or universe_id).upper()
+    song_folder = slugify(song.get("title") or song_id).upper()
+    root = f"{artist}/{song_folder}"
+
+    project = (
+        Repository(studio.db, universe_id, VIDEO_PROJECTS).get(song["video_project_id"])
+        if song.get("video_project_id")
+        else None
+    )
+    content = Repository(studio.db, universe_id, CONTENT).list(
+        where={"song_id": song_id}, limit=200
+    )
+
+    files: list[dict[str, Any]] = []
+
+    def add(folder: str, name: str, source_path: str | None) -> None:
+        if not source_path or not studio.storage.exists(source_path):
+            return
+        files.append(
+            {
+                "folder": folder,
+                "name": name,
+                "source_path": source_path,
+                "package_path": f"{root}/{folder}/{name}",
+                "url": studio.storage.signed_url(source_path),
+            }
+        )
+
+    master = song.get("approved_master_path")
+    add("AUDIO", "master.wav" if str(master).endswith(".wav") else "master.mp3", master)
+    add("COVER", "cover.jpg", song.get("cover_path"))
+    if project:
+        add("MUSIC_VIDEO", "youtube_16x9.mp4", project.get("master_16x9_path"))
+        add("MUSIC_VIDEO", "vertical_9x16.mp4", project.get("master_9x16_path"))
+
+    counters: dict[str, int] = {}
+    for piece in content:
+        if piece.get("status") != CanonStatus.APPROVED.value:
+            continue
+        folder = _folder_for(piece.get("kind", ""))
+        counters[folder] = counters.get(folder, 0) + 1
+        prefix = folder.lower().rstrip("s") or "clip"
+        add(folder, f"{prefix}_{counters[folder]:02d}.mp4", piece.get("storage_path"))
+
+    metadata = {
+        "artist": universe.get("name"),
+        "universe_id": universe_id,
+        "song": {
+            "id": song_id,
+            "title": song.get("title"),
+            "genre": song.get("genre"),
+            "bpm": song.get("bpm"),
+            "mood": song.get("mood"),
+            "structure": song.get("structure"),
+            "lyrics_author": song.get("lyrics_author"),
+            "duration_seconds": song.get("requested_duration_seconds"),
+            "model": song.get("model"),
+            "cost_usd": song.get("cost_usd"),
+        },
+        "video_project": {
+            "id": project.get("id"),
+            "video_type": project.get("video_type"),
+            "cost_usd": project.get("cost_usd"),
+        }
+        if project
+        else None,
+        "files": [{"path": f["package_path"], "source": f["source_path"]} for f in files],
+        "exported_at": now_iso(),
+    }
+
+    metadata_path = export_path(universe_id, f"{root}/METADATA/metadata.json")
+    studio.storage.write_bytes(
+        metadata_path,
+        json.dumps(metadata, indent=2, ensure_ascii=False).encode(),
+        "application/json",
+    )
+    info_path = export_path(universe_id, f"{root}/METADATA/song_info.txt")
+    studio.storage.write_bytes(info_path, _song_info(song, universe).encode(), "text/plain")
+    files.append(
+        {
+            "folder": "METADATA",
+            "name": "metadata.json",
+            "source_path": metadata_path,
+            "package_path": f"{root}/METADATA/metadata.json",
+            "url": studio.storage.signed_url(metadata_path),
+        }
+    )
+    files.append(
+        {
+            "folder": "METADATA",
+            "name": "song_info.txt",
+            "source_path": info_path,
+            "package_path": f"{root}/METADATA/song_info.txt",
+            "url": studio.storage.signed_url(info_path),
+        }
+    )
+
+    archive_path = _maybe_zip(studio, universe_id, root, files)
+
+    record = Repository(studio.db, universe_id, EXPORTS).create(
+        new_id("exp"),
+        {
+            "song_id": song_id,
+            "project_id": project.get("id") if project else None,
+            "root_path": root,
+            "files": files,
+            "manifest_path": metadata_path,
+            "archive_path": archive_path,
+            "status": CanonStatus.APPROVED.value,
+        },
+    )
+    return {
+        **record,
+        "archive_url": studio.storage.signed_url(archive_path) if archive_path else None,
+        "tree": render_tree(root, files),
+    }
+
+
+def _folder_for(kind: str) -> str:
+    if kind in {ContentKind.SHORT.value, ContentKind.REEL.value, ContentKind.TIKTOK.value,
+                ContentKind.TEASER.value, ContentKind.LYRIC_CLIP.value}:
+        return "SHORTS"
+    if kind == ContentKind.BTS.value:
+        return "BTS"
+    if kind == ContentKind.INTERVIEW.value:
+        return "INTERVIEWS"
+    return "EXTRAS"
+
+
+def _song_info(song: dict[str, Any], universe: dict[str, Any]) -> str:
+    concept = song.get("concept") or {}
+    return "\n".join(
+        [
+            f"ARTISTA: {universe.get('name','')}",
+            f"TITULO: {song.get('title','')}",
+            f"GENERO: {song.get('genre','')}",
+            f"BPM: {song.get('bpm','')}",
+            f"MOOD: {song.get('mood','')}",
+            f"ESTRUCTURA: {', '.join(song.get('structure') or [])}",
+            f"AUTOR DE LA LETRA: {song.get('lyrics_author','')}",
+            f"MODELO DE MUSICA: {song.get('model','')}",
+            "",
+            "CONCEPTO:",
+            concept.get("concept", ""),
+            "",
+            "LETRA:",
+            song.get("lyrics", ""),
+        ]
+    )
+
+
+def _maybe_zip(studio, universe_id: str, root: str, files: list[dict[str, Any]]) -> str | None:
+    total = 0
+    for entry in files:
+        try:
+            total += len(studio.storage.read_bytes(entry["source_path"]))
+        except (FileNotFoundError, OSError):
+            continue
+    if total > MAX_ZIP_BYTES:
+        logger.info("export_zip_skipped bytes=%s", total)
+        return None
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for entry in files:
+            try:
+                archive.writestr(
+                    entry["package_path"], studio.storage.read_bytes(entry["source_path"])
+                )
+            except (FileNotFoundError, OSError):
+                continue
+    path = export_path(universe_id, f"{root.replace('/', '_')}.zip")
+    studio.storage.write_bytes(path, buffer.getvalue(), "application/zip")
+    return path
+
+
+def render_tree(root: str, files: list[dict[str, Any]]) -> str:
+    """The layout from PRD 49, rendered for the phone."""
+    lines = [f"{root.split('/')[0]}/", f"  {root.split('/')[-1]}/"]
+    by_folder: dict[str, list[str]] = {}
+    for entry in files:
+        by_folder.setdefault(entry["folder"], []).append(entry["name"])
+    for folder in ["AUDIO", "COVER", "MUSIC_VIDEO", "SHORTS", "BTS", "INTERVIEWS", "EXTRAS",
+                   "METADATA"]:
+        names = by_folder.get(folder)
+        if not names:
+            continue
+        lines.append(f"    {folder}/")
+        lines.extend(f"      {name}" for name in sorted(names))
+    return "\n".join(lines)

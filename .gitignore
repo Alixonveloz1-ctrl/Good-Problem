@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+backend/.localdata/
+
+# Node
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# Local
+.env
+.env.local
+.DS_Store

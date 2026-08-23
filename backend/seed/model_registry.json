@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "note": "Fuente de verdad de los modelos disponibles y sus precios. Vive en Firestore (config/models). Editar este documento NO requiere desplegar codigo. Los modelos de 'excluded' no se pueden reactivar desde aqui: estan tambien bloqueados en app/domain/guards.py.",
+  "currency": "USD",
+  "models": [
+    {
+      "id": "gemini-3-pro",
+      "kind": "text",
+      "label": "Gemini 3 Pro",
+      "role_hint": "Director, Producer, Music Director",
+      "status": "active",
+      "variants": [
+        {
+          "key": "default",
+          "label": "Estandar",
+          "unit": "1m_tokens",
+          "price_input": 1.25,
+          "price_output": 10.0
+        }
+      ],
+      "capabilities": {
+        "accepts_images": true,
+        "structured_output": true,
+        "prompt_language": "en-US"
+      }
+    },
+    {
+      "id": "gemini-3-pro-image",
+      "kind": "image",
+      "label": "Nano Banana Pro",
+      "status": "active",
+      "default_variant": "1K",
+      "variants": [
+        { "key": "1K", "label": "1K", "unit": "image", "price": 0.134 },
+        { "key": "2K", "label": "2K", "unit": "image", "price": 0.134 },
+        { "key": "4K", "label": "4K", "unit": "image", "price": 0.24 }
+      ],
+      "capabilities": {
+        "reference_characters_max": 5,
+        "reference_objects_max": 6,
+        "reference_styles_max": 3,
+        "resolutions": ["1K", "2K", "4K"]
+      }
+    },
+    {
+      "id": "gemini-3.1-flash-image",
+      "kind": "image",
+      "label": "Nano Banana 2",
+      "status": "active",
+      "default_variant": "1K",
+      "variants": [
+        { "key": "512px", "label": "512 px", "unit": "image", "price": 0.067 },
+        { "key": "1K", "label": "1K", "unit": "image", "price": 0.067 },
+        { "key": "2K", "label": "2K", "unit": "image", "price": 0.101 },
+        { "key": "4K", "label": "4K", "unit": "image", "price": 0.151 }
+      ],
+      "capabilities": {
+        "reference_characters_max": 4,
+        "reference_objects_max": 10,
+        "reference_styles_max": 0,
+        "resolutions": ["512px", "1K", "2K", "4K"]
+      }
+    },
+    {
+      "id": "gemini-3.1-flash-lite-image",
+      "kind": "image",
+      "label": "Nano Banana 2 Lite",
+      "status": "active",
+      "default_variant": "1K",
+      "variants": [{ "key": "1K", "label": "1K", "unit": "image", "price": 0.034 }],
+      "capabilities": {
+        "reference_characters_max": 0,
+        "reference_objects_max": 14,
+        "reference_styles_max": 0,
+        "resolutions": ["1K"]
+      }
+    },
+    {
+      "id": "lyria-3-pro",
+      "kind": "music",
+      "label": "Lyria 3 Pro",
+      "status": "active",
+      "default_variant": "song",
+      "variants": [{ "key": "song", "label": "Cancion completa", "unit": "song", "price": 0.08 }],
+      "capabilities": {
+        "full_songs": true,
+        "max_duration_seconds": 180,
+        "reference_audio": false,
+        "reference_images": true,
+        "prompt_language": "en-US"
+      }
+    },
+    {
+      "id": "veo-3.1",
+      "kind": "video",
+      "label": "Veo 3.1",
+      "status": "active",
+      "default_variant": "1080p",
+      "variants": [
+        { "key": "1080p", "label": "1080p", "unit": "second", "price": 0.2 },
+        { "key": "4K", "label": "4K", "unit": "second", "price": 0.4 }
+      ],
+      "capabilities": {
+        "durations_seconds": [4, 6, 8],
+        "reference_images_max": 3,
+        "supports_extend": true,
+        "extend_seconds": 7,
+        "max_total_seconds": 148,
+        "aspect_ratios": ["16:9", "9:16"],
+        "audio": "always_disabled"
+      }
+    },
+    {
+      "id": "veo-3.1-fast",
+      "kind": "video",
+      "label": "Veo 3.1 Fast",
+      "status": "active",
+      "default_variant": "1080p",
+      "variants": [
+        { "key": "1080p", "label": "1080p", "unit": "second", "price": 0.1 },
+        { "key": "720p", "label": "720p", "unit": "second", "price": 0.08 }
+      ],
+      "capabilities": {
+        "durations_seconds": [4, 6, 8],
+        "reference_images_max": 3,
+        "supports_extend": true,
+        "extend_seconds": 7,
+        "max_total_seconds": 148,
+        "aspect_ratios": ["16:9", "9:16"],
+        "audio": "always_disabled"
+      }
+    },
+    {
+      "id": "veo-3.1-lite",
+      "kind": "video",
+      "label": "Veo 3.1 Lite",
+      "status": "active",
+      "default_variant": "1080p",
+      "variants": [
+        { "key": "1080p", "label": "1080p", "unit": "second", "price": 0.05 },
+        { "key": "720p", "label": "720p", "unit": "second", "price": 0.03 }
+      ],
+      "capabilities": {
+        "durations_seconds": [4, 6, 8],
+        "reference_images_max": 3,
+        "supports_extend": false,
+        "extend_seconds": 0,
+        "max_total_seconds": 8,
+        "aspect_ratios": ["16:9", "9:16"],
+        "audio": "always_disabled"
+      }
+    },
+    {
+      "id": "chirp-3-instant-custom-voice",
+      "kind": "speech",
+      "label": "Chirp 3 Instant Custom Voice",
+      "status": "active",
+      "default_variant": "default",
+      "variants": [
+        { "key": "default", "label": "Voz clonada", "unit": "1m_characters", "price": 30.0 }
+      ],
+      "capabilities": {
+        "requires_voice_cloning_key": true,
+        "sample_seconds": 10,
+        "output_encodings": ["LINEAR16", "MP3"]
+      }
+    }
+  ],
+  "excluded": [
+    {
+      "id": "lyria-3",
+      "kind": "music",
+      "reason": "Genera clips de 30 s, no canciones completas. Prohibido tambien como respaldo ante un fallo (PRD 14)."
+    },
+    {
+      "id": "lyria-2",
+      "kind": "music",
+      "reason": "Genera clips de 30 s, no canciones completas. Prohibido tambien como respaldo ante un fallo (PRD 14)."
+    },
+    {
+      "id": "imagen-3.0-generate-002",
+      "kind": "image",
+      "reason": "Imagen no acepta imagenes de referencia; endpoints apagados el 17-08-2026 (PRD 24)."
+    },
+    {
+      "id": "imagen-4.0-generate-001",
+      "kind": "image",
+      "reason": "Imagen no acepta imagenes de referencia; endpoints apagados el 17-08-2026 (PRD 24)."
+    }
+  ]
+}
