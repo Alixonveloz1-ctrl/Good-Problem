@@ -143,6 +143,7 @@ def assemble_project(
     *,
     formats: list[str] | None = None,
     captions: bool = False,
+    transition_seconds: float = 0.0,
 ) -> dict[str, Any]:
     formats = formats or ["16:9", "9:16"]
     edl = build_edl(studio, universe_id, project_id, captions=captions)
@@ -165,26 +166,43 @@ def assemble_project(
             "reason": reason,
             "edl_path": edl_path,
             "total_seconds": edl.total_seconds,
+            "picture_seconds": _picture_seconds(edl, transition_seconds),
             "clips": len(edl.entries),
             "reused": sum(1 for e in edl.entries if e.reused_from),
             "formats": formats,
+            "transition_seconds": transition_seconds,
         }
 
-    outputs = _render(studio, universe_id, project_id, edl, formats=formats, captions=captions)
+    outputs = _render(
+        studio, universe_id, project_id, edl,
+        formats=formats, captions=captions, transition_seconds=transition_seconds,
+    )
     patch: dict[str, Any] = {"edl_path": edl_path, "status": CanonStatus.DRAFT.value}
     if "16:9" in outputs:
         patch["master_16x9_path"] = outputs["16:9"]
     if "9:16" in outputs:
         patch["master_9x16_path"] = outputs["9:16"]
     Repository(studio.db, universe_id, VIDEO_PROJECTS).update(project_id, patch)
+    imagen = _picture_seconds(edl, transition_seconds)
     return {
         "rendered": True,
         "edl_path": edl_path,
         "outputs": outputs,
         "total_seconds": edl.total_seconds,
+        "picture_seconds": imagen,
+        "shortened_by_seconds": round(edl.total_seconds - imagen, 2),
         "clips": len(edl.entries),
         "reused": sum(1 for e in edl.entries if e.reused_from),
+        "transition_seconds": transition_seconds,
     }
+
+
+def _picture_seconds(edl: EditDecisionList, transition_seconds: float) -> float:
+    """Con fundidos la imagen dura menos que la suma de los clips: cada fundido
+    solapa dos planos. Conviene saberlo porque el audio no se acorta."""
+    if transition_seconds <= 0:
+        return edl.total_seconds
+    return cmds.chain_duration([e.duration_seconds for e in edl.entries], transition_seconds)
 
 
 def _run(command: list[str], *, cwd: Path) -> None:
@@ -205,6 +223,7 @@ def _render(
     *,
     formats: list[str],
     captions: bool,
+    transition_seconds: float = 0.0,
 ) -> dict[str, str]:
     outputs: dict[str, str] = {}
     with tempfile.TemporaryDirectory(prefix="aaus-assembly-") as tmp:
@@ -219,11 +238,22 @@ def _render(
         audio_local = work / "master_audio"
         audio_local.write_bytes(studio.storage.read_bytes(edl.master_audio_path))
 
-        list_file = work / "concat.txt"
-        list_file.write_text(cmds.concat_list_file(local_clips))
-
         silent = work / "picture.mp4"
-        _run(cmds.concat(str(list_file), str(silent), cmds.LANDSCAPE_1080), cwd=work)
+        if transition_seconds > 0:
+            _run(
+                cmds.crossfade_chain(
+                    local_clips,
+                    [e.duration_seconds for e in edl.entries],
+                    str(silent),
+                    cmds.LANDSCAPE_1080,
+                    transition=transition_seconds,
+                ),
+                cwd=work,
+            )
+        else:
+            list_file = work / "concat.txt"
+            list_file.write_text(cmds.concat_list_file(local_clips))
+            _run(cmds.concat(str(list_file), str(silent), cmds.LANDSCAPE_1080), cwd=work)
 
         landscape = work / "master_16x9.mp4"
         _run(

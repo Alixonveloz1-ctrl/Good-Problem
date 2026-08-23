@@ -10,7 +10,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 FFMPEG = "ffmpeg"
-FFPROBE = "ffprobe"
 
 
 @dataclass(frozen=True)
@@ -61,17 +60,72 @@ def concat(list_path: str, output: str, profile: RenderProfile) -> list[str]:
     ]
 
 
-def crossfade_pair(
-    first: str, second: str, output: str, *, offset: float, duration: float = 0.5
+def crossfade_chain(
+    inputs: list[str],
+    durations: list[int],
+    output: str,
+    profile: RenderProfile,
+    *,
+    transition: float = 0.5,
 ) -> list[str]:
-    """Two clips with a crossfade. Used when the Editor asks for transitions
-    instead of hard cuts."""
-    return [
-        FFMPEG, "-y", "-i", first, "-i", second,
-        "-filter_complex",
-        f"[0:v][1:v]xfade=transition=fade:duration={duration}:offset={offset},format=yuv420p[v]",
-        "-map", "[v]", "-an", "-c:v", "libx264", "-preset", "medium", output,
+    """Todos los planos encadenados con un fundido entre cada dos (PRD 29).
+
+    Cada fundido se come ``transition`` segundos de metraje, asi que la imagen
+    sale mas corta que la suma de los clips. ``chain_duration`` calcula cuanto.
+    """
+    if len(inputs) != len(durations):
+        raise ValueError("un clip, una duracion")
+    if len(inputs) == 1:
+        return concat_single(inputs[0], output, profile)
+
+    comando = [FFMPEG, "-y"]
+    for ruta in inputs:
+        comando += ["-i", ruta]
+
+    escala = (
+        f"scale={profile.width}:{profile.height}:force_original_aspect_ratio=decrease,"
+        f"pad={profile.width}:{profile.height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={profile.fps}"
+    )
+    partes = [f"[{i}:v]{escala}[v{i}]" for i in range(len(inputs))]
+
+    anterior = "[v0]"
+    acumulado = 0.0
+    for i in range(1, len(inputs)):
+        acumulado += durations[i - 1]
+        offset = max(acumulado - i * transition, 0.0)
+        etiqueta = f"[x{i}]" if i < len(inputs) - 1 else "[out]"
+        partes.append(
+            f"{anterior}[v{i}]xfade=transition=fade:duration={transition}:"
+            f"offset={offset:.3f}{etiqueta}"
+        )
+        anterior = etiqueta
+
+    comando += [
+        "-filter_complex", ";".join(partes),
+        "-map", "[out]", "-an",
+        "-c:v", "libx264", "-preset", "medium", "-b:v", profile.video_bitrate,
+        "-pix_fmt", "yuv420p", output,
     ]
+    return comando
+
+
+def concat_single(source: str, output: str, profile: RenderProfile) -> list[str]:
+    """Un solo plano: no hay nada que encadenar, solo normalizar el tamano."""
+    return [
+        FFMPEG, "-y", "-i", source,
+        "-vf", f"scale={profile.width}:{profile.height}:force_original_aspect_ratio=decrease,"
+               f"pad={profile.width}:{profile.height}:(ow-iw)/2:(oh-ih)/2,setsar=1,"
+               f"fps={profile.fps}",
+        "-an", "-c:v", "libx264", "-preset", "medium", "-b:v", profile.video_bitrate,
+        "-pix_fmt", "yuv420p", output,
+    ]
+
+
+def chain_duration(durations: list[int], transition: float) -> float:
+    """Lo que dura la imagen con fundidos: cada uno se come ``transition``."""
+    if not durations:
+        return 0.0
+    return max(sum(durations) - (len(durations) - 1) * transition, 0.0)
 
 
 def mux_audio(video: str, audio: str, output: str, profile: RenderProfile) -> list[str]:
@@ -137,13 +191,6 @@ def to_wav(source: str, output: str) -> list[str]:
 
 def to_mp3(source: str, output: str, bitrate: str = "320k") -> list[str]:
     return [FFMPEG, "-y", "-i", source, "-b:a", bitrate, output]
-
-
-def probe_duration(source: str) -> list[str]:
-    return [
-        FFPROBE, "-v", "error", "-show_entries", "format=duration",
-        "-of", "default=noprint_wrappers=1:nokey=1", source,
-    ]
 
 
 def srt_timestamp(seconds: float) -> str:

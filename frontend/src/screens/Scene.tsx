@@ -3,9 +3,9 @@ import { useParams } from 'react-router-dom'
 import { api, newIdempotencyKey } from '../api/client'
 import { useAction, useResource } from '../hooks/useApi'
 import type { Scene } from '../api/types'
-import { ApprovalBar } from '../components/ApprovalBar'
 import { JobWatcher } from '../components/JobWatcher'
 import { ModelPicker, type ModelChoice } from '../components/ModelPicker'
+import type { Registry } from '../api/types'
 import { Card, ErrorNote, Field, Loading, StatusBadge, TopBar } from '../components/ui'
 
 interface SceneDetail extends Scene {
@@ -24,6 +24,7 @@ export function SceneScreen() {
   const { data, loading, error, reload } = useResource<SceneDetail>(
     `/api/universes/${universeId}/scenes/${sceneId}`,
   )
+  const registry = useResource<Registry>('/api/registry/models')
   const action = useAction()
   const [imageModel, setImageModel] = useState<ModelChoice | null>(null)
   const [videoModel, setVideoModel] = useState<ModelChoice | null>(null)
@@ -38,6 +39,14 @@ export function SceneScreen() {
   }
 
   const imageApproved = data?.image_status === 'APPROVED'
+  const clipApproved = data?.clip_status === 'APPROVED'
+  // Veo solo continua una toma con veo-3.1 y veo-3.1-fast; lite no puede.
+  const puedeAlargar = Boolean(
+    clipApproved &&
+      data?.clip &&
+      (registry.data?.models ?? []).find((m) => m.id === data.clip?.model)?.capabilities
+        .supports_extend,
+  )
 
   return (
     <>
@@ -209,6 +218,38 @@ export function SceneScreen() {
               )}
             </Card>
 
+            {puedeAlargar && (
+              <Card>
+                <h3>3 · Alargar esta toma</h3>
+                <p className="muted" style={{ margin: 0 }}>
+                  Veo continua el plano 7 segundos mas, sin corte. Quedaria en{' '}
+                  {data.duration_seconds + 7} segundos.
+                </p>
+                <div className="notice">
+                  Dos cosas antes de pulsarlo. La continuacion sale siempre a <strong>720p</strong>,
+                  aunque esta toma sea 1080p. Y Veo no recibe aqui las fotos del personaje: solo
+                  mira el ultimo segundo del clip. Si la toma termina sin verse la cara, puede
+                  cambiartela.
+                </div>
+                <button
+                  className="btn block"
+                  disabled={action.busy}
+                  onClick={() =>
+                    run(() =>
+                      api.post(`${base}/clip/extend`, {
+                        idempotency_key: newIdempotencyKey('ext'),
+                      }),
+                    )
+                  }
+                >
+                  Alargar +7 s
+                </button>
+                <div className="muted">
+                  Tendras que volver a aprobarla: dura mas y llega en 720p.
+                </div>
+              </Card>
+            )}
+
             {jobId && (
               <JobWatcher
                 universeId={universeId}
@@ -220,11 +261,10 @@ export function SceneScreen() {
               />
             )}
 
-            <ApprovalBar status={data.status} busy={action.busy} />
             {data.clip && (
               <div className="muted">
-                Clip: {data.clip.model} · {data.clip.variant} · {data.clip.duration_seconds}s ·
-                audio {String(data.clip.generate_audio)}
+                Clip generado con {data.clip.model} en {data.clip.variant},{' '}
+                {data.clip.duration_seconds} segundos, sin audio.
               </div>
             )}
           </>

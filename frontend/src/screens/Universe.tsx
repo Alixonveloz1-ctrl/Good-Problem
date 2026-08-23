@@ -11,6 +11,7 @@ const SECTIONS: { to: string; label: string; hint: string; glyph: string }[] = [
   { to: 'songs', label: 'Musica', hint: 'Conceptos, letras y canciones', glyph: '🎵' },
   { to: 'projects', label: 'Videoclips', hint: 'Historia, storyboard, montaje', glyph: '🎬' },
   { to: 'content', label: 'Contenido', hint: 'Shorts, BTS, entrevistas', glyph: '📱' },
+  { to: 'voz', label: 'Voz del artista', hint: 'Grabar la voz que habla', glyph: '🎙️' },
   { to: 'canon', label: 'Canon', hint: 'Lo aprobado, como referencia', glyph: '✅' },
   { to: 'jobs', label: 'Jobs', hint: 'Cola de generacion', glyph: '⚙️' },
   { to: 'exports', label: 'Export', hint: 'Paquetes descargables', glyph: '📦' },

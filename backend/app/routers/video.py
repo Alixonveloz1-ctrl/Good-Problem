@@ -91,6 +91,9 @@ class PlanIn(BaseModel):
 class AssembleIn(BaseModel):
     formats: list[str] = Field(default_factory=lambda: ["16:9", "9:16"])
     captions: bool = False
+    transition_seconds: float = 0.0
+    """0 son cortes secos. Un fundido de medio segundo entre planos acorta la
+    imagen, porque cada fundido solapa dos tomas (PRD 29)."""
     idempotency_key: str | None = None
 
 
@@ -545,6 +548,46 @@ def approve_scene_clip(
     return scenes.update(scene_id, {"clip_status": CanonStatus.APPROVED.value})
 
 
+class ExtendIn(BaseModel):
+    prompt: str | None = None
+    idempotency_key: str | None = None
+
+
+@router.post("/scenes/{scene_id}/clip/extend")
+def extend_scene_clip(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, scene_id: str, body: ExtendIn
+) -> dict[str, Any]:
+    """Alarga la toma aprobada 7 segundos mas (PRD 26).
+
+    Tres limites que vienen de la API de Veo, no de aqui: la continuacion no
+    admite imagenes de referencia, sale siempre a 720p, y veo-3.1-lite no la
+    soporta. La escena vuelve a quedar pendiente de aprobacion.
+    """
+    scenes = _scenes(studio, universe_id)
+    scene = scenes.require(scene_id)
+    if scene.get("clip_status") != CanonStatus.APPROVED.value or not scene.get("clip_id"):
+        raise Conflict("Aprueba la toma antes de alargarla.")
+    clip = Repository(studio.db, universe_id, VIDEOS).require(scene["clip_id"])
+    spec = studio.registry.require_active(clip["model"], "video")
+    if not spec.cap("supports_extend", False):
+        raise Conflict(
+            f"{spec.label} no puede alargar tomas. Regenera el clip con otro modelo si lo "
+            "necesitas mas largo."
+        )
+    return studio.orchestrator.submit(
+        GenerationRequest(
+            universe_id=universe_id,
+            kind="video_extend",
+            target_type="scene",
+            target_id=scene_id,
+            model=clip["model"],
+            variant="720p" if any(v.key == "720p" for v in spec.variants) else None,
+            idempotency_key=body.idempotency_key,
+            payload={"prompt": body.prompt},
+        )
+    )
+
+
 @router.post("/scenes/{scene_id}/clip/reject")
 def reject_scene_clip(
     owner: OwnerDep, studio: StudioDep, universe_id: str, scene_id: str
@@ -571,7 +614,11 @@ def assemble(
             target_type="video_project",
             target_id=project_id,
             idempotency_key=body.idempotency_key,
-            payload={"formats": body.formats, "captions": body.captions},
+            payload={
+                "formats": body.formats,
+                "captions": body.captions,
+                "transition_seconds": max(0.0, min(body.transition_seconds, 2.0)),
+            },
         )
     )
 

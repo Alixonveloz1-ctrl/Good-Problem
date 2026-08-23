@@ -13,7 +13,10 @@ from __future__ import annotations
 import io
 import json
 import logging
+import subprocess
+import tempfile
 import zipfile
+from pathlib import Path
 from typing import Any
 
 from ..clock import now_iso
@@ -21,7 +24,7 @@ from ..db.repositories import CONTENT, EXPORTS, SONGS, VIDEO_PROJECTS, Repositor
 from ..domain.enums import CanonStatus, ContentKind
 from ..errors import Conflict
 from ..ids import new_id, slugify
-from ..providers.storage import export_path
+from ..providers.storage import export_path, song_path
 
 logger = logging.getLogger("aaus.exports")
 
@@ -62,8 +65,10 @@ def build_package(studio, universe_id: str, song_id: str) -> dict[str, Any]:
             }
         )
 
-    master = song.get("approved_master_path")
-    add("AUDIO", "master.wav" if str(master).endswith(".wav") else "master.mp3", master)
+    # El PRD 49 pide los dos: wav para trabajar y mp3 para subir a cualquier
+    # sitio. Lyria devuelve uno solo, asi que el otro se convierte aqui.
+    for nombre, ruta in _audio_masters(studio, universe_id, song).items():
+        add("AUDIO", nombre, ruta)
     add("COVER", "cover.jpg", song.get("cover_path"))
     if project:
         add("MUSIC_VIDEO", "youtube_16x9.mp4", project.get("master_16x9_path"))
@@ -150,6 +155,51 @@ def build_package(studio, universe_id: str, song_id: str) -> dict[str, Any]:
         "archive_url": studio.storage.signed_url(archive_path) if archive_path else None,
         "tree": render_tree(root, files),
     }
+
+
+def _audio_masters(studio, universe_id: str, song: dict[str, Any]) -> dict[str, str]:
+    """Devuelve {"master.wav": ruta, "master.mp3": ruta}, convirtiendo el que
+    falte. Si FFmpeg no esta disponible se entrega solo el original, y el
+    paquete lo dice en lugar de fingir que estan los dos."""
+    from ..assembly import ffmpeg_cmds as cmds
+    from ..assembly.engine import ffmpeg_available
+
+    original = song.get("approved_master_path")
+    if not original:
+        return {}
+    es_wav = str(original).lower().endswith(".wav")
+    salida = {"master.wav" if es_wav else "master.mp3": original}
+
+    faltante = "master.mp3" if es_wav else "master.wav"
+    destino = song_path(universe_id, song["id"], faltante)
+    if studio.storage.exists(destino):
+        salida[faltante] = destino
+        return salida
+    if studio.settings.dry_run or not ffmpeg_available():
+        logger.info("export_audio_sin_convertir %s", faltante)
+        return salida
+
+    with tempfile.TemporaryDirectory(prefix="aaus-audio-") as tmp:
+        trabajo = Path(tmp)
+        entrada = trabajo / ("master.wav" if es_wav else "master.mp3")
+        entrada.write_bytes(studio.storage.read_bytes(original))
+        convertido = trabajo / faltante
+        comando = (
+            cmds.to_mp3(str(entrada), str(convertido))
+            if faltante.endswith(".mp3")
+            else cmds.to_wav(str(entrada), str(convertido))
+        )
+        proceso = subprocess.run(comando, cwd=trabajo, capture_output=True, text=True)
+        if proceso.returncode != 0:
+            logger.warning("export_audio_conversion_fallida %s", proceso.stderr[-500:])
+            return salida
+        studio.storage.write_bytes(
+            destino,
+            convertido.read_bytes(),
+            "audio/mpeg" if faltante.endswith(".mp3") else "audio/wav",
+        )
+    salida[faltante] = destino
+    return salida
 
 
 def _folder_for(kind: str) -> str:

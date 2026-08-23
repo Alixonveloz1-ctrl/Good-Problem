@@ -135,6 +135,20 @@ de servicio adjunta; Cloud Build se conecta a GitHub con la app de Google; y
 Secret Manager guarda únicamente la clave de voz clonada de Chirp 3, que es un
 identificador de la API y no una credencial de acceso a la cuenta.
 
+## Alargar una toma
+
+Veo genera 8 segundos y para. Desde la pantalla de una escena, una toma ya
+aprobada se puede continuar 7 segundos más, hasta unos 148 s. Tres cosas que
+vienen de la API de Google y que la pantalla avisa antes de pulsar:
+
+- la continuación **no recibe las fotos del personaje**: Veo solo mira el último
+  segundo del clip, así que si la toma acaba sin verse la cara, se la inventa;
+- sale siempre a **720p**, aunque el clip original sea 1080p o 4K;
+- `veo-3.1-lite` no puede hacerlo.
+
+Para un videoclip normal no hace falta: se monta con planos de 8 segundos.
+Sirve para un plano largo sin cortes.
+
 ## Lo que el MVP no resuelve
 
 La **identidad vocal cantada**. Lyria acepta texto e imágenes de referencia,

@@ -53,6 +53,7 @@ export function ProjectScreen() {
   const action = useAction()
   const [jobId, setJobId] = useState<string | null>(null)
   const [planOpen, setPlanOpen] = useState(false)
+  const [fundido, setFundido] = useState(false)
   const base = `/api/universes/${universeId}/video-projects/${projectId}`
 
   const run = async (fn: () => Promise<{ id: string }>) => {
@@ -196,6 +197,27 @@ export function ProjectScreen() {
                 El master usa siempre el audio aprobado. La version 9:16 se deriva del master por
                 reencuadre y no cuesta nada generar.
               </p>
+              <div className="chips">
+                <button
+                  className={`chip ${!fundido ? 'active' : ''}`}
+                  onClick={() => setFundido(false)}
+                >
+                  Cortes secos
+                </button>
+                <button
+                  className={`chip ${fundido ? 'active' : ''}`}
+                  onClick={() => setFundido(true)}
+                >
+                  Fundido entre planos
+                </button>
+              </div>
+              {fundido && (
+                <div className="notice">
+                  Cada fundido solapa dos planos medio segundo, asi que la imagen queda algo mas
+                  corta que la cancion. Con {scenes.length} escenas se acorta{' '}
+                  {((scenes.length - 1) * 0.5).toFixed(1)} segundos.
+                </div>
+              )}
               <button
                 className="btn primary block"
                 disabled={action.busy}
@@ -203,6 +225,7 @@ export function ProjectScreen() {
                   run(() =>
                     api.post(`${base}/assemble`, {
                       formats: ['16:9', '9:16'],
+                      transition_seconds: fundido ? 0.5 : 0,
                       idempotency_key: newIdempotencyKey('asm'),
                     }),
                   )

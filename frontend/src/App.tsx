@@ -8,6 +8,7 @@ import { SongScreen, SongsScreen } from './screens/Songs'
 import { ProjectScreen, ProjectsScreen } from './screens/Projects'
 import { SceneScreen } from './screens/Scene'
 import { ContentScreen } from './screens/Content'
+import { VoiceCloneScreen } from './screens/VoiceClone'
 import { JobsScreen } from './screens/Jobs'
 import { CanonScreen, ExportsScreen, SettingsScreen } from './screens/Misc'
 
@@ -54,6 +55,7 @@ export default function App() {
         <Route path="/u/:universeId/projects/:projectId" element={<ProjectScreen />} />
         <Route path="/u/:universeId/scenes/:sceneId" element={<SceneScreen />} />
         <Route path="/u/:universeId/content" element={<ContentScreen />} />
+        <Route path="/u/:universeId/voz" element={<VoiceCloneScreen />} />
         <Route path="/u/:universeId/canon" element={<CanonScreen />} />
         <Route path="/u/:universeId/jobs" element={<JobsScreen />} />
         <Route path="/u/:universeId/exports" element={<ExportsScreen />} />

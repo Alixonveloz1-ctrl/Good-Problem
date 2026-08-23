@@ -213,3 +213,43 @@ def test_a_scene_cannot_reuse_itself(studio, universe):
     )
     scenes = studio.db.list(f"universes/{universe}/scenes")
     assert scenes[0]["reuses_scene_id"] is None
+
+
+def test_los_fundidos_acortan_la_imagen(studio, universe):
+    """Cada fundido solapa dos planos, asi que la imagen dura menos que la suma
+    de los clips. El resultado del ensamblaje lo dice, en vez de dejar que se
+    descubra al ver el video."""
+    from app.assembly.engine import assemble_project
+
+    project_id = "vp_fund"
+    studio.db.set(
+        f"universes/{universe}/video_projects/{project_id}",
+        {"id": project_id, "universe_id": universe, "song_id": "song_f"},
+    )
+    studio.db.set(
+        f"universes/{universe}/songs/song_f",
+        {"id": "song_f", "universe_id": universe, "status": CanonStatus.APPROVED.value,
+         "approved_master_path": "p.wav"},
+    )
+    for indice in range(3):
+        escena = _scene(studio, universe, project_id, indice)
+        _attach_clip(studio, universe, project_id, escena, f"clip_f{indice}")
+
+    seco = assemble_project(studio, universe, project_id)
+    assert seco["picture_seconds"] == 24
+
+    fundido = assemble_project(studio, universe, project_id, transition_seconds=0.5)
+    assert fundido["picture_seconds"] == 23.0
+    assert fundido["total_seconds"] == 24
+
+
+def test_el_comando_de_fundidos_encadena_todos_los_planos():
+    from app.assembly import ffmpeg_cmds as cmds
+
+    comando = cmds.crossfade_chain(
+        ["a.mp4", "b.mp4", "c.mp4"], [8, 8, 8], "out.mp4", cmds.LANDSCAPE_1080, transition=0.5
+    )
+    filtro = comando[comando.index("-filter_complex") + 1]
+    assert filtro.count("xfade") == 2, "dos fundidos para tres planos"
+    assert "offset=7.500" in filtro and "offset=15.000" in filtro
+    assert "[out]" in filtro

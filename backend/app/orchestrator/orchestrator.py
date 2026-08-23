@@ -103,6 +103,7 @@ _KIND_TO_MODEL_KIND: dict[str, ModelKind] = {
     "image": ModelKind.IMAGE,
     "music": ModelKind.MUSIC,
     "video": ModelKind.VIDEO,
+    "video_extend": ModelKind.VIDEO,
     "speech": ModelKind.SPEECH,
 }
 
@@ -161,6 +162,16 @@ class Orchestrator:
         if request.kind == "image":
             return estimate_images(
                 registry, resolved.spec.id, resolved.variant, images=int(payload.get("count", 1))
+            )
+        if request.kind == "video_extend":
+            # Siempre +7 s y siempre a 720p, lo diga quien lo diga.
+            spec = registry.get(resolved.spec.id)
+            return estimate_video(
+                registry,
+                spec.id,
+                resolved.variant,
+                seconds=int(spec.cap("extend_seconds", 7)),
+                clips=1,
             )
         if request.kind == "video":
             seconds = resolve_clip_duration(

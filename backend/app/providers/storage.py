@@ -171,13 +171,5 @@ def content_path(universe_id: str, filename: str) -> str:
     return f"{universe_prefix(universe_id)}/content/{filename}"
 
 
-def reference_path(universe_id: str, filename: str) -> str:
-    return f"{universe_prefix(universe_id)}/references/{filename}"
-
-
 def export_path(universe_id: str, filename: str) -> str:
     return f"{universe_prefix(universe_id)}/exports/{filename}"
-
-
-def temp_path(universe_id: str, filename: str) -> str:
-    return f"{universe_prefix(universe_id)}/temp/{filename}"

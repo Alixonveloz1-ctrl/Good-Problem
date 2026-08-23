@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { api, money } from '../api/client'
 import { useAction, useResource } from '../hooks/useApi'
@@ -105,6 +106,51 @@ export function ExportsScreen() {
   )
 }
 
+/**
+ * La comprobacion del paso 27 del PRD: que ninguna llamada a Veo haya pedido
+ * audio. Generarlo costaria el doble por segundo para producir una pista que el
+ * montaje tira, asi que conviene poder mirarlo sin fiarse de nadie.
+ */
+function ComprobacionAudio() {
+  const [resultado, setResultado] = useState<{ count: number; audio: number } | null>(null)
+  const action = useAction()
+
+  const comprobar = async () => {
+    const datos = await action.run(() =>
+      api.get<{ count: number; calls_requesting_audio: number }>(
+        '/api/diagnostics/vertex-calls?prefix=veo',
+      ),
+    )
+    if (datos) setResultado({ count: datos.count, audio: datos.calls_requesting_audio })
+  }
+
+  return (
+    <Card>
+      <h3>Comprobar que el video no lleva audio</h3>
+      <p className="muted" style={{ margin: 0 }}>
+        La musica sale de Lyria y la voz de Chirp, asi que Veo se llama siempre con el audio
+        apagado. Generarlo costaria el doble por segundo para tirarlo en el montaje. Aqui puedes
+        comprobar que asi ha sido.
+      </p>
+      <button className="btn block" onClick={comprobar} disabled={action.busy}>
+        {action.busy ? 'Mirando…' : 'Comprobar'}
+      </button>
+      {resultado && (
+        <div
+          className={resultado.audio === 0 ? 'notice' : 'error'}
+          style={resultado.audio === 0 ? { borderColor: 'var(--ok)', color: 'var(--ok)' } : {}}
+        >
+          {resultado.count === 0
+            ? 'Todavia no se ha llamado a Veo en esta sesion.'
+            : resultado.audio === 0
+              ? `${resultado.count} llamadas a Veo, ninguna pidio audio.`
+              : `Atencion: ${resultado.audio} de ${resultado.count} llamadas pidieron audio.`}
+        </div>
+      )}
+    </Card>
+  )
+}
+
 export function SettingsScreen() {
   const registry = useResource<Registry>('/api/registry/models')
   const health = useResource<{ dry_run: boolean; project: string | null; storage: string }>(
@@ -152,6 +198,8 @@ export function SettingsScreen() {
             </div>
           ))}
         </Card>
+
+        <ComprobacionAudio />
 
         {health.data && (
           <Card>

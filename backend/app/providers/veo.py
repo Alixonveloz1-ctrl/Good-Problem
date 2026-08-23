@@ -27,7 +27,7 @@ from ..domain.guards import (
     resolve_clip_duration,
 )
 from ..domain.registry import ModelSpec
-from ..errors import ProviderError
+from ..errors import InvalidGenerationRequest, ProviderError
 from .vertex import VertexClient
 
 
@@ -122,23 +122,47 @@ def start_generation(
     return VideoOperation(name=name, model=spec.id, parameters=parameters, seconds=seconds)
 
 
+EXTENSION_RESOLUTION = "720p"
+"""Veo devuelve la extension siempre a 720p, aunque el clip original sea 1080p
+o 4K. Documentado por Google y confirmado por los proveedores que exponen la
+API. Forzarlo aqui evita cobrar 1080p por algo que llega a 720p."""
+
+EXTENSION_MAX_TOTAL_SECONDS = 148
+
+
 def start_extension(
     client: VertexClient,
     spec: ModelSpec,
     *,
     prompt: str,
-    variant: str,
     video_uri: str,
     aspect_ratio: str = "16:9",
+    current_seconds: int = 8,
 ) -> VideoOperation:
-    """+7 seconds at a time, up to about 148 s. veo-3.1-lite cannot do it."""
+    """Continua un clip ya generado, +7 s cada vez, hasta unos 148 s.
+
+    Tres cosas que conviene tener presentes y que el PRD no recoge:
+
+    * la peticion **no acepta imagenes de referencia**: solo el video anterior y
+      un texto. Veo deduce quien es el personaje mirando el ultimo segundo del
+      clip, asi que si ahi no se le ve la cara, se la inventa;
+    * la salida es siempre 720p, sea cual sea la resolucion del clip original;
+    * veo-3.1-lite no la soporta.
+    """
     assert_extend_supported(spec.id, supports_extend=bool(spec.cap("supports_extend", False)))
+    added = int(spec.cap("extend_seconds", 7))
+    total = current_seconds + added
+    if total > EXTENSION_MAX_TOTAL_SECONDS:
+        raise InvalidGenerationRequest(
+            f"Una toma no puede pasar de {EXTENSION_MAX_TOTAL_SECONDS} segundos. "
+            f"Esta lleva {current_seconds} y quedaria en {total}."
+        )
     parameters = enforce_video_audio_disabled(
         {
             "aspectRatio": assert_aspect_ratio(aspect_ratio),
-            "resolution": variant,
+            "resolution": EXTENSION_RESOLUTION,
             "sampleCount": 1,
-            "durationSeconds": int(spec.cap("extend_seconds", 7)),
+            "durationSeconds": added,
         }
     )
     response = client.call(
@@ -150,9 +174,7 @@ def start_extension(
     name = response.get("name")
     if not name:
         raise ProviderError("Veo no devolvio una operacion de extension.")
-    return VideoOperation(
-        name=name, model=spec.id, parameters=parameters, seconds=int(parameters["durationSeconds"])
-    )
+    return VideoOperation(name=name, model=spec.id, parameters=parameters, seconds=added)
 
 
 def poll(client: VertexClient, operation: VideoOperation) -> VideoResult | None:

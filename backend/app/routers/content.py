@@ -77,6 +77,59 @@ def list_content(owner: OwnerDep, studio: StudioDep, universe_id: str) -> list[d
     ]
 
 
+# Las rutas de /voice-clone van antes que /{content_id}: FastAPI resuelve en
+# orden, y si no, tomaria 'voice-clone' por el id de una pieza de contenido.
+class VoiceCloneIn(BaseModel):
+    sample_base64: str
+    consent_base64: str
+    language_code: str = "es-ES"
+    secret_name: str = "chirp-voice-cloning-key"
+
+
+@router.get("/voice-clone")
+def voice_clone_status(owner: OwnerDep, studio: StudioDep, universe_id: str) -> dict[str, Any]:
+    """Que hace falta para clonar la voz hablada, y si ya esta hecha.
+
+    El texto de consentimiento lo fija Google: hay que leerlo palabra por
+    palabra y en ingles, o Chirp rechaza la grabacion.
+    """
+    from ..providers.chirp import CONSENT_SCRIPT
+
+    studio.orchestrator.require_universe(universe_id)
+    bible = load_bible(studio.db, universe_id)
+    return {
+        "ready": bool(bible.voice_profile.speaking_voice_secret),
+        "secret_name": bible.voice_profile.speaking_voice_secret,
+        "consent_script": CONSENT_SCRIPT,
+        "sample_seconds": 10,
+        "sample_rate_hertz": 24000,
+    }
+
+
+@router.post("/voice-clone")
+def create_voice_clone(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, body: VoiceCloneIn
+) -> dict[str, Any]:
+    """Ten seconds of sample plus a consent recording produce a reusable key.
+    The key is stored in Secret Manager and referenced from the Voice Profile;
+    it is the only secret this project keeps (PRD 40)."""
+    import base64
+
+    studio.orchestrator.require_universe(universe_id)
+    key = studio.chirp.create_voice_clone_key(
+        sample_wav=base64.b64decode(body.sample_base64),
+        consent_wav=base64.b64decode(body.consent_base64),
+        language_code=body.language_code,
+    )
+    secret_name = f"{body.secret_name}-{universe_id}"
+    studio.secrets.write(secret_name, key)
+    from ..services.context import save_bible
+
+    bible = load_bible(studio.db, universe_id)
+    bible.voice_profile.speaking_voice_secret = secret_name
+    save_bible(studio.db, universe_id, bible)
+    return {"secret_name": secret_name, "stored": True}
+
 @router.get("/{content_id}")
 def get_content(
     owner: OwnerDep, studio: StudioDep, universe_id: str, content_id: str
@@ -299,35 +352,3 @@ def approve_content(
         storage_path=row.get("storage_path"),
     )
     return updated
-
-
-class VoiceCloneIn(BaseModel):
-    sample_base64: str
-    consent_base64: str
-    language_code: str = "es-ES"
-    secret_name: str = "chirp-voice-cloning-key"
-
-
-@router.post("/voice-clone")
-def create_voice_clone(
-    owner: OwnerDep, studio: StudioDep, universe_id: str, body: VoiceCloneIn
-) -> dict[str, Any]:
-    """Ten seconds of sample plus a consent recording produce a reusable key.
-    The key is stored in Secret Manager and referenced from the Voice Profile;
-    it is the only secret this project keeps (PRD 40)."""
-    import base64
-
-    studio.orchestrator.require_universe(universe_id)
-    key = studio.chirp.create_voice_clone_key(
-        sample_wav=base64.b64decode(body.sample_base64),
-        consent_wav=base64.b64decode(body.consent_base64),
-        language_code=body.language_code,
-    )
-    secret_name = f"{body.secret_name}-{universe_id}"
-    studio.secrets.write(secret_name, key)
-    from ..services.context import save_bible
-
-    bible = load_bible(studio.db, universe_id)
-    bible.voice_profile.speaking_voice_secret = secret_name
-    save_bible(studio.db, universe_id, bible)
-    return {"secret_name": secret_name, "stored": True}

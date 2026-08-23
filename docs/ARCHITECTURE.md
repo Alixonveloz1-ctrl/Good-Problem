@@ -187,7 +187,9 @@ El Media Assembly Engine no es un servicio externo: es un componente de este
 sistema que corre en Google Cloud.
 
 - `assembly/ffmpeg_cmds.py`: funciones puras que devuelven líneas de comando, lo
-  que permite verificarlas sin FFmpeg instalado.
+  que permite verificarlas sin FFmpeg instalado. El montaje puede ir a corte
+  seco o con fundidos encadenados; cada fundido solapa dos planos, así que la
+  imagen sale más corta que la suma de los clips y el resultado dice cuánto.
 - `assembly/engine.py`: resuelve la línea de tiempo, calcula offsets y escribe
   la lista de montaje (EDL) en Storage; después codifica.
 - `assembly/job.py`: punto de entrada del Cloud Run Job.
@@ -199,7 +201,26 @@ es fingir que produjo un video.
 La versión 9:16 se deriva del master 16:9 por recorte central y escalado. No
 cuesta nada generarla.
 
-## 10. Content Studio
+## 10. Alargar una toma
+
+Veo genera 8 segundos y para. Para un plano continuo mas largo existe la
+extension: se le pasa el clip ya generado y continua 7 segundos mas, hasta unos
+148 s. `veo-3.1-lite` no la soporta.
+
+Tres limites de la API que conviene tener presentes, verificados en la
+documentacion de Google y no deducidos del PRD:
+
+- **la peticion no acepta imagenes de referencia.** Solo recibe el video
+  anterior y un texto, y deduce quien es el personaje del ultimo segundo de ese
+  clip. Si la toma termina sin verse la cara, Veo se la inventa;
+- **la salida es siempre 720p**, aunque el clip original sea 1080p o 4K. Por eso
+  `start_extension` fuerza esa resolucion en vez de repetir la del clip;
+- cada continuacion deja la escena **pendiente de aprobar otra vez**: dura mas y
+  llega con menos nitidez, asi que hay que volver a mirarla.
+
+La pantalla de la escena dice las tres cosas antes de que se pulse el boton.
+
+## 11. Content Studio
 
 Dos caminos distintos, porque cuestan cosas distintas:
 
@@ -215,7 +236,7 @@ Los tres trabajos que no llaman a ningún modelo —`assembly`, `cut` y `mix`—
 pasan por `submit_local`, que salta la resolución de modelo pero crea el mismo
 Job que ve el teléfono.
 
-## 11. Autenticación
+## 12. Autenticación
 
 Una sola persona usa esto, así que no hay registro, ni roles, ni recuperación de
 contraseña, ni pantalla de consentimiento OAuth: nada que obligue a sacar una
@@ -232,7 +253,7 @@ la sesión de Google del navegador en una petición autorizada. Es el único pun
 donde el PRD necesita un matiz: la idea de «solo IAM» es correcta, pero en la
 práctica se implementa con IAM *más* IAP.
 
-## 12. Almacenamiento
+## 13. Almacenamiento
 
 Firestore para documentos, Cloud Storage para binarios, ambos detrás de una
 interfaz pequeña (`db/client.py`, `providers/storage.py`) con una

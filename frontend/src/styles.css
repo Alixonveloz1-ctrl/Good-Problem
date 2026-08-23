@@ -225,6 +225,15 @@ select {
   font-size: 12px;
 }
 
+pre.block.wrap {
+  /* Un texto que hay que leer en voz alta no puede obligar a desplazar el
+     movil de lado para verlo entero. */
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: visible;
+  line-height: 1.7;
+}
+
 pre.block {
   margin: 0;
   padding: 12px;

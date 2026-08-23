@@ -18,6 +18,7 @@ export function ApprovalBar({
   onReject?: () => void
   extra?: ReactNode
 }) {
+  if (!onApprove && !onRegenerate && !onEdit && !onReject && !extra) return null
   return (
     <div className="approval">
       <div className="btn-grid">

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { api, newIdempotencyKey } from '../api/client'
 import { useAction, useResource } from '../hooks/useApi'
 import type { ContentPiece } from '../api/types'
@@ -26,6 +26,7 @@ export function ContentScreen() {
   const { data, loading, error, reload } = useResource<ContentPiece[]>(
     `/api/universes/${universeId}/content`,
   )
+  const voz = useResource<{ ready: boolean }>(`/api/universes/${universeId}/content/voice-clone`)
   const [creating, setCreating] = useState(false)
   const [kind, setKind] = useState('short')
   const [title, setTitle] = useState('')
@@ -69,6 +70,15 @@ export function ContentScreen() {
           entrevistas y anuncios necesitan material propio: imagen primero, despues Veo sin audio, y
           la voz de Chirp encima en el montaje. Todo respeta el Canon.
         </p>
+        {voz.data && !voz.data.ready && (
+          <div className="notice">
+            Este artista todavia no tiene voz. Sin ella, el boton «Voz de Chirp» no puede
+            funcionar.{' '}
+            <Link to={`/u/${universeId}/voz`} style={{ color: 'var(--accent)' }}>
+              Grabarla ahora
+            </Link>
+          </div>
+        )}
         <ModelPicker kind="image" value={imageModel} onChange={setImageModel} label="Modelo de imagen" />
         <ModelPicker kind="video" value={videoModel} onChange={setVideoModel} label="Modelo de video" />
 
@@ -155,7 +165,7 @@ export function ContentScreen() {
 
                 <button
                   className="btn small"
-                  disabled={action.busy || !piece.script}
+                  disabled={action.busy || !piece.script || voz.data?.ready === false}
                   onClick={() =>
                     run(() =>
                       api.post(`/api/universes/${universeId}/content/${piece.id}/voice`, {

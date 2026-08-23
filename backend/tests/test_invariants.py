@@ -120,8 +120,42 @@ def test_lite_cannot_extend_a_scene(registry):
             VertexClient("p", dry_run=True),
             registry.get("veo-3.1-lite"),
             prompt="more",
-            variant="1080p",
             video_uri="gs://bucket/clip.mp4",
+        )
+
+
+def test_an_extension_always_comes_back_at_720p(registry):
+    """Veo devuelve la extension a 720p aunque el clip original sea 1080p o 4K,
+    asi que la peticion no debe pedir otra cosa ni cobrarse como tal."""
+    client = VertexClient("p", dry_run=True)
+    veo.start_extension(
+        client, registry.get("veo-3.1"), prompt="sigue", video_uri="gs://b/clip.mp4"
+    )
+    parametros = client.calls.all()[-1].payload["parameters"]
+    assert parametros["resolution"] == "720p"
+    assert parametros["durationSeconds"] == 7
+    assert parametros["generateAudio"] is False
+
+
+def test_an_extension_carries_no_reference_images(registry):
+    """La API de extension solo acepta el video anterior y un texto. Si algun
+    dia se le colara una referencia, Veo la ignoraria en silencio."""
+    client = VertexClient("p", dry_run=True)
+    veo.start_extension(
+        client, registry.get("veo-3.1-fast"), prompt="sigue", video_uri="gs://b/clip.mp4"
+    )
+    instancia = client.calls.all()[-1].payload["instances"][0]
+    assert set(instancia) == {"prompt", "video"}
+
+
+def test_a_take_cannot_grow_past_the_limit(registry):
+    with pytest.raises(InvalidGenerationRequest):
+        veo.start_extension(
+            VertexClient("p", dry_run=True),
+            registry.get("veo-3.1"),
+            prompt="sigue",
+            video_uri="gs://b/clip.mp4",
+            current_seconds=145,
         )
 
 
@@ -250,3 +284,13 @@ def test_the_studio_keeps_no_budget(client):
     assert client.get("/api/budget").status_code == 404
     home = client.get("/api/home").json()
     assert "budget" not in home
+
+
+def test_la_ruta_de_voz_no_la_tapa_la_de_contenido(client, universe):
+    """FastAPI resuelve las rutas en orden. Si /voice-clone queda despues de
+    /{content_id}, la app pide la voz y recibe un 404 sin sentido."""
+    respuesta = client.get(f"/api/universes/{universe}/content/voice-clone")
+    assert respuesta.status_code == 200
+    cuerpo = respuesta.json()
+    assert cuerpo["ready"] is False
+    assert "consent" in cuerpo["consent_script"].lower()

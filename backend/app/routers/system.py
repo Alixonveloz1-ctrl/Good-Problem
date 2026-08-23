@@ -143,7 +143,3 @@ def media(path: str, studio: StudioDep):
         raise NotFound(f"No existe {path}")
     return FileResponse(full)
 
-
-@router.get("/media-url")
-def media_url(owner: OwnerDep, studio: StudioDep, path: str) -> dict[str, str]:
-    return {"url": studio.storage.signed_url(path)}
