@@ -186,24 +186,22 @@ def _song_info(song: dict[str, Any], universe: dict[str, Any]) -> str:
 
 
 def _maybe_zip(studio, universe_id: str, root: str, files: list[dict[str, Any]]) -> str | None:
-    total = 0
-    for entry in files:
-        try:
-            total += len(studio.storage.read_bytes(entry["source_path"]))
-        except (FileNotFoundError, OSError):
-            continue
-    if total > MAX_ZIP_BYTES:
-        logger.info("export_zip_skipped bytes=%s", total)
-        return None
+    """One archive to drop into Files, when the package is small enough to build
+    in memory. Each file is read once, and the moment the total goes over the
+    ceiling the archive is abandoned in favour of the per-file links."""
     buffer = io.BytesIO()
+    total = 0
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
         for entry in files:
             try:
-                archive.writestr(
-                    entry["package_path"], studio.storage.read_bytes(entry["source_path"])
-                )
+                data = studio.storage.read_bytes(entry["source_path"])
             except (FileNotFoundError, OSError):
                 continue
+            total += len(data)
+            if total > MAX_ZIP_BYTES:
+                logger.info("export_zip_skipped bytes=%s", total)
+                return None
+            archive.writestr(entry["package_path"], data)
     path = export_path(universe_id, f"{root.replace('/', '_')}.zip")
     studio.storage.write_bytes(path, buffer.getvalue(), "application/zip")
     return path

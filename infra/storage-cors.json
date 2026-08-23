@@ -1,0 +1,8 @@
+[
+  {
+    "origin": ["https://*.run.app"],
+    "method": ["GET", "HEAD"],
+    "responseHeader": ["Content-Type", "Content-Length", "Content-Range"],
+    "maxAgeSeconds": 3600
+  }
+]

@@ -1,0 +1,156 @@
+import { useState } from 'react'
+import { useParams } from 'react-router-dom'
+import { api, newIdempotencyKey } from '../api/client'
+import { useAction, useResource } from '../hooks/useApi'
+import type { ContentPiece } from '../api/types'
+import { JobWatcher } from '../components/JobWatcher'
+import { Card, Empty, ErrorNote, Field, Loading, Sheet, StatusBadge, TopBar } from '../components/ui'
+
+const KINDS = [
+  ['short', 'Short'],
+  ['reel', 'Reel'],
+  ['tiktok', 'TikTok'],
+  ['teaser', 'Teaser'],
+  ['bts', 'BTS'],
+  ['interview', 'Entrevista'],
+  ['announcement', 'Anuncio'],
+  ['lyric_clip', 'Lyric clip'],
+]
+
+export function ContentScreen() {
+  const { universeId = '' } = useParams()
+  const { data, loading, error, reload } = useResource<ContentPiece[]>(
+    `/api/universes/${universeId}/content`,
+  )
+  const [creating, setCreating] = useState(false)
+  const [kind, setKind] = useState('short')
+  const [title, setTitle] = useState('')
+  const [jobId, setJobId] = useState<string | null>(null)
+  const action = useAction()
+
+  const create = async () => {
+    const created = await action.run(() =>
+      api.post<ContentPiece>(`/api/universes/${universeId}/content`, { kind, title }),
+    )
+    if (created) {
+      setCreating(false)
+      setTitle('')
+      await reload()
+    }
+  }
+
+  const run = async (fn: () => Promise<{ id: string }>) => {
+    const job = await action.run(fn)
+    if (job) setJobId(job.id)
+  }
+
+  return (
+    <>
+      <TopBar
+        title="Contenido"
+        back
+        action={
+          <button className="btn small primary" onClick={() => setCreating(true)}>
+            Nuevo
+          </button>
+        }
+      />
+      <main className="screen">
+        {loading && !data && <Loading />}
+        <ErrorNote error={error ?? action.error} onDismiss={action.clearError} />
+        <p className="muted" style={{ margin: 0 }}>
+          El video se genera sin audio y la voz de Chirp se superpone en el montaje. Todo respeta el
+          Canon.
+        </p>
+
+        {data && data.length === 0 && (
+          <Empty title="Sin contenido" hint="Shorts, Reels, TikToks, BTS, entrevistas y teasers." />
+        )}
+
+        <div className="list">
+          {(data ?? []).map((piece) => (
+            <Card key={piece.id}>
+              <div className="row between">
+                <strong>{piece.title || piece.kind}</strong>
+                <StatusBadge status={piece.status} />
+              </div>
+              <span className="badge">{piece.kind}</span>
+              {piece.script && <p className="sub" style={{ whiteSpace: 'pre-wrap' }}>{piece.script}</p>}
+              {piece.voice_url && <audio controls preload="none" src={piece.voice_url} style={{ width: '100%' }} />}
+              <div className="btn-grid">
+                <button
+                  className="btn small"
+                  disabled={action.busy}
+                  onClick={() =>
+                    run(() =>
+                      api.post(`/api/universes/${universeId}/content/${piece.id}/script`, {
+                        idempotency_key: newIdempotencyKey('script'),
+                      }),
+                    )
+                  }
+                >
+                  Escribir guion
+                </button>
+                <button
+                  className="btn small"
+                  disabled={action.busy || !piece.script}
+                  onClick={() =>
+                    run(() =>
+                      api.post(`/api/universes/${universeId}/content/${piece.id}/voice`, {
+                        idempotency_key: newIdempotencyKey('voice'),
+                      }),
+                    )
+                  }
+                >
+                  Voz de Chirp
+                </button>
+                <button
+                  className="btn small ok"
+                  disabled={action.busy}
+                  onClick={async () => {
+                    await action.run(() =>
+                      api.post(`/api/universes/${universeId}/content/${piece.id}/approve`),
+                    )
+                    await reload()
+                  }}
+                >
+                  Aprobar
+                </button>
+              </div>
+            </Card>
+          ))}
+        </div>
+
+        {jobId && (
+          <JobWatcher
+            universeId={universeId}
+            jobId={jobId}
+            onReady={() => {
+              setJobId(null)
+              void reload()
+            }}
+          />
+        )}
+      </main>
+
+      {creating && (
+        <Sheet title="Nuevo contenido" onClose={() => setCreating(false)}>
+          <div className="field">
+            <label>Tipo</label>
+            <select value={kind} onChange={(event) => setKind(event.target.value)}>
+              {KINDS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Field label="Titulo" value={title} onChange={setTitle} />
+          <button className="btn primary block" onClick={create} disabled={action.busy}>
+            Crear
+          </button>
+        </Sheet>
+      )}
+    </>
+  )
+}

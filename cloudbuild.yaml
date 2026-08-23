@@ -1,0 +1,100 @@
+# GitHub -> Cloud Build -> Cloud Run (PRD 40).
+#
+# The trigger is connected to the repository through Google's own GitHub app,
+# Cloud Build runs as its own service account and a push to main deploys. No
+# service account key is generated, downloaded or stored anywhere.
+
+substitutions:
+  _SERVICE: aaus
+  _REGION: us-central1
+  _REPO: aaus
+  _RUNTIME_SA: aaus-run@${PROJECT_ID}.iam.gserviceaccount.com
+  _BUCKET: ${PROJECT_ID}-aaus
+  _OWNER_EMAIL: ''
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+images:
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${SHORT_SHA}
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}-assembly:${SHORT_SHA}
+
+steps:
+  - id: test
+    name: python:3.11-slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        pip install --no-cache-dir -r backend/requirements-dev.txt
+        cd backend && python -m pytest -q && ruff check app tests
+
+  - id: build-service
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${SHORT_SHA}
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:latest
+      - -f
+      - Dockerfile
+      - .
+
+  - id: build-assembly
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}-assembly:${SHORT_SHA}
+      - -f
+      - Dockerfile.assembly
+      - .
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        docker push ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${SHORT_SHA}
+        docker push ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:latest
+        docker push ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}-assembly:${SHORT_SHA}
+
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        gcloud run deploy ${_SERVICE} \
+          --image ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${SHORT_SHA} \
+          --region ${_REGION} \
+          --service-account ${_RUNTIME_SA} \
+          --no-allow-unauthenticated \
+          --ingress all \
+          --memory 2Gi \
+          --cpu 2 \
+          --timeout 900 \
+          --concurrency 20 \
+          --max-instances 4 \
+          --set-env-vars "AAUS_PROJECT_ID=${PROJECT_ID},AAUS_LOCATION=${_REGION},AAUS_BUCKET=${_BUCKET},AAUS_OWNER_EMAIL=${_OWNER_EMAIL},AAUS_DRY_RUN=false"
+
+  - id: deploy-assembly-job
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        gcloud run jobs deploy ${_SERVICE}-assembly \
+          --image ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}-assembly:${SHORT_SHA} \
+          --region ${_REGION} \
+          --service-account ${_RUNTIME_SA} \
+          --memory 4Gi \
+          --cpu 4 \
+          --task-timeout 3600 \
+          --max-retries 1 \
+          --set-env-vars "AAUS_PROJECT_ID=${PROJECT_ID},AAUS_LOCATION=${_REGION},AAUS_BUCKET=${_BUCKET},AAUS_DRY_RUN=false"
+
+timeout: 2400s

@@ -14,7 +14,15 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from ..db.repositories import IMAGES, SCENES, SONGS, VIDEO_PROJECTS, VIDEOS, Repository
+from ..db.repositories import (
+    IMAGES,
+    LOCATIONS,
+    SCENES,
+    SONGS,
+    VIDEO_PROJECTS,
+    VIDEOS,
+    Repository,
+)
 from ..domain.enums import CanonStatus, CreativeRole, StageKey, StageStatus, UserAction, VideoType
 from ..errors import Conflict, NotFound
 from ..ids import new_id
@@ -301,7 +309,7 @@ def propose_storyboard(
                 ],
                 "locations": [
                     {"name": loc.get("name"), "description": loc.get("description")}
-                    for loc in Repository(studio.db, universe_id, "locations").list(limit=50)
+                    for loc in Repository(studio.db, universe_id, LOCATIONS).list(limit=50)
                 ],
                 "wardrobe": [
                     {"name": o.get("name"), "description": o.get("description")}

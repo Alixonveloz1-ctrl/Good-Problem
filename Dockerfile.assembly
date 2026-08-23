@@ -1,0 +1,21 @@
+# Media Assembly Engine (PRD 29).
+#
+# A Cloud Run Job, not a request handler: a three minute render does not belong
+# in an HTTP request. Same code as the service, plus FFmpeg.
+
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY backend/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY backend/app ./app
+COPY backend/seed ./seed
+
+ENTRYPOINT ["python", "-m", "app.assembly.job"]

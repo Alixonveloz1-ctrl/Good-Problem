@@ -64,7 +64,9 @@ class BudgetService:
                 "total_usd": self.settings.credit_total_usd,
                 "spent_usd": 0.0,
                 "hard_stop_enabled": True,
-                "credit_started_on": self.settings.credit_started_on or None,
+                # No configured date means "the credit clock starts today".
+                # The owner corrects it in Ajustes with the real sign up date.
+                "credit_started_on": self.settings.credit_started_on or today().isoformat(),
                 "credit_total_usd": self.settings.credit_total_usd,
                 "credit_days": self.settings.credit_days,
             }

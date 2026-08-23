@@ -140,7 +140,7 @@ def _apply_director_result(
             "genre": data.get("genre") or data.get("proposed_genre", ""),
             "bpm": data.get("bpm") or data.get("proposed_bpm"),
             "mood": data.get("mood", ""),
-            "structure": data.get("structure") or data.get("structure", []),
+            "structure": data.get("structure") or [],
             "production": data.get("production") or data.get("proposed_production", ""),
             "interpretation": data.get("interpretation")
             or data.get("proposed_interpretation", ""),
@@ -281,6 +281,10 @@ def _apply_storyboard(
         scene_id = new_id("scene")
         index_to_id[index] = scene_id
         reuse_index = int(raw.get("reuses_scene_index", -1))
+        if reuse_index == index:
+            # A shot cannot reuse itself; that would leave the scene with no
+            # source clip at assembly time.
+            reuse_index = -1
         scene = scenes_repo.create(
             scene_id,
             {

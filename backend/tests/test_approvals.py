@@ -193,3 +193,23 @@ def _attach_clip(studio, universe, project_id, scene, clip_id):
         f"universes/{universe}/scenes/{scene['id']}",
         {"clip_id": clip_id, "clip_status": CanonStatus.APPROVED.value},
     )
+
+
+def test_a_scene_cannot_reuse_itself(studio, universe):
+    """The Director can emit a self reference; that would leave the scene with
+    no source clip at assembly time."""
+    from app.orchestrator.handlers import _apply_storyboard
+
+    project_id = "vp_self"
+    studio.db.set(
+        f"universes/{universe}/video_projects/{project_id}",
+        {"id": project_id, "universe_id": universe, "song_id": "song_s"},
+    )
+    _apply_storyboard(
+        studio,
+        universe,
+        project_id,
+        {"scenes": [{"index": 0, "action": "x", "reuses_scene_index": 0}]},
+    )
+    scenes = studio.db.list(f"universes/{universe}/scenes")
+    assert scenes[0]["reuses_scene_id"] is None

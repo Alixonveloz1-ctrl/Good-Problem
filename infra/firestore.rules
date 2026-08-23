@@ -1,0 +1,17 @@
+rules_version = '2';
+
+// The application is the only client of this database.
+//
+// It talks to Firestore with the Cloud Run service account, which is not
+// subject to these rules. Nothing else should ever reach the data: the app has
+// one user and no client side SDK, so every direct access is denied.
+//
+// If a future version ever adds a browser SDK, replace this with a rule keyed
+// on the owner's email rather than opening it up.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
