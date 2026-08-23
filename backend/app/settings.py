@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     """Cloud Tasks queue name. Empty runs jobs in-process, which is fine locally."""
     tasks_target_url: str = ""
     tasks_service_account: str = ""
+    iap_audience: str = ""
+    """Client ID de OAuth de IAP.
+
+    Cuando IAP esta delante del servicio, un token OIDC dirigido a la URL no
+    entra: IAP exige que el destinatario del token sea su propio client ID. Sin
+    esto, la cola de trabajos recibiria un 401 en cada intento.
+    """
 
     # --- Modes --------------------------------------------------------------
     dry_run: bool = True

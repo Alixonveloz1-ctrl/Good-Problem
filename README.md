@@ -132,8 +132,10 @@ de forma explícita.
 
 ## Despliegue
 
-[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) tiene el procedimiento completo,
-ejecutable desde Cloud Shell en la app de Google Cloud para iOS.
+**[`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md) es la guía paso a paso**, escrita
+para seguirla desde el iPhone sin tocar un ordenador.
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) es la versión técnica, con el detalle
+de roles, identidades y por qué cada cosa está donde está.
 
 ```bash
 bash infra/setup.sh MI-PROYECTO propietario@gmail.com us-central1

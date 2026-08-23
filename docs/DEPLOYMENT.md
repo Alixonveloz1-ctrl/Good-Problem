@@ -1,5 +1,8 @@
 # Despliegue
 
+Referencia técnica. Para seguir los pasos, usa
+**[DESPLIEGUE.md](DESPLIEGUE.md)**, que cuenta lo mismo sin tecnicismos.
+
 Todo desde el iPhone. Si algún paso necesita una computadora, está marcado y
 explicado por qué.
 
@@ -101,6 +104,29 @@ computadora.
 La aplicación comprueba además la cabecera `X-Goog-Authenticated-User-Email`
 contra `AAUS_OWNER_EMAIL` (`app/auth.py`). Es la segunda cerradura: si la
 petición llegó al contenedor, IAP ya respondió por ella.
+
+### La cola de trabajos también tiene que atravesar IAP
+
+Los trabajos largos no se ejecutan dentro de la petición: Cloud Tasks los empuja
+de vuelta a `POST /api/internal/jobs/run` del mismo servicio, y por eso una
+generación sobrevive a que se cierre Safari (PRD 37).
+
+Con IAP delante, esa petición de vuelta pasa por el mismo control. Un token OIDC
+dirigido a la URL del servicio **no entra**: IAP exige que el destinatario del
+token sea su propio Client ID de OAuth. Sin eso, cada trabajo encolado recibe un
+401 y la generación no arranca nunca, sin ningún error visible en la app.
+
+Por eso el despliegue necesita dos cosas que solo existen después de activar
+IAP:
+
+1. `AAUS_IAP_AUDIENCE` con el Client ID que IAP crea, pasado al activador de
+   Cloud Build como `_IAP_AUDIENCE`;
+2. el rol `roles/iap.httpsResourceAccessor` sobre la cuenta `aaus-tasks`, que
+   `infra/setup.sh` ya concede.
+
+Y `AAUS_TASKS_TARGET_URL` es la URL del propio servicio, que no existe hasta
+haberlo desplegado: el paso `conectar-cola` de `cloudbuild.yaml` la lee después
+del despliegue y actualiza el servicio con ella.
 
 ## 4. Instalar la PWA en el iPhone
 

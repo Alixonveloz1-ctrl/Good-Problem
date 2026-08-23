@@ -9,8 +9,11 @@ substitutions:
   _REGION: us-central1
   _REPO: aaus
   _RUNTIME_SA: aaus-run@${PROJECT_ID}.iam.gserviceaccount.com
+  _TASKS_SA: aaus-tasks@${PROJECT_ID}.iam.gserviceaccount.com
   _BUCKET: ${PROJECT_ID}-aaus
+  _QUEUE: aaus-generation
   _OWNER_EMAIL: ''
+  _IAP_AUDIENCE: ''
 
 options:
   logging: CLOUD_LOGGING_ONLY
@@ -76,10 +79,25 @@ steps:
           --ingress all \
           --memory 2Gi \
           --cpu 2 \
-          --timeout 900 \
+          --timeout 3600 \
           --concurrency 20 \
           --max-instances 4 \
           --set-env-vars "AAUS_PROJECT_ID=${PROJECT_ID},AAUS_LOCATION=${_REGION},AAUS_BUCKET=${_BUCKET},AAUS_OWNER_EMAIL=${_OWNER_EMAIL},AAUS_DRY_RUN=false"
+
+  # La cola necesita la URL del servicio, que no existe hasta que esta
+  # desplegado. Sin este paso los trabajos correrian en un hilo del propio
+  # proceso y un video a medias se perderia al apagarse la instancia (PRD 37).
+  - id: conectar-cola
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        URL=$(gcloud run services describe ${_SERVICE} --region ${_REGION} \
+          --format='value(status.url)')
+        echo "Servicio en $$URL"
+        gcloud run services update ${_SERVICE} --region ${_REGION} \
+          --update-env-vars "AAUS_TASKS_QUEUE=${_QUEUE},AAUS_TASKS_TARGET_URL=$$URL,AAUS_TASKS_SERVICE_ACCOUNT=${_TASKS_SA},AAUS_IAP_AUDIENCE=${_IAP_AUDIENCE}"
 
   - id: deploy-assembly-job
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim

@@ -249,3 +249,36 @@ def test_la_ruta_de_voz_no_la_tapa_la_de_contenido(client, universe):
     cuerpo = respuesta.json()
     assert cuerpo["ready"] is False
     assert "consent" in cuerpo["consent_script"].lower()
+
+
+def test_la_cola_de_trabajos_atraviesa_iap(settings, studio):
+    """PRD 37: los trabajos siguen en Google Cloud aunque se cierre el iPhone.
+
+    Eso solo se cumple si van por Cloud Tasks, y con IAP delante el token tiene
+    que ir dirigido a su client ID. Con la URL del servicio, IAP responde 401 y
+    la generacion nunca arranca.
+    """
+    from app.services.jobs import JobService
+
+    settings.tasks_queue = "aaus-generation"
+    settings.tasks_target_url = "https://aaus-abc.a.run.app"
+    settings.tasks_service_account = "aaus-tasks@proyecto.iam.gserviceaccount.com"
+    settings.iap_audience = "1234-abc.apps.googleusercontent.com"
+
+    tarea = JobService(studio.db, settings).build_task("uni_1", "job_1", "POST")
+    peticion = tarea["http_request"]
+
+    assert peticion["url"] == "https://aaus-abc.a.run.app/api/internal/jobs/run"
+    assert peticion["oidc_token"]["audience"] == "1234-abc.apps.googleusercontent.com"
+    assert peticion["oidc_token"]["service_account_email"].startswith("aaus-tasks@")
+
+
+def test_sin_iap_el_token_va_dirigido_a_la_url(settings, studio):
+    from app.services.jobs import JobService
+
+    settings.tasks_target_url = "https://aaus-abc.a.run.app"
+    settings.tasks_service_account = "aaus-tasks@proyecto.iam.gserviceaccount.com"
+    settings.iap_audience = ""
+
+    tarea = JobService(studio.db, settings).build_task("uni_1", "job_1", "POST")
+    assert "audience" not in tarea["http_request"]["oidc_token"]

@@ -163,6 +163,32 @@ class JobService:
             return
         self._run_inline(universe_id, job_id)
 
+    def build_task(self, universe_id: str, job_id: str, http_method: Any) -> dict[str, Any]:
+        """La tarea que se le entrega a Cloud Tasks.
+
+        Separada de la llamada para poder comprobarla sin red: es el punto donde
+        un detalle mal puesto deja los trabajos sin ejecutarse.
+        """
+        task: dict[str, Any] = {
+            "http_request": {
+                "http_method": http_method,
+                "url": f"{self.settings.tasks_target_url.rstrip('/')}/api/internal/jobs/run",
+                "headers": {"Content-Type": "application/json"},
+                "body": json.dumps({"universe_id": universe_id, "job_id": job_id}).encode(),
+            }
+        }
+        if self.settings.tasks_service_account:
+            oidc: dict[str, Any] = {
+                "service_account_email": self.settings.tasks_service_account
+            }
+            if self.settings.iap_audience:
+                # Con IAP delante, el destinatario del token es su client ID y no
+                # la URL del servicio. Sin esto la cola recibe un 401 y el job
+                # nunca llega a ejecutarse.
+                oidc["audience"] = self.settings.iap_audience
+            task["http_request"]["oidc_token"] = oidc
+        return task
+
     def _enqueue_cloud_task(self, universe_id: str, job_id: str) -> None:
         from google.cloud import tasks_v2
 
@@ -170,18 +196,7 @@ class JobService:
         parent = client.queue_path(
             self.settings.project_id, self.settings.location, self.settings.tasks_queue
         )
-        task: dict[str, Any] = {
-            "http_request": {
-                "http_method": tasks_v2.HttpMethod.POST,
-                "url": f"{self.settings.tasks_target_url.rstrip('/')}/api/internal/jobs/run",
-                "headers": {"Content-Type": "application/json"},
-                "body": json.dumps({"universe_id": universe_id, "job_id": job_id}).encode(),
-            }
-        }
-        if self.settings.tasks_service_account:
-            task["http_request"]["oidc_token"] = {
-                "service_account_email": self.settings.tasks_service_account
-            }
+        task = self.build_task(universe_id, job_id, tasks_v2.HttpMethod.POST)
         client.create_task(request={"parent": parent, "task": task})
         logger.info("job_enqueued %s %s", universe_id, job_id)
 

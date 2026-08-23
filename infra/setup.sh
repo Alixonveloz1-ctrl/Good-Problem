@@ -76,6 +76,11 @@ gcloud iam service-accounts create aaus-tasks \
   --display-name="AI Artist Universe Studio queue" 2>/dev/null || true
 gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
   --member="serviceAccount:${TASKS_SA}" --role=roles/run.invoker --condition=None >/dev/null
+# Con IAP delante, la cola tambien tiene que poder atravesarlo: si no, cada
+# trabajo encolado recibe un 401 y nunca llega a ejecutarse.
+gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+  --member="serviceAccount:${TASKS_SA}" \
+  --role=roles/iap.httpsResourceAccessor --condition=None >/dev/null
 gcloud tasks queues create aaus-generation --location="${REGION}" 2>/dev/null || true
 # Video generation is slow and expensive: one at a time, and never a silent
 # retry storm that would bill twice.
@@ -125,7 +130,12 @@ Listo. Queda por hacer, una sola vez y desde el movil:
      una vez desplegado. IAP es lo que deja entrar desde Safari sin construir
      login dentro de la app.
 
-  3. Revisar el budget alert en la consola de facturacion. La aplicacion no
+  3. Copiar el Client ID de OAuth que IAP crea al activarse y anadirlo al
+     disparador como _IAP_AUDIENCE, y volver a lanzar el despliegue. Sin ese
+     dato la cola de trabajos recibe un 401 en cada intento y las generaciones
+     no arrancan.
+
+  4. Revisar el budget alert en la consola de facturacion. La aplicacion no
      controla el gasto: se mira aqui.
 
 Para un despliegue puntual sin GitHub:
