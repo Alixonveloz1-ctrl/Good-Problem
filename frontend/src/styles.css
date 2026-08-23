@@ -6,6 +6,10 @@
  */
 
 :root {
+  /* Native controls — audio and video players, form fields, scrollbars — follow
+     this. Without it the built-in media player renders white on a dark page. */
+  color-scheme: dark;
+
   --bg: #0b0b10;
   --bg-raised: #14141d;
   --bg-sunken: #08080c;
@@ -562,6 +566,16 @@ pre.block {
 }
 
 /* --- Media -------------------------------------------------------------- */
+
+audio {
+  width: 100%;
+  height: 40px;
+}
+
+video {
+  width: 100%;
+  background: #000;
+}
 
 .media {
   width: 100%;

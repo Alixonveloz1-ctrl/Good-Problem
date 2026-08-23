@@ -414,7 +414,11 @@ class ContentPiece(Entity):
     song_id: str | None = None
     project_id: str | None = None
     script: str = ""
+    spoken_text: str = ""
+    video_prompt: str = ""
     spoken_audio_path: str | None = None
+    source_image_path: str | None = None
+    """The still the clip is generated from, kept apart from the finished video."""
     storage_path: str | None = None
     aspect_ratio: AspectRatio = AspectRatio.VERTICAL
     source_clip_ids: list[str] = Field(default_factory=list)

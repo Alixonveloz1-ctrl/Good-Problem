@@ -215,3 +215,41 @@ def _seed_storyboard(studio, uid, pid, character_id, location_id, outfit_id):
             ],
         },
     )
+
+
+def test_content_studio_makes_a_bts_clip(client, studio):
+    """PRD 33-35: the picture is generated without audio and the cloned voice is
+    laid over it afterwards."""
+    uid = client.post("/api/universes", json={"name": "Nova"}).json()["id"]
+    piece = _run(client, studio, "post", f"/api/universes/{uid}/content",
+                 json={"kind": "bts", "bts_kind": "recording_session", "title": "En el estudio"})
+    cid = piece["id"]
+
+    _run(client, studio, "post", f"/api/universes/{uid}/content/{cid}/script", json={})
+    _run(client, studio, "post", f"/api/universes/{uid}/content/{cid}/still",
+         json={"prompt": "Nova at the mixing desk", "model": "gemini-3.1-flash-image"})
+
+    clip = _run(client, studio, "post", f"/api/universes/{uid}/content/{cid}/clip",
+                json={"model": "veo-3.1-lite", "variant": "720p"})
+    assert clip["result"]["generate_audio"] is False
+    assert clip["model"] == "veo-3.1-lite"
+
+    _run(client, studio, "post", f"/api/universes/{uid}/content/{cid}/voice",
+         json={"text": "Llevamos tres dias con esta cancion."})
+
+    mixed = _run(client, studio, "post", f"/api/universes/{uid}/content/{cid}/mix", json={})
+    assert mixed["result"]["voice"], "la voz entra en la mezcla"
+    assert mixed["actual_cost_usd"] == 0.0, "la mezcla no llama a ningun modelo"
+
+    for call in studio.calls.for_model_prefix("veo"):
+        if call.method == "predictLongRunning":
+            assert call.payload["parameters"]["generateAudio"] is False
+
+
+def test_a_clip_needs_an_image_first(client, studio):
+    uid = client.post("/api/universes", json={"name": "Nova"}).json()["id"]
+    piece = client.post(f"/api/universes/{uid}/content",
+                        json={"kind": "interview", "title": "Sin imagen"}).json()
+    response = client.post(f"/api/universes/{uid}/content/{piece['id']}/clip", json={})
+    assert response.status_code == 409
+    assert "imagen" in response.json()["error"]["message"]

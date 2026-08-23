@@ -4,7 +4,11 @@ import { api, newIdempotencyKey } from '../api/client'
 import { useAction, useResource } from '../hooks/useApi'
 import type { ContentPiece } from '../api/types'
 import { JobWatcher } from '../components/JobWatcher'
+import { ModelPicker, type ModelChoice } from '../components/ModelPicker'
 import { Card, Empty, ErrorNote, Field, Loading, Sheet, StatusBadge, TopBar } from '../components/ui'
+
+/** Pieces cut out of an approved master cost nothing; the rest need footage. */
+const DERIVED_KINDS = new Set(['short', 'reel', 'tiktok', 'teaser', 'lyric_clip'])
 
 const KINDS = [
   ['short', 'Short'],
@@ -26,6 +30,8 @@ export function ContentScreen() {
   const [kind, setKind] = useState('short')
   const [title, setTitle] = useState('')
   const [jobId, setJobId] = useState<string | null>(null)
+  const [imageModel, setImageModel] = useState<ModelChoice | null>(null)
+  const [videoModel, setVideoModel] = useState<ModelChoice | null>(null)
   const action = useAction()
 
   const create = async () => {
@@ -59,9 +65,12 @@ export function ContentScreen() {
         {loading && !data && <Loading />}
         <ErrorNote error={error ?? action.error} onDismiss={action.clearError} />
         <p className="muted" style={{ margin: 0 }}>
-          El video se genera sin audio y la voz de Chirp se superpone en el montaje. Todo respeta el
-          Canon.
+          Shorts, Reels y TikToks se recortan del master aprobado y no cuestan nada. BTS,
+          entrevistas y anuncios necesitan material propio: imagen primero, despues Veo sin audio, y
+          la voz de Chirp encima en el montaje. Todo respeta el Canon.
         </p>
+        <ModelPicker kind="image" value={imageModel} onChange={setImageModel} label="Modelo de imagen" />
+        <ModelPicker kind="video" value={videoModel} onChange={setVideoModel} label="Modelo de video" />
 
         {data && data.length === 0 && (
           <Empty title="Sin contenido" hint="Shorts, Reels, TikToks, BTS, entrevistas y teasers." />
@@ -77,6 +86,7 @@ export function ContentScreen() {
               <span className="badge">{piece.kind}</span>
               {piece.script && <p className="sub" style={{ whiteSpace: 'pre-wrap' }}>{piece.script}</p>}
               {piece.voice_url && <audio controls preload="none" src={piece.voice_url} style={{ width: '100%' }} />}
+              {piece.url && <video className="media" controls preload="none" src={piece.url} />}
               <div className="btn-grid">
                 <button
                   className="btn small"
@@ -91,6 +101,58 @@ export function ContentScreen() {
                 >
                   Escribir guion
                 </button>
+
+                {DERIVED_KINDS.has(piece.kind) ? (
+                  <button
+                    className="btn small"
+                    disabled={action.busy}
+                    onClick={() =>
+                      run(() =>
+                        api.post(`/api/universes/${universeId}/content/${piece.id}/cut`, {
+                          start: 0,
+                          duration: 15,
+                          idempotency_key: newIdempotencyKey('cut'),
+                        }),
+                      )
+                    }
+                  >
+                    Recortar del master · gratis
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      className="btn small"
+                      disabled={action.busy}
+                      onClick={() =>
+                        run(() =>
+                          api.post(`/api/universes/${universeId}/content/${piece.id}/still`, {
+                            model: imageModel?.model,
+                            variant: imageModel?.variant,
+                            idempotency_key: newIdempotencyKey('still'),
+                          }),
+                        )
+                      }
+                    >
+                      Generar imagen
+                    </button>
+                    <button
+                      className="btn small"
+                      disabled={action.busy}
+                      onClick={() =>
+                        run(() =>
+                          api.post(`/api/universes/${universeId}/content/${piece.id}/clip`, {
+                            model: videoModel?.model,
+                            variant: videoModel?.variant,
+                            idempotency_key: newIdempotencyKey('cclip'),
+                          }),
+                        )
+                      }
+                    >
+                      Generar video
+                    </button>
+                  </>
+                )}
+
                 <button
                   className="btn small"
                   disabled={action.busy || !piece.script}
@@ -103,6 +165,19 @@ export function ContentScreen() {
                   }
                 >
                   Voz de Chirp
+                </button>
+                <button
+                  className="btn small"
+                  disabled={action.busy || !piece.voice_url || !piece.url}
+                  onClick={() =>
+                    run(() =>
+                      api.post(`/api/universes/${universeId}/content/${piece.id}/mix`, {
+                        idempotency_key: newIdempotencyKey('mix'),
+                      }),
+                    )
+                  }
+                >
+                  Montar voz sobre el video
                 </button>
                 <button
                   className="btn small ok"

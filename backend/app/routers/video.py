@@ -575,7 +575,7 @@ def assemble(
     owner: OwnerDep, studio: StudioDep, universe_id: str, project_id: str, body: AssembleIn
 ) -> dict[str, Any]:
     rules.assert_ready_for_assembly(studio.db, universe_id, project_id)
-    return studio.orchestrator.submit_assembly(
+    return studio.orchestrator.submit_local(
         GenerationRequest(
             universe_id=universe_id,
             kind="assembly",

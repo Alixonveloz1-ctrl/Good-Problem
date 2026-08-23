@@ -28,7 +28,7 @@ from ..clock import now_iso
 from ..db.repositories import SCENES, SONGS, VIDEO_PROJECTS, VIDEOS, Repository
 from ..domain.enums import CanonStatus
 from ..errors import Conflict, DomainError
-from ..providers.storage import project_path
+from ..providers.storage import content_path, project_path
 from ..services import approvals
 from . import ffmpeg_cmds as cmds
 
@@ -281,3 +281,66 @@ def cut_short(
         studio.storage.write_bytes(path, out.read_bytes(), "video/mp4")
     return {"rendered": True, "storage_path": path}
 
+
+
+def mix_content(studio, universe_id: str, content_id: str) -> dict[str, Any]:
+    """Lay the cloned Chirp voice over footage generated without audio.
+
+    This is what makes a BTS clip or an interview work: Veo produced the picture
+    silently, Chirp produced the voice, and the edit puts them together
+    (PRD 29, 34, 35).
+    """
+    from ..db.repositories import CONTENT
+
+    repo = Repository(studio.db, universe_id, CONTENT)
+    piece = repo.require(content_id)
+    video_path = piece.get("storage_path")
+    voice_path = piece.get("spoken_audio_path")
+    if not video_path:
+        raise Conflict("Esta pieza no tiene video sobre el que superponer la voz.")
+    if not voice_path:
+        raise Conflict("Esta pieza no tiene voz de Chirp. Generala antes de mezclar.")
+
+    music_path = _bed_music_path(studio, universe_id, piece)
+
+    if studio.settings.dry_run or not ffmpeg_available():
+        return {
+            "rendered": False,
+            "reason": "dry_run" if studio.settings.dry_run else "ffmpeg_no_disponible",
+            "video": video_path,
+            "voice": voice_path,
+            "music_bed": music_path,
+        }
+
+    with tempfile.TemporaryDirectory(prefix="aaus-mix-") as tmp:
+        work = Path(tmp)
+        video = work / "picture.mp4"
+        video.write_bytes(studio.storage.read_bytes(video_path))
+        voice = work / "voice.wav"
+        voice.write_bytes(studio.storage.read_bytes(voice_path))
+        out = work / "mixed.mp4"
+
+        if music_path:
+            music = work / "bed"
+            music.write_bytes(studio.storage.read_bytes(music_path))
+            _run(cmds.overlay_voice(str(video), str(music), str(voice), str(out)), cwd=work)
+        else:
+            _run(
+                cmds.mux_audio(str(video), str(voice), str(out), cmds.VERTICAL_1080),
+                cwd=work,
+            )
+
+        path = content_path(universe_id, f"{content_id}_final.mp4")
+        studio.storage.write_bytes(path, out.read_bytes(), "video/mp4")
+
+    repo.update(content_id, {"storage_path": path})
+    return {"rendered": True, "storage_path": path, "music_bed": music_path}
+
+
+def _bed_music_path(studio, universe_id: str, piece: dict[str, Any]) -> str | None:
+    """The approved master, quiet under the voice, when the piece belongs to a
+    song."""
+    if not piece.get("song_id"):
+        return None
+    song = Repository(studio.db, universe_id, SONGS).get(piece["song_id"])
+    return (song or {}).get("approved_master_path")

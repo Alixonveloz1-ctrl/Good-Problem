@@ -18,7 +18,7 @@ from ..errors import Conflict
 from ..ids import new_id
 from ..orchestrator.orchestrator import GenerationRequest
 from ..services.approvals import ApprovalService
-from ..services.context import load_bible
+from ..services.context import load_bible, load_scene_context
 from .deps import OwnerDep, StudioDep
 
 router = APIRouter(prefix="/api/universes/{universe_id}/content", tags=["content"])
@@ -143,6 +143,145 @@ def synthesize_voice(
             payload={"text": text, "language_code": body.language_code},
         )
     )
+
+
+class StillIn(BaseModel):
+    prompt: str | None = None
+    model: str | None = None
+    variant: str | None = None
+    idempotency_key: str | None = None
+
+
+class ClipIn(BaseModel):
+    prompt: str | None = None
+    model: str | None = None
+    variant: str | None = None
+    duration_seconds: int | None = None
+    idempotency_key: str | None = None
+
+
+class CutIn(BaseModel):
+    project_id: str | None = None
+    start: float = 0.0
+    duration: float = 15.0
+    idempotency_key: str | None = None
+
+
+@router.post("/{content_id}/still")
+def generate_still(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, content_id: str, body: StillIn
+) -> dict[str, Any]:
+    """The image the clip will be generated from. Same rule as a scene: nothing
+    reaches Veo without an image first (PRD 24)."""
+    row = _repo(studio, universe_id).require(content_id)
+    prompt = body.prompt or row.get("video_prompt") or row.get("script", "")[:500]
+    if not prompt.strip():
+        raise Conflict("No hay prompt. Pide el guion al Director o escribe uno.")
+    context = load_scene_context(
+        studio.db,
+        universe_id,
+        character_ids=[c["id"] for c in _lead_characters(studio, universe_id)],
+        location_id=None,
+        wardrobe_ids=[],
+    )
+    return studio.orchestrator.submit(
+        GenerationRequest(
+            universe_id=universe_id,
+            kind="image",
+            target_type="content",
+            target_id=content_id,
+            model=body.model,
+            variant=body.variant,
+            idempotency_key=body.idempotency_key,
+            payload={
+                "purpose": "content",
+                "prompt": prompt,
+                "aspect_ratio": row.get("aspect_ratio", "9:16"),
+                "reference_paths": context.reference_paths,
+            },
+        )
+    )
+
+
+@router.post("/{content_id}/clip")
+def generate_clip(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, content_id: str, body: ClipIn
+) -> dict[str, Any]:
+    """Veo, without audio as always. The voice goes on afterwards."""
+    row = _repo(studio, universe_id).require(content_id)
+    if not row.get("source_image_path"):
+        raise Conflict("Genera primero la imagen de esta pieza.")
+    return studio.orchestrator.submit(
+        GenerationRequest(
+            universe_id=universe_id,
+            kind="video",
+            target_type="content",
+            target_id=content_id,
+            model=body.model,
+            variant=body.variant,
+            idempotency_key=body.idempotency_key,
+            payload={
+                "prompt": body.prompt,
+                "aspect_ratio": row.get("aspect_ratio", "9:16"),
+                "duration_seconds": body.duration_seconds,
+            },
+        )
+    )
+
+
+@router.post("/{content_id}/cut")
+def cut_from_master(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, content_id: str, body: CutIn
+) -> dict[str, Any]:
+    """Shorts, Reels and TikToks come out of the approved master by reframing,
+    so they cost nothing to generate (PRD 32, 33)."""
+    _repo(studio, universe_id).require(content_id)
+    return studio.orchestrator.submit_local(
+        GenerationRequest(
+            universe_id=universe_id,
+            kind="cut",
+            target_type="content",
+            target_id=content_id,
+            idempotency_key=body.idempotency_key,
+            payload={
+                "project_id": body.project_id,
+                "start": body.start,
+                "duration": body.duration,
+            },
+        )
+    )
+
+
+@router.post("/{content_id}/mix")
+def mix_voice(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, content_id: str,
+    body: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Lay the Chirp voice over the silent footage (PRD 29, 34, 35)."""
+    row = _repo(studio, universe_id).require(content_id)
+    if not row.get("storage_path"):
+        raise Conflict("Esta pieza todavia no tiene video.")
+    if not row.get("spoken_audio_path"):
+        raise Conflict("Genera la voz de Chirp antes de mezclar.")
+    return studio.orchestrator.submit_local(
+        GenerationRequest(
+            universe_id=universe_id,
+            kind="mix",
+            target_type="content",
+            target_id=content_id,
+            idempotency_key=(body or {}).get("idempotency_key"),
+        )
+    )
+
+
+def _lead_characters(studio, universe_id: str) -> list[dict[str, Any]]:
+    """The artist travels with every piece of content about the artist."""
+    from ..db.repositories import CHARACTERS
+
+    rows = Repository(studio.db, universe_id, CHARACTERS).list(limit=50)
+    approved = [r for r in rows if r.get("status") == CanonStatus.APPROVED.value]
+    leads = [r for r in approved if r.get("role") == "lead"]
+    return leads or approved[:1]
 
 
 @router.post("/{content_id}/approve")

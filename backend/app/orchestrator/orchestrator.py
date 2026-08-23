@@ -91,6 +91,9 @@ class ResolvedModel:
     """Where the choice came from: 'user', 'bible' or 'registry'."""
 
 
+LOCAL_KINDS: frozenset[str] = frozenset({"assembly", "mix", "cut"})
+"""Kinds handled by our own FFmpeg component rather than by a model."""
+
 _KIND_TO_MODEL_KIND: dict[str, ModelKind] = {
     "text": ModelKind.TEXT,
     "image": ModelKind.IMAGE,
@@ -114,8 +117,8 @@ class Orchestrator:
     # -- 8. model resolution ----------------------------------------------
     def resolve_model(self, request: GenerationRequest) -> ResolvedModel:
         registry = self.studio.registry
-        if request.kind == "assembly":
-            raise InvalidGenerationRequest("El ensamblaje no usa un modelo generativo.")
+        if request.kind in LOCAL_KINDS:
+            raise InvalidGenerationRequest(f"'{request.kind}' no usa un modelo generativo.")
         model_kind = _KIND_TO_MODEL_KIND.get(request.kind)
         if model_kind is None:
             raise InvalidGenerationRequest(f"Tipo de generacion desconocido: '{request.kind}'.")
@@ -215,9 +218,13 @@ class Orchestrator:
         self.studio.jobs.enqueue(request.universe_id, job["id"])
         return job
 
-    def submit_assembly(self, request: GenerationRequest) -> dict[str, Any]:
-        """Assembly runs our own FFmpeg component, not a generative model, so it
-        skips model resolution but still gets a Job and a cost row (PRD 29)."""
+    def submit_local(self, request: GenerationRequest) -> dict[str, Any]:
+        """Work our own FFmpeg component does: assembling a video, cutting a
+        Short out of an approved master, laying the Chirp voice over silent
+        footage. No generative model, so no model resolution and no generation
+        cost, but still a Job the phone can watch (PRD 29, 32, 33)."""
+        if request.kind not in LOCAL_KINDS:
+            raise InvalidGenerationRequest(f"'{request.kind}' no es un trabajo local.")
         self.require_universe(request.universe_id)
         if request.idempotency_key:
             existing = self.studio.idempotency.lookup(
@@ -227,7 +234,7 @@ class Orchestrator:
                 return self.studio.jobs.get(request.universe_id, existing)
         job = self.studio.jobs.create(
             request.universe_id,
-            kind="assembly",
+            kind=request.kind,
             model="ffmpeg",
             variant="cloud-run-job",
             target_type=request.target_type,

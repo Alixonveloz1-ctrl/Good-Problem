@@ -469,9 +469,11 @@ def _store_image(studio, universe_id, job, purpose, payload, result, reference_p
         return stored, {"id": None}
 
     if purpose == "content":
-        path = content_path(universe_id, f"{target_id}.{suffix}")
+        path = content_path(universe_id, f"{target_id}_still.{suffix}")
         stored = studio.storage.write_bytes(path, result.data, result.mime_type)
-        _repo(studio, universe_id, CONTENT).update(target_id, {"storage_path": stored.path})
+        _repo(studio, universe_id, CONTENT).update(
+            target_id, {"source_image_path": stored.path}
+        )
         return stored, {"id": target_id}
 
     if purpose == "cover":
@@ -587,6 +589,8 @@ def _compose_music_prompt(song: dict[str, Any], voice_lines: list[str], payload)
 
 
 def handle_video(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
+    if job.get("target_type") == "content":
+        return _handle_content_video(studio, universe_id, job)
     payload = _payload(job)
     scene_id = job.get("target_id") or ""
     scenes = _repo(studio, universe_id, SCENES)
@@ -696,6 +700,76 @@ def handle_video(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
     )
 
 
+def _handle_content_video(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
+    """Footage for a BTS clip, an interview or an announcement.
+
+    Same rules as a scene: a still first, then Veo, always without audio. The
+    voice is laid over it afterwards (PRD 34, 35).
+    """
+    payload = _payload(job)
+    content_id = job.get("target_id") or ""
+    repo = _repo(studio, universe_id, CONTENT)
+    piece = repo.require(content_id)
+
+    still_path = piece.get("source_image_path")
+    if not still_path:
+        raise Conflict(
+            "Genera primero la imagen de esta pieza. El video parte siempre de una imagen."
+        )
+
+    spec = studio.registry.require_active(job["model"], "video")
+    variant = job.get("variant") or spec.default_variant
+    aspect_ratio = payload.get("aspect_ratio") or piece.get("aspect_ratio", "9:16")
+    duration = resolve_clip_duration(
+        payload.get("duration_seconds"), resolution=variant, reference_image_count=1
+    )
+    prompt = payload.get("prompt") or piece.get("video_prompt") or piece.get("script", "")[:500]
+
+    operation = veo.start_generation(
+        studio.vertex,
+        spec,
+        prompt=prompt,
+        variant=variant,
+        source_image=veo.SourceImage(data=studio.storage.read_bytes(still_path)),
+        duration_seconds=duration,
+        aspect_ratio=aspect_ratio,
+    )
+    video = _await_video(studio, operation)
+    data = video.data if video and video.data else _placeholder_clip(spec.id, duration)
+    stored = studio.storage.write_bytes(
+        content_path(universe_id, f"{content_id}.mp4"), data, "video/mp4"
+    )
+    cost = price_video(studio.registry, spec.id, variant, seconds=duration, clips=1)
+    repo.update(
+        content_id,
+        {
+            "storage_path": stored.path,
+            "cost_usd": round(float(piece.get("cost_usd", 0.0)) + cost.amount_usd, 4),
+            "provenance": {
+                "parent_id": content_id,
+                "model": spec.id,
+                "variant": variant,
+                "prompt": prompt,
+                "parameters": operation.parameters,
+                "timestamp": now_iso(),
+                "cost_usd": round(cost.amount_usd, 4),
+            },
+        },
+    )
+    return Outcome(
+        result={
+            "content_id": content_id,
+            "storage_path": stored.path,
+            "url": studio.storage.signed_url(stored.path),
+            "duration_seconds": duration,
+            "model": spec.id,
+            "variant": variant,
+            "generate_audio": False,
+        },
+        cost=cost,
+    )
+
+
 def _scene_prompt(scene: dict[str, Any]) -> str:
     bits = [
         scene.get("action", ""),
@@ -788,6 +862,41 @@ def handle_assembly(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
     return Outcome(result=result, cost=None)
 
 
+def handle_cut(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
+    """A Short, Reel or TikTok taken out of the approved master. Derived, so it
+    costs nothing to generate (PRD 32, 33)."""
+    from ..assembly.engine import cut_short
+
+    payload = _payload(job)
+    content_id = job.get("target_id") or ""
+    repo = _repo(studio, universe_id, CONTENT)
+    piece = repo.require(content_id)
+    project_id = payload.get("project_id") or piece.get("project_id")
+    if not project_id:
+        raise Conflict("Esta pieza no esta asociada a ningun videoclip del que recortar.")
+
+    vertical = piece.get("aspect_ratio", "9:16") == "9:16"
+    result = cut_short(
+        studio,
+        universe_id,
+        project_id,
+        start=float(payload.get("start", 0.0)),
+        duration=float(payload.get("duration", 15.0)),
+        vertical=vertical,
+        name=f"{content_id}.mp4",
+    )
+    if result.get("storage_path"):
+        repo.update(content_id, {"storage_path": result["storage_path"]})
+    return Outcome(result=result, cost=None)
+
+
+def handle_mix(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
+    """Chirp voice over footage generated without audio (PRD 34, 35)."""
+    from ..assembly.engine import mix_content
+
+    return Outcome(result=mix_content(studio, universe_id, job.get("target_id") or ""), cost=None)
+
+
 HANDLERS: dict[str, Callable[..., Outcome]] = {
     "text": handle_text,
     "image": handle_image,
@@ -795,4 +904,6 @@ HANDLERS: dict[str, Callable[..., Outcome]] = {
     "video": handle_video,
     "speech": handle_speech,
     "assembly": handle_assembly,
+    "cut": handle_cut,
+    "mix": handle_mix,
 }

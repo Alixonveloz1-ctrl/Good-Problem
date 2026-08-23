@@ -187,7 +187,23 @@ es fingir que produjo un video.
 La versión 9:16 se deriva del master 16:9 por recorte central y escalado. No
 cuesta nada generarla.
 
-## 10. Autenticación
+## 10. Content Studio
+
+Dos caminos distintos, porque cuestan cosas distintas:
+
+- **Shorts, Reels, TikToks, teasers y lyric clips** se recortan del master
+  aprobado (`engine.cut_short`). No hay generación, así que no hay costo.
+- **BTS, entrevistas y anuncios** necesitan material propio y siguen la misma
+  regla que una escena: imagen primero, después Veo sin audio
+  (`_handle_content_video`), y por último la voz de Chirp encima
+  (`engine.mix_content`). Cuando la pieza pertenece a una canción, el master
+  aprobado entra como cama de música por debajo de la voz.
+
+Los tres trabajos que no llaman a ningún modelo —`assembly`, `cut` y `mix`—
+pasan por `submit_local`, que salta la resolución de modelo pero crea el mismo
+Job que ve el teléfono.
+
+## 11. Autenticación
 
 Una sola persona usa esto, así que no hay registro, ni roles, ni recuperación de
 contraseña, ni pantalla de consentimiento OAuth: nada que obligue a sacar una
@@ -204,7 +220,7 @@ la sesión de Google del navegador en una petición autorizada. Es el único pun
 donde el PRD necesita un matiz: la idea de «solo IAM» es correcta, pero en la
 práctica se implementa con IAM *más* IAP.
 
-## 11. Almacenamiento
+## 12. Almacenamiento
 
 Firestore para documentos, Cloud Storage para binarios, ambos detrás de una
 interfaz pequeña (`db/client.py`, `providers/storage.py`) con una
