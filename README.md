@@ -60,7 +60,7 @@ gasto dentro de la app, la cuenta atrás de los 90 días del crédito y un corte
 automático al llegar al presupuesto. Nada de eso existe: el estudio no lleva
 cuentas ni frena ninguna generación. El gasto se consulta en la consola de
 Google Cloud, y los avisos de presupuesto se configuran allí
-(`infra/setup.sh` los deja creados).
+(los avisos de presupuesto se configuran en la consola de facturación).
 
 Lo que sí queda es lo que cuesta cada cosa **antes** de lanzarla: el precio de
 cada opción en el selector de modelo y la estimación del Production Plan. Y cada
@@ -132,14 +132,21 @@ de forma explícita.
 
 ## Despliegue
 
-**[`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md) es la guía paso a paso**, escrita
-para seguirla desde el iPhone sin tocar un ordenador.
-[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) es la versión técnica, con el detalle
-de roles, identidades y por qué cada cosa está donde está.
+Desde **Cloud Shell**, en la app de Google Cloud del iPhone:
 
 ```bash
-bash infra/setup.sh MI-PROYECTO propietario@gmail.com us-central1
+git clone -b main https://github.com/Alixonveloz1-ctrl/Good-Problem.git
+cd Good-Problem
+./setup.sh
 ```
+
+El script no pide argumentos: toma el proyecto y la cuenta de Cloud Shell, monta
+todo, publica la aplicación y al final dice los dos toques que quedan en el
+navegador. Volver a ejecutarlo es seguro; de hecho hay que hacerlo dos veces,
+porque la segunda recoge la credencial que el candado crea al activarse.
+
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) explica el detalle técnico: roles,
+identidades y por qué cada cosa está donde está.
 
 **No se genera, no se descarga y no se almacena ninguna clave JSON de cuenta de
 servicio en ningún punto del sistema.** Cloud Run usa la identidad de su cuenta

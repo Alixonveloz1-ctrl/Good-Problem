@@ -1,7 +1,7 @@
 # Despliegue
 
-Referencia técnica. Para seguir los pasos, usa
-**[DESPLIEGUE.md](DESPLIEGUE.md)**, que cuenta lo mismo sin tecnicismos.
+Referencia técnica. Para instalar, se ejecuta `./setup.sh` desde Cloud Shell:
+no pide argumentos y va explicando en pantalla lo que hace.
 
 Todo desde el iPhone. Si algún paso necesita una computadora, está marcado y
 explicado por qué.
@@ -37,14 +37,20 @@ es un identificador de la API y no una credencial de acceso a la cuenta.
 Desde **Cloud Shell**, en la app de Google Cloud para iOS:
 
 ```bash
-git clone https://github.com/<usuario>/<repo>.git
-cd <repo>
-bash infra/setup.sh MI-PROYECTO propietario@gmail.com us-central1
+git clone -b main https://github.com/Alixonveloz1-ctrl/Good-Problem.git
+cd Good-Problem
+./setup.sh
 ```
 
-El script habilita las APIs, crea Firestore, el bucket, Artifact Registry, la
-cola de Cloud Tasks, la cuenta de servicio del runtime con sus roles, el budget
-alert y el acceso del propietario. Volver a ejecutarlo es seguro.
+El script toma el proyecto y la cuenta de la sesión de Cloud Shell, habilita las
+APIs, crea Firestore, el bucket, la cola de Cloud Tasks, las dos cuentas de
+servicio con sus roles y el acceso del propietario, publica el servicio con
+`gcloud run deploy --source .` y le conecta la cola con la URL que acaba de
+obtener.
+
+Se ejecuta **dos veces**: la primera deja todo montado y pide activar IAP; la
+segunda lee el Client ID que IAP creó y lo conecta con la cola. Sin esa segunda
+pasada la aplicación abre pero ninguna generación arranca.
 
 Roles de la cuenta de servicio del runtime, y ninguno más:
 
@@ -122,7 +128,7 @@ IAP:
 1. `AAUS_IAP_AUDIENCE` con el Client ID que IAP crea, pasado al activador de
    Cloud Build como `_IAP_AUDIENCE`;
 2. el rol `roles/iap.httpsResourceAccessor` sobre la cuenta `aaus-tasks`, que
-   `infra/setup.sh` ya concede.
+   `setup.sh` ya concede.
 
 Y `AAUS_TASKS_TARGET_URL` es la URL del propio servicio, que no existe hasta
 haberlo desplegado: el paso `conectar-cola` de `cloudbuild.yaml` la lee después
@@ -165,10 +171,10 @@ restante y no rechaza ninguna generación por presupuesto. Es una desviación
 deliberada del PRD 44, a petición del propietario: el gasto se consulta en la
 consola de Google Cloud.
 
-Lo que hay que dejar montado allí, y `infra/setup.sh` ya lo crea:
+Lo que conviene dejar montado allí:
 
-- **Budget alerts** sobre la cuenta de facturación, con avisos al 50 %, 90 % y
-  100 %. Avisan por correo; no detienen nada.
+- **Budget alerts** sobre la cuenta de facturación. Avisan por correo; no
+  detienen nada.
 - Si quieres un freno de verdad, se monta en Google Cloud, no aquí: un
   presupuesto con una función de Cloud Functions suscrita al tema de Pub/Sub que
   desactive la facturación del proyecto al llegar al tope.
