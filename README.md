@@ -132,11 +132,10 @@ de forma explícita.
 
 ## Despliegue
 
-Desde **Cloud Shell**, en la app de Google Cloud del iPhone:
+**[▶ Abrir en Cloud Shell](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2FAlixonveloz1-ctrl%2FGood-Problem)**
+descarga el proyecto solo. Después, dentro de Cloud Shell:
 
 ```bash
-git clone -b main https://github.com/Alixonveloz1-ctrl/Good-Problem.git
-cd Good-Problem
 ./setup.sh
 ```
 

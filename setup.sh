@@ -278,17 +278,44 @@ if [[ "$IAP_LISTO" == "no" ]]; then
 
 PENDIENTE
 else
-  cat <<TERMINADO
-  ${GREEN}${BOLD}TODO LISTO. Solo queda instalarla en el iPhone:${RESET}
+  # ¿Ya está conectada la publicación automática desde GitHub?
+  CONTINUA="$(gcloud builds triggers list --project="$PROJECT_ID" --region="$REGION" \
+              --format='value(name)' 2>/dev/null | head -1 || true)"
 
+  cat <<TERMINADO
+  ${GREEN}${BOLD}La aplicación ya está en marcha.${RESET}
+
+  ${BOLD}Instálala en el iPhone:${RESET}
      1. Abre ${URL} en ${BOLD}Safari${RESET}
      2. Inicia sesión con ${CORREO}
      3. Compartir → Añadir a pantalla de inicio
 
+TERMINADO
+
+  if [[ -z "$CONTINUA" ]]; then
+    cat <<CONTINUA_PENDIENTE
+  ${BOLD}Queda una cosa: que se actualice sola${RESET}   ${DIM}(recomendado, 1 minuto)${RESET}
+     Sin esto, cada cambio te obliga a volver aquí y ejecutar el script otra vez.
+     Con esto, se publica sola en unos minutos.
+
+     Abre:  https://console.cloud.google.com/run/detail/${REGION}/${SERVICIO}/revisions?project=${PROJECT_ID}
+     Toca:  Configurar implementación continua
+            →  Conectar tu cuenta de GitHub (te pedirá autorizar)
+            →  Repositorio: Good-Problem   ·   Rama: main
+            →  Tipo de compilación: Dockerfile
+            →  Guardar
+
+CONTINUA_PENDIENTE
+  else
+    ok "La publicación automática desde GitHub ya está conectada"
+    echo
+  fi
+
+  cat <<COMPROBAR
   ${DIM}Para comprobar que quedó bien: entra en Ajustes dentro de la app.
   Debe decir "En producción" en verde, y tu proyecto en vez de "local".${RESET}
 
-TERMINADO
+COMPROBAR
 fi
 
 echo "${BOLD}${GREEN}  Bienvenido a AI Artist Universe Studio.${RESET}"
