@@ -7,6 +7,12 @@ It takes the approved master audio, the approved clips in storyboard order and
 the editing instructions, and produces the 16:9 master plus the 9:16 reframe.
 Vertical versions are derived from the master, so they cost nothing to generate.
 
+How the video is cut is decided by the Editor, not by the user (PRD 43). The
+Editor reads the storyboard and the song and chooses, for every join between two
+shots, a hard cut or a soft transition. Most joins in a music video are hard
+cuts; a crossfade also makes the picture shorter than the song, so it is not a
+free decoration.
+
 When FFmpeg is not present, or the studio is in dry run, the engine still does
 all of its real work except the encode: it resolves reused takes, orders the
 timeline, computes offsets and writes the edit decision list. That artefact is
@@ -143,10 +149,10 @@ def assemble_project(
     *,
     formats: list[str] | None = None,
     captions: bool = False,
-    transition_seconds: float = 0.0,
 ) -> dict[str, Any]:
     formats = formats or ["16:9", "9:16"]
     edl = build_edl(studio, universe_id, project_id, captions=captions)
+    uniones, notas_edicion, coste_editor = plan_edit(studio, universe_id, project_id, edl)
 
     edl_path = project_path(universe_id, project_id, "edl.json")
     studio.storage.write_bytes(
@@ -166,16 +172,19 @@ def assemble_project(
             "reason": reason,
             "edl_path": edl_path,
             "total_seconds": edl.total_seconds,
-            "picture_seconds": _picture_seconds(edl, transition_seconds),
+            "picture_seconds": cmds.timeline_duration(
+                [e.duration_seconds for e in edl.entries], uniones
+            ),
             "clips": len(edl.entries),
             "reused": sum(1 for e in edl.entries if e.reused_from),
             "formats": formats,
-            "transition_seconds": transition_seconds,
+            "edit": _resumen_edicion(edl, uniones, notas_edicion),
+            "editor_cost": coste_editor,
         }
 
     outputs = _render(
         studio, universe_id, project_id, edl,
-        formats=formats, captions=captions, transition_seconds=transition_seconds,
+        formats=formats, captions=captions, uniones=uniones,
     )
     patch: dict[str, Any] = {"edl_path": edl_path, "status": CanonStatus.DRAFT.value}
     if "16:9" in outputs:
@@ -183,7 +192,7 @@ def assemble_project(
     if "9:16" in outputs:
         patch["master_9x16_path"] = outputs["9:16"]
     Repository(studio.db, universe_id, VIDEO_PROJECTS).update(project_id, patch)
-    imagen = _picture_seconds(edl, transition_seconds)
+    imagen = cmds.timeline_duration([e.duration_seconds for e in edl.entries], uniones)
     return {
         "rendered": True,
         "edl_path": edl_path,
@@ -193,16 +202,110 @@ def assemble_project(
         "shortened_by_seconds": round(edl.total_seconds - imagen, 2),
         "clips": len(edl.entries),
         "reused": sum(1 for e in edl.entries if e.reused_from),
-        "transition_seconds": transition_seconds,
+        "edit": _resumen_edicion(edl, uniones, notas_edicion),
+        "editor_cost": coste_editor,
     }
 
 
-def _picture_seconds(edl: EditDecisionList, transition_seconds: float) -> float:
-    """Con fundidos la imagen dura menos que la suma de los clips: cada fundido
-    solapa dos planos. Conviene saberlo porque el audio no se acorta."""
-    if transition_seconds <= 0:
-        return edl.total_seconds
-    return cmds.chain_duration([e.duration_seconds for e in edl.entries], transition_seconds)
+def plan_edit(studio, universe_id: str, project_id: str, edl: EditDecisionList):
+    """El Editor decide como se corta el videoclip (PRD 43).
+
+    Si el modelo no responde algo utilizable, se monta a corte seco: es lo que
+    hace la mayoria de los videoclips y nunca estropea un montaje.
+    """
+    from ..orchestrator import director
+
+    por_defecto = [cmds.Union("cut") for _ in range(max(len(edl.entries) - 1, 0))]
+    if len(edl.entries) < 2:
+        return [], "Un solo plano: no hay nada que cortar.", None
+
+    project = Repository(studio.db, universe_id, VIDEO_PROJECTS).require(project_id)
+    song = Repository(studio.db, universe_id, SONGS).get(edl.song_id) or {}
+    escenas = Repository(studio.db, universe_id, SCENES).list(
+        where={"project_id": project_id}, order_by="index", descending=False
+    )
+    por_id = {escena["id"]: escena for escena in escenas}
+
+    modelo = studio.registry.default_for("text")
+    if modelo is None:
+        return por_defecto, "Sin modelo de texto disponible: montado a corte seco.", None
+
+    try:
+        resultado = director.run(
+            studio,
+            universe_id,
+            modelo.id,
+            {
+                "task": "edit_plan",
+                "song": {
+                    "title": song.get("title"),
+                    "genre": song.get("genre"),
+                    "mood": song.get("mood"),
+                    "structure": song.get("structure", []),
+                },
+                "story": project.get("story") or {},
+                "scenes": [
+                    {
+                        "index": entrada.index,
+                        "action": (por_id.get(entrada.scene_id) or {}).get("action", ""),
+                        "emotion": (por_id.get(entrada.scene_id) or {}).get("emotion", ""),
+                        "location": (por_id.get(entrada.scene_id) or {}).get("location_id", ""),
+                        "song_timestamp": (por_id.get(entrada.scene_id) or {}).get(
+                            "song_timestamp", ""
+                        ),
+                        "reused": bool(entrada.reused_from),
+                    }
+                    for entrada in edl.entries
+                ],
+            },
+        )
+    except DomainError as exc:
+        logger.warning("edit_plan_fallo %s", exc)
+        return por_defecto, "El Editor no pudo proponer el montaje: corte seco.", None
+
+    datos = resultado.data or {}
+    uniones = list(por_defecto)
+    for corte in datos.get("cuts") or []:
+        try:
+            posicion = int(corte.get("after_scene_index", -1))
+        except (TypeError, ValueError):
+            continue
+        if 0 <= posicion < len(uniones):
+            uniones[posicion] = cmds.Union(
+                str(corte.get("type", "cut")), float(corte.get("seconds") or 0.5)
+            ).normalizada()
+
+    from ..domain.pricing import estimate_text
+
+    coste = estimate_text(
+        studio.registry,
+        modelo.id,
+        input_tokens=resultado.prompt_tokens,
+        output_tokens=resultado.output_tokens,
+    )
+    notas = datos.get("notes") or ""
+    blandas = sum(1 for u in uniones if not u.es_corte)
+    logger.info("edit_plan cortes=%s fundidos=%s", len(uniones) - blandas, blandas)
+    return uniones, notas, coste
+
+
+def _resumen_edicion(
+    edl: EditDecisionList, uniones: list[cmds.Union], notas: str
+) -> dict[str, Any]:
+    """Lo que decidio el Editor, para que se vea en la pantalla."""
+    return {
+        "notes": notas,
+        "hard_cuts": sum(1 for u in uniones if u.es_corte),
+        "transitions": sum(1 for u in uniones if not u.es_corte),
+        "joins": [
+            {
+                "after_scene": edl.entries[i].index,
+                "type": union.tipo,
+                "seconds": union.segundos if not union.es_corte else 0,
+            }
+            for i, union in enumerate(uniones)
+        ],
+    }
 
 
 def _run(command: list[str], *, cwd: Path) -> None:
@@ -223,7 +326,7 @@ def _render(
     *,
     formats: list[str],
     captions: bool,
-    transition_seconds: float = 0.0,
+    uniones: list[cmds.Union],
 ) -> dict[str, str]:
     outputs: dict[str, str] = {}
     with tempfile.TemporaryDirectory(prefix="aaus-assembly-") as tmp:
@@ -239,21 +342,16 @@ def _render(
         audio_local.write_bytes(studio.storage.read_bytes(edl.master_audio_path))
 
         silent = work / "picture.mp4"
-        if transition_seconds > 0:
-            _run(
-                cmds.crossfade_chain(
-                    local_clips,
-                    [e.duration_seconds for e in edl.entries],
-                    str(silent),
-                    cmds.LANDSCAPE_1080,
-                    transition=transition_seconds,
-                ),
-                cwd=work,
-            )
-        else:
-            list_file = work / "concat.txt"
-            list_file.write_text(cmds.concat_list_file(local_clips))
-            _run(cmds.concat(str(list_file), str(silent), cmds.LANDSCAPE_1080), cwd=work)
+        _run(
+            cmds.build_timeline(
+                local_clips,
+                [e.duration_seconds for e in edl.entries],
+                uniones,
+                str(silent),
+                cmds.LANDSCAPE_1080,
+            ),
+            cwd=work,
+        )
 
         landscape = work / "master_16x9.mp4"
         _run(

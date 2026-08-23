@@ -30,6 +30,7 @@ TASK_ROLES: dict[str, CreativeRole] = {
     "character": CreativeRole.CASTING_DIRECTOR,
     "content_script": CreativeRole.DIRECTOR,
     "interview": CreativeRole.DIRECTOR,
+    "edit_plan": CreativeRole.EDITOR,
 }
 
 TASK_SCHEMAS: dict[str, dict[str, Any]] = {
@@ -42,6 +43,7 @@ TASK_SCHEMAS: dict[str, dict[str, Any]] = {
     "character": S.CHARACTER_SCHEMA,
     "content_script": S.CONTENT_SCHEMA,
     "interview": S.INTERVIEW_SCHEMA,
+    "edit_plan": S.EDIT_PLAN_SCHEMA,
 }
 
 
@@ -156,6 +158,31 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
         )
         if brief:
             sections.append(f"USER DIRECTION\n{brief}")
+
+    elif task == "edit_plan":
+        escenas = payload.get("scenes") or []
+        sections.append(
+            "Decide how this music video is cut. For every join between two consecutive shots, "
+            "choose one of: cut (hard cut, the default in a music video), fade (crossfade), "
+            "fadeblack (through black, for a break in time or place) or dissolve (slow, for a "
+            "dreamy or reflective passage)."
+        )
+        sections.append(
+            f"There are {len(escenas)} shots, so there are {max(len(escenas) - 1, 0)} joins to "
+            "decide, one after each shot except the last. Index them by the shot they follow."
+        )
+        sections.append(
+            "Most joins in a music video are hard cuts. Use a soft transition only where the "
+            "music or the story asks for it: a change of place, a passage of time, the end of a "
+            "section. Do not decorate. A crossfade lasts between 0.25 and 1 second, and every "
+            "one of them makes the picture shorter than the song, so they are not free."
+        )
+        for key in ("song", "story"):
+            value = payload.get(key)
+            if value:
+                sections.append(f"{key.upper()}\n{_kv(value)}")
+        if escenas:
+            sections.append("SHOTS\n" + _kv(escenas))
 
     elif task == "interview":
         sections.append(

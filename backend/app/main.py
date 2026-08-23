@@ -76,15 +76,23 @@ _static = Path(_settings.static_dir)
 if _static.is_dir():
     app.mount("/assets", StaticFiles(directory=_static / "assets"), name="assets")
 
-    @app.get("/{full_path:path}", include_in_schema=False)
-    def spa(full_path: str) -> Any:
+    @app.api_route(
+        "/{full_path:path}",
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+        include_in_schema=False,
+    )
+    def spa(request: Request, full_path: str) -> Any:
         """Serve the built PWA, letting the client router handle the path.
 
         An unknown /api path must not fall through to index.html: a client
         calling a route that no longer exists would get HTML and a 200, and the
-        mistake would surface as a JSON parse error somewhere far away.
+        mistake would surface as a JSON parse error somewhere far away. It gets
+        a 404 whatever the method, rather than the 405 that a GET-only catch all
+        would produce for a POST.
         """
         if full_path.startswith("api/"):
+            raise NotFound(f"No existe la ruta /{full_path}")
+        if request.method != "GET":
             raise NotFound(f"No existe la ruta /{full_path}")
         candidate = _static / full_path
         if full_path and candidate.is_file():

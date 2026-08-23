@@ -215,41 +215,81 @@ def test_a_scene_cannot_reuse_itself(studio, universe):
     assert scenes[0]["reuses_scene_id"] is None
 
 
-def test_los_fundidos_acortan_la_imagen(studio, universe):
-    """Cada fundido solapa dos planos, asi que la imagen dura menos que la suma
-    de los clips. El resultado del ensamblaje lo dice, en vez de dejar que se
-    descubra al ver el video."""
+def test_el_editor_decide_los_cortes_no_el_usuario(studio, universe):
+    """PRD 43. El montaje lo decide el rol Editor a partir del storyboard y de
+    la cancion; en la pantalla no hay ningun selector de transiciones."""
     from app.assembly.engine import assemble_project
 
-    project_id = "vp_fund"
-    studio.db.set(
-        f"universes/{universe}/video_projects/{project_id}",
-        {"id": project_id, "universe_id": universe, "song_id": "song_f"},
-    )
-    studio.db.set(
-        f"universes/{universe}/songs/song_f",
-        {"id": "song_f", "universe_id": universe, "status": CanonStatus.APPROVED.value,
-         "approved_master_path": "p.wav"},
-    )
-    for indice in range(3):
-        escena = _scene(studio, universe, project_id, indice)
-        _attach_clip(studio, universe, project_id, escena, f"clip_f{indice}")
+    _preparar_proyecto(studio, universe, "vp_ed", clips=3)
+    resultado = assemble_project(studio, universe, "vp_ed")
 
-    seco = assemble_project(studio, universe, project_id)
-    assert seco["picture_seconds"] == 24
-
-    fundido = assemble_project(studio, universe, project_id, transition_seconds=0.5)
-    assert fundido["picture_seconds"] == 23.0
-    assert fundido["total_seconds"] == 24
+    assert "edit" in resultado
+    assert resultado["edit"]["hard_cuts"] + resultado["edit"]["transitions"] == 2
+    assert len(resultado["edit"]["joins"]) == 2
+    assert resultado["picture_seconds"] <= resultado["total_seconds"]
 
 
-def test_el_comando_de_fundidos_encadena_todos_los_planos():
+def test_sin_plan_utilizable_se_monta_a_corte_seco(studio, universe):
+    """Si el Editor no responde algo aprovechable, se monta a corte seco: es lo
+    que hace la mayoria de los videoclips y nunca estropea un montaje."""
+    from app.assembly.engine import build_edl, plan_edit
+    from app.errors import ProviderError
+
+    _preparar_proyecto(studio, universe, "vp_fallo", clips=3)
+    edl = build_edl(studio, universe, "vp_fallo")
+
+    def revienta(*_args, **_kwargs):
+        raise ProviderError("Gemini no responde")
+
+    import app.orchestrator.director as director
+
+    original = director.run
+    director.run = revienta
+    try:
+        uniones, notas, coste = plan_edit(studio, universe, "vp_fallo", edl)
+    finally:
+        director.run = original
+
+    assert all(u.es_corte for u in uniones)
+    assert coste is None
+    assert "corte seco" in notas
+
+
+def test_cortes_y_fundidos_conviven_en_una_sola_pasada():
+    """Encadenar codificaciones degradaria la imagen una vez por cada corte, asi
+    que el montaje entero va en un solo comando."""
     from app.assembly import ffmpeg_cmds as cmds
 
-    comando = cmds.crossfade_chain(
-        ["a.mp4", "b.mp4", "c.mp4"], [8, 8, 8], "out.mp4", cmds.LANDSCAPE_1080, transition=0.5
+    uniones = [cmds.Union("cut"), cmds.Union("fadeblack", 0.6), cmds.Union("cut")]
+    comando = cmds.build_timeline(
+        ["a.mp4", "b.mp4", "c.mp4", "d.mp4"], [8, 8, 8, 8], uniones, "out.mp4",
+        cmds.LANDSCAPE_1080,
     )
+    assert comando.count("-filter_complex") == 1
     filtro = comando[comando.index("-filter_complex") + 1]
-    assert filtro.count("xfade") == 2, "dos fundidos para tres planos"
-    assert "offset=7.500" in filtro and "offset=15.000" in filtro
-    assert "[out]" in filtro
+    assert filtro.count("concat=n=2") == 2
+    assert "xfade=transition=fadeblack:duration=0.6:offset=15.400" in filtro
+    assert cmds.timeline_duration([8, 8, 8, 8], uniones) == 31.4
+
+
+def test_el_editor_no_puede_pedir_un_fundido_absurdo():
+    from app.assembly import ffmpeg_cmds as cmds
+
+    assert cmds.Union("fade", 9.0).normalizada().segundos == cmds.MAX_TRANSICION
+    assert cmds.Union("fade", 0.01).normalizada().segundos == cmds.MIN_TRANSICION
+    assert cmds.Union("remolino", 0.5).normalizada().es_corte, "un tipo inventado es corte seco"
+
+
+def _preparar_proyecto(studio, universe, project_id, *, clips):
+    studio.db.set(
+        f"universes/{universe}/video_projects/{project_id}",
+        {"id": project_id, "universe_id": universe, "song_id": f"song_{project_id}"},
+    )
+    studio.db.set(
+        f"universes/{universe}/songs/song_{project_id}",
+        {"id": f"song_{project_id}", "universe_id": universe,
+         "status": CanonStatus.APPROVED.value, "approved_master_path": "p.wav"},
+    )
+    for indice in range(clips):
+        escena = _scene(studio, universe, project_id, indice)
+        _attach_clip(studio, universe, project_id, escena, f"clip_{project_id}_{indice}")

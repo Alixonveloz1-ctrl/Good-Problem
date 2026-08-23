@@ -53,7 +53,7 @@ export function ProjectScreen() {
   const action = useAction()
   const [jobId, setJobId] = useState<string | null>(null)
   const [planOpen, setPlanOpen] = useState(false)
-  const [fundido, setFundido] = useState(false)
+  const [edicion, setEdicion] = useState<ResumenEdicion | null>(null)
   const base = `/api/universes/${universeId}/video-projects/${projectId}`
 
   const run = async (fn: () => Promise<{ id: string }>) => {
@@ -195,29 +195,9 @@ export function ProjectScreen() {
               <h3>Ensamblaje</h3>
               <p className="muted" style={{ margin: 0 }}>
                 El master usa siempre el audio aprobado. La version 9:16 se deriva del master por
-                reencuadre y no cuesta nada generar.
+                reencuadre y no cuesta nada generar. El Editor decide como se corta el videoclip
+                a partir del storyboard y de la cancion.
               </p>
-              <div className="chips">
-                <button
-                  className={`chip ${!fundido ? 'active' : ''}`}
-                  onClick={() => setFundido(false)}
-                >
-                  Cortes secos
-                </button>
-                <button
-                  className={`chip ${fundido ? 'active' : ''}`}
-                  onClick={() => setFundido(true)}
-                >
-                  Fundido entre planos
-                </button>
-              </div>
-              {fundido && (
-                <div className="notice">
-                  Cada fundido solapa dos planos medio segundo, asi que la imagen queda algo mas
-                  corta que la cancion. Con {scenes.length} escenas se acorta{' '}
-                  {((scenes.length - 1) * 0.5).toFixed(1)} segundos.
-                </div>
-              )}
               <button
                 className="btn primary block"
                 disabled={action.busy}
@@ -225,7 +205,6 @@ export function ProjectScreen() {
                   run(() =>
                     api.post(`${base}/assemble`, {
                       formats: ['16:9', '9:16'],
-                      transition_seconds: fundido ? 0.5 : 0,
                       idempotency_key: newIdempotencyKey('asm'),
                     }),
                   )
@@ -233,6 +212,7 @@ export function ProjectScreen() {
               >
                 Ensamblar 16:9 y 9:16
               </button>
+              {edicion && <Montaje edicion={edicion} />}
               {data.master_16x9_url && (
                 <video className="media wide" controls preload="none" src={data.master_16x9_url} />
               )}
@@ -250,8 +230,10 @@ export function ProjectScreen() {
               <JobWatcher
                 universeId={universeId}
                 jobId={jobId}
-                onReady={() => {
+                onReady={(job) => {
                   setJobId(null)
+                  const resumen = (job.result as { edit?: ResumenEdicion } | null)?.edit
+                  if (resumen) setEdicion(resumen)
                   void reload()
                 }}
               />
@@ -268,6 +250,42 @@ export function ProjectScreen() {
         />
       )}
     </>
+  )
+}
+
+interface ResumenEdicion {
+  notes: string
+  hard_cuts: number
+  transitions: number
+  joins: { after_scene: number; type: string; seconds: number }[]
+}
+
+const NOMBRE_TRANSICION: Record<string, string> = {
+  cut: 'corte seco',
+  fade: 'fundido',
+  fadeblack: 'a negro',
+  dissolve: 'disolvencia',
+}
+
+/** Lo que decidio el Editor, para que se vea sin tener que preguntar. */
+function Montaje({ edicion }: { edicion: ResumenEdicion }) {
+  const blandas = edicion.joins.filter((j) => j.type !== 'cut')
+  return (
+    <div className="notice">
+      <strong>Como lo ha montado el Editor</strong>
+      {edicion.notes && <p style={{ margin: '6px 0' }}>{edicion.notes}</p>}
+      <div>
+        {edicion.hard_cuts} cortes secos
+        {edicion.transitions > 0 ? ` y ${edicion.transitions} transiciones` : ', sin transiciones'}
+        .
+      </div>
+      {blandas.map((join) => (
+        <div key={join.after_scene} className="muted">
+          Tras la escena {join.after_scene + 1}: {NOMBRE_TRANSICION[join.type] ?? join.type} de{' '}
+          {join.seconds}s
+        </div>
+      ))}
+    </div>
   )
 }
 

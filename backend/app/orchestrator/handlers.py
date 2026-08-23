@@ -27,7 +27,7 @@ from ..db.repositories import (
     Repository,
 )
 from ..domain.enums import CanonStatus, LyricsAuthor
-from ..domain.guards import assert_same_model_on_retry, resolve_clip_duration
+from ..domain.guards import resolve_clip_duration
 from ..domain.pricing import estimate_images, estimate_song, estimate_speech, estimate_text
 from ..domain.pricing import estimate_video as price_video
 from ..domain.schemas import MASTER_SHOTS
@@ -858,116 +858,10 @@ def handle_assembly(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
         project_id,
         formats=payload.get("formats") or ["16:9", "9:16"],
         captions=bool(payload.get("captions", False)),
-        transition_seconds=float(payload.get("transition_seconds", 0.0)),
     )
-    return Outcome(result=result, cost=None)
-
-
-def handle_video_extend(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
-    """Alarga una toma ya aprobada, +7 s (PRD 26).
-
-    Veo no acepta imagenes de referencia aqui: solo recibe el clip anterior y un
-    texto, y deduce quien es el personaje del ultimo segundo de ese clip. Por eso
-    solo se permite sobre un clip aprobado, y por eso la pantalla avisa de que
-    si la toma acaba sin ver la cara, puede salir otra persona.
-    """
-    payload = _payload(job)
-    scene_id = job.get("target_id") or ""
-    scenes = _repo(studio, universe_id, SCENES)
-    scene = scenes.require(scene_id)
-
-    if scene.get("clip_status") != CanonStatus.APPROVED.value or not scene.get("clip_id"):
-        raise Conflict("Solo se alarga una toma que ya hayas aprobado.")
-    clip = _repo(studio, universe_id, VIDEOS).require(scene["clip_id"])
-
-    if not studio.settings.use_gcs and not studio.settings.dry_run:
-        raise Conflict(
-            "Alargar una toma requiere que el video este en Cloud Storage: Veo lo lee de alli."
-        )
-
-    # La continuacion tiene que salir del mismo modelo que hizo la toma.
-    assert_same_model_on_retry(clip["model"], job["model"])
-    spec = studio.registry.require_active(clip["model"], "video")
-    current = int(clip.get("duration_seconds", 8))
-    prompt = payload.get("prompt") or scene.get("video_prompt") or _scene_prompt(scene)
-
-    operation = veo.start_extension(
-        studio.vertex,
-        spec,
-        prompt=prompt,
-        video_uri=studio.storage.uri(clip["storage_path"]),
-        aspect_ratio=clip.get("aspect_ratio", "16:9"),
-        current_seconds=current,
-    )
-    video = _await_video(studio, operation)
-
-    # Veo devuelve un unico archivo con el clip original y la continuacion.
-    total = current + operation.seconds
-    version = _next_version(studio, universe_id, VIDEOS, {"scene_id": scene_id})
-    data = video.data if video and video.data else _placeholder_clip(spec.id, total)
-    stored = studio.storage.write_bytes(
-        scene_path(universe_id, scene_id, f"clip_v{version}.mp4"), data, "video/mp4"
-    )
-
-    cost = price_video(
-        studio.registry, spec.id, _extension_variant(spec), seconds=operation.seconds, clips=1
-    )
-    nuevo_clip = _repo(studio, universe_id, VIDEOS).create(
-        new_id("clip"),
-        {
-            "scene_id": scene_id,
-            "project_id": scene.get("project_id"),
-            "storage_path": stored.path,
-            "source_image_id": clip.get("source_image_id", ""),
-            "extends_clip_id": clip["id"],
-            "prompt": prompt,
-            "model": spec.id,
-            "variant": veo.EXTENSION_RESOLUTION,
-            "duration_seconds": total,
-            "aspect_ratio": clip.get("aspect_ratio", "16:9"),
-            "generate_audio": False,
-            "references": [],
-            "parameters": operation.parameters,
-            "version": version,
-            "status": CanonStatus.DRAFT.value,
-            "locked": False,
-            "cost_usd": round(cost.amount_usd, 4),
-            "job_id": job["id"],
-        },
-    )
-    # La toma alargada vuelve a estar pendiente de aprobacion: dura mas y llega
-    # a 720p, asi que hay que mirarla otra vez.
-    scenes.update(
-        scene_id,
-        {
-            "clip_id": nuevo_clip["id"],
-            "clip_status": CanonStatus.DRAFT.value,
-            "duration_seconds": total,
-        },
-    )
-    return Outcome(
-        result={
-            "scene_id": scene_id,
-            "clip_id": nuevo_clip["id"],
-            "storage_path": stored.path,
-            "url": studio.storage.signed_url(stored.path),
-            "added_seconds": operation.seconds,
-            "duration_seconds": total,
-            "resolution": veo.EXTENSION_RESOLUTION,
-            "model": spec.id,
-            "generate_audio": False,
-        },
-        cost=cost,
-    )
-
-
-def _extension_variant(spec) -> str:
-    """La extension llega a 720p. Si el modelo no tiene tarifa de 720p, se toma
-    la mas barata que tenga: es una estimacion, no una factura."""
-    for variant in spec.variants:
-        if variant.key == veo.EXTENSION_RESOLUTION:
-            return variant.key
-    return min(spec.variants, key=lambda v: v.price).key
+    # El Editor decide los cortes, y esa propuesta la escribe un modelo de texto.
+    coste = result.pop("editor_cost", None)
+    return Outcome(result=result, cost=coste)
 
 
 def handle_cut(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
@@ -1014,5 +908,4 @@ HANDLERS: dict[str, Callable[..., Outcome]] = {
     "assembly": handle_assembly,
     "cut": handle_cut,
     "mix": handle_mix,
-    "video_extend": handle_video_extend,
 }

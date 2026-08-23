@@ -263,6 +263,39 @@ CONTENT_SCHEMA: dict[str, Any] = {
     "required": ["title", "script"],
 }
 
+EDIT_PLAN_SCHEMA: dict[str, Any] = {
+    "type": "OBJECT",
+    "properties": {
+        "cuts": _arr(
+            {
+                "type": "OBJECT",
+                "properties": {
+                    "after_scene_index": {
+                        "type": "INTEGER",
+                        "description": "El corte que va DESPUES de esta escena",
+                    },
+                    "type": {
+                        "type": "STRING",
+                        "enum": ["cut", "fade", "fadeblack", "dissolve"],
+                        "description": (
+                            "cut: corte seco. fade: fundido encadenado. "
+                            "fadeblack: pasa por negro. dissolve: disolvencia lenta."
+                        ),
+                    },
+                    "seconds": {
+                        "type": "NUMBER",
+                        "description": "Duracion del fundido, entre 0,25 y 1. Se ignora en cut.",
+                    },
+                    "why": _str("Por que ese corte y no otro, en espanol y en una linea"),
+                },
+                "required": ["after_scene_index", "type"],
+            }
+        ),
+        "notes": _str("Como se ha montado el videoclip, en espanol, en dos o tres frases"),
+    },
+    "required": ["cuts"],
+}
+
 INTERVIEW_SCHEMA: dict[str, Any] = {
     "type": "OBJECT",
     "properties": {

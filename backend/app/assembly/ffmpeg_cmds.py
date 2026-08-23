@@ -30,53 +30,50 @@ VERTICAL_1080 = RenderProfile(1080, 1920)
 LANDSCAPE_4K = RenderProfile(3840, 2160, video_bitrate="45M")
 
 
-def concat_list_file(paths: list[str]) -> str:
-    """Body of the concat demuxer list. Single quotes are escaped the way the
-    demuxer expects."""
-    lines = []
-    for path in paths:
-        escaped = path.replace("'", r"'\''")
-        lines.append(f"file '{escaped}'")
-    return "\n".join(lines) + "\n"
+TRANSICIONES: frozenset[str] = frozenset({"cut", "fade", "fadeblack", "dissolve"})
+"""Lo que el Editor puede pedir. Las tres blandas existen tal cual en xfade."""
+
+MIN_TRANSICION = 0.25
+MAX_TRANSICION = 1.0
 
 
-def concat(list_path: str, output: str, profile: RenderProfile) -> list[str]:
-    """Join the approved clips in storyboard order.
+@dataclass(frozen=True)
+class Union:
+    """Como se pasa de un plano al siguiente."""
 
-    Re-encodes rather than stream copying: clips can come from three different
-    Veo models at three different resolutions, and stream copy would refuse or
-    produce a broken file.
-    """
-    return [
-        FFMPEG, "-y",
-        "-f", "concat", "-safe", "0", "-i", list_path,
-        "-vf", f"scale={profile.width}:{profile.height}:force_original_aspect_ratio=decrease,"
-               f"pad={profile.width}:{profile.height}:(ow-iw)/2:(oh-ih)/2,setsar=1,"
-               f"fps={profile.fps}",
-        "-an",
-        "-c:v", "libx264", "-preset", "medium", "-b:v", profile.video_bitrate,
-        "-pix_fmt", "yuv420p",
-        output,
-    ]
+    tipo: str = "cut"
+    segundos: float = 0.0
+
+    @property
+    def es_corte(self) -> bool:
+        return self.tipo == "cut" or self.segundos <= 0
+
+    def normalizada(self) -> Union:
+        if self.tipo not in TRANSICIONES or self.tipo == "cut":
+            return Union("cut", 0.0)
+        return Union(self.tipo, min(max(self.segundos, MIN_TRANSICION), MAX_TRANSICION))
 
 
-def crossfade_chain(
+def build_timeline(
     inputs: list[str],
     durations: list[int],
+    uniones: list[Union],
     output: str,
     profile: RenderProfile,
-    *,
-    transition: float = 0.5,
 ) -> list[str]:
-    """Todos los planos encadenados con un fundido entre cada dos (PRD 29).
+    """Monta todos los planos en una sola pasada de FFmpeg (PRD 29).
 
-    Cada fundido se come ``transition`` segundos de metraje, asi que la imagen
-    sale mas corta que la suma de los clips. ``chain_duration`` calcula cuanto.
+    Cortes secos y fundidos conviven en el mismo grafo: los primeros con
+    ``concat``, los segundos con ``xfade``. Se hace en un solo comando a
+    proposito, porque encadenar codificaciones sucesivas degradaria la imagen
+    una vez por cada corte.
     """
     if len(inputs) != len(durations):
         raise ValueError("un clip, una duracion")
+    if len(uniones) != max(len(inputs) - 1, 0):
+        raise ValueError("hace falta una union entre cada dos planos")
     if len(inputs) == 1:
-        return concat_single(inputs[0], output, profile)
+        return normalize_single(inputs[0], output, profile)
 
     comando = [FFMPEG, "-y"]
     for ruta in inputs:
@@ -88,16 +85,21 @@ def crossfade_chain(
     )
     partes = [f"[{i}:v]{escala}[v{i}]" for i in range(len(inputs))]
 
+    acumulado = float(durations[0])
     anterior = "[v0]"
-    acumulado = 0.0
     for i in range(1, len(inputs)):
-        acumulado += durations[i - 1]
-        offset = max(acumulado - i * transition, 0.0)
-        etiqueta = f"[x{i}]" if i < len(inputs) - 1 else "[out]"
-        partes.append(
-            f"{anterior}[v{i}]xfade=transition=fade:duration={transition}:"
-            f"offset={offset:.3f}{etiqueta}"
-        )
+        union = uniones[i - 1].normalizada()
+        etiqueta = f"[t{i}]" if i < len(inputs) - 1 else "[out]"
+        if union.es_corte:
+            partes.append(f"{anterior}[v{i}]concat=n=2:v=1:a=0{etiqueta}")
+            acumulado += durations[i]
+        else:
+            offset = max(acumulado - union.segundos, 0.0)
+            partes.append(
+                f"{anterior}[v{i}]xfade=transition={union.tipo}:"
+                f"duration={union.segundos}:offset={offset:.3f}{etiqueta}"
+            )
+            acumulado += durations[i] - union.segundos
         anterior = etiqueta
 
     comando += [
@@ -109,8 +111,8 @@ def crossfade_chain(
     return comando
 
 
-def concat_single(source: str, output: str, profile: RenderProfile) -> list[str]:
-    """Un solo plano: no hay nada que encadenar, solo normalizar el tamano."""
+def normalize_single(source: str, output: str, profile: RenderProfile) -> list[str]:
+    """Un solo plano: no hay nada que unir, solo normalizar el tamano."""
     return [
         FFMPEG, "-y", "-i", source,
         "-vf", f"scale={profile.width}:{profile.height}:force_original_aspect_ratio=decrease,"
@@ -121,11 +123,16 @@ def concat_single(source: str, output: str, profile: RenderProfile) -> list[str]
     ]
 
 
-def chain_duration(durations: list[int], transition: float) -> float:
-    """Lo que dura la imagen con fundidos: cada uno se come ``transition``."""
+def timeline_duration(durations: list[int], uniones: list[Union]) -> float:
+    """Lo que dura la imagen. Cada fundido solapa dos planos, asi que resta."""
     if not durations:
         return 0.0
-    return max(sum(durations) - (len(durations) - 1) * transition, 0.0)
+    total = float(sum(durations))
+    for union in uniones:
+        limpia = union.normalizada()
+        if not limpia.es_corte:
+            total -= limpia.segundos
+    return max(total, 0.0)
 
 
 def mux_audio(video: str, audio: str, output: str, profile: RenderProfile) -> list[str]:

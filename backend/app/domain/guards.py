@@ -133,13 +133,6 @@ def assert_aspect_ratio(aspect_ratio: str) -> str:
     return aspect_ratio
 
 
-def assert_extend_supported(model_id: str, *, supports_extend: bool) -> None:
-    if not supports_extend:
-        raise InvalidGenerationRequest(
-            f"{model_id} no soporta extension de escena. Usa otro modelo o divide la toma."
-        )
-
-
 def assert_same_model_on_retry(requested_model: str, retry_model: str) -> None:
     """PRD 37: a failed job retries with the model that was asked for."""
     if requested_model != retry_model:

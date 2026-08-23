@@ -31,15 +31,34 @@
       "status": "active",
       "default_variant": "1K",
       "variants": [
-        { "key": "1K", "label": "1K", "unit": "image", "price": 0.134 },
-        { "key": "2K", "label": "2K", "unit": "image", "price": 0.134 },
-        { "key": "4K", "label": "4K", "unit": "image", "price": 0.24 }
+        {
+          "key": "1K",
+          "label": "1K",
+          "unit": "image",
+          "price": 0.134
+        },
+        {
+          "key": "2K",
+          "label": "2K",
+          "unit": "image",
+          "price": 0.134
+        },
+        {
+          "key": "4K",
+          "label": "4K",
+          "unit": "image",
+          "price": 0.24
+        }
       ],
       "capabilities": {
         "reference_characters_max": 5,
         "reference_objects_max": 6,
         "reference_styles_max": 3,
-        "resolutions": ["1K", "2K", "4K"]
+        "resolutions": [
+          "1K",
+          "2K",
+          "4K"
+        ]
       }
     },
     {
@@ -49,16 +68,41 @@
       "status": "active",
       "default_variant": "1K",
       "variants": [
-        { "key": "512px", "label": "512 px", "unit": "image", "price": 0.067 },
-        { "key": "1K", "label": "1K", "unit": "image", "price": 0.067 },
-        { "key": "2K", "label": "2K", "unit": "image", "price": 0.101 },
-        { "key": "4K", "label": "4K", "unit": "image", "price": 0.151 }
+        {
+          "key": "512px",
+          "label": "512 px",
+          "unit": "image",
+          "price": 0.067
+        },
+        {
+          "key": "1K",
+          "label": "1K",
+          "unit": "image",
+          "price": 0.067
+        },
+        {
+          "key": "2K",
+          "label": "2K",
+          "unit": "image",
+          "price": 0.101
+        },
+        {
+          "key": "4K",
+          "label": "4K",
+          "unit": "image",
+          "price": 0.151
+        }
       ],
       "capabilities": {
         "reference_characters_max": 4,
         "reference_objects_max": 10,
         "reference_styles_max": 0,
-        "resolutions": ["512px", "1K", "2K", "4K"]
+        "resolutions": [
+          "512px",
+          "1K",
+          "2K",
+          "4K"
+        ]
       }
     },
     {
@@ -67,12 +111,21 @@
       "label": "Nano Banana 2 Lite",
       "status": "active",
       "default_variant": "1K",
-      "variants": [{ "key": "1K", "label": "1K", "unit": "image", "price": 0.034 }],
+      "variants": [
+        {
+          "key": "1K",
+          "label": "1K",
+          "unit": "image",
+          "price": 0.034
+        }
+      ],
       "capabilities": {
         "reference_characters_max": 0,
         "reference_objects_max": 14,
         "reference_styles_max": 0,
-        "resolutions": ["1K"]
+        "resolutions": [
+          "1K"
+        ]
       }
     },
     {
@@ -81,7 +134,14 @@
       "label": "Lyria 3 Pro",
       "status": "active",
       "default_variant": "song",
-      "variants": [{ "key": "song", "label": "Cancion completa", "unit": "song", "price": 0.08 }],
+      "variants": [
+        {
+          "key": "song",
+          "label": "Cancion completa",
+          "unit": "song",
+          "price": 0.08
+        }
+      ],
       "capabilities": {
         "full_songs": true,
         "max_duration_seconds": 180,
@@ -97,16 +157,30 @@
       "status": "active",
       "default_variant": "1080p",
       "variants": [
-        { "key": "1080p", "label": "1080p", "unit": "second", "price": 0.2 },
-        { "key": "4K", "label": "4K", "unit": "second", "price": 0.4 }
+        {
+          "key": "1080p",
+          "label": "1080p",
+          "unit": "second",
+          "price": 0.2
+        },
+        {
+          "key": "4K",
+          "label": "4K",
+          "unit": "second",
+          "price": 0.4
+        }
       ],
       "capabilities": {
-        "durations_seconds": [4, 6, 8],
+        "durations_seconds": [
+          4,
+          6,
+          8
+        ],
         "reference_images_max": 3,
-        "supports_extend": true,
-        "extend_seconds": 7,
-        "max_total_seconds": 148,
-        "aspect_ratios": ["16:9", "9:16"],
+        "aspect_ratios": [
+          "16:9",
+          "9:16"
+        ],
         "audio": "always_disabled"
       }
     },
@@ -117,16 +191,30 @@
       "status": "active",
       "default_variant": "1080p",
       "variants": [
-        { "key": "1080p", "label": "1080p", "unit": "second", "price": 0.1 },
-        { "key": "720p", "label": "720p", "unit": "second", "price": 0.08 }
+        {
+          "key": "1080p",
+          "label": "1080p",
+          "unit": "second",
+          "price": 0.1
+        },
+        {
+          "key": "720p",
+          "label": "720p",
+          "unit": "second",
+          "price": 0.08
+        }
       ],
       "capabilities": {
-        "durations_seconds": [4, 6, 8],
+        "durations_seconds": [
+          4,
+          6,
+          8
+        ],
         "reference_images_max": 3,
-        "supports_extend": true,
-        "extend_seconds": 7,
-        "max_total_seconds": 148,
-        "aspect_ratios": ["16:9", "9:16"],
+        "aspect_ratios": [
+          "16:9",
+          "9:16"
+        ],
         "audio": "always_disabled"
       }
     },
@@ -137,16 +225,30 @@
       "status": "active",
       "default_variant": "1080p",
       "variants": [
-        { "key": "1080p", "label": "1080p", "unit": "second", "price": 0.05 },
-        { "key": "720p", "label": "720p", "unit": "second", "price": 0.03 }
+        {
+          "key": "1080p",
+          "label": "1080p",
+          "unit": "second",
+          "price": 0.05
+        },
+        {
+          "key": "720p",
+          "label": "720p",
+          "unit": "second",
+          "price": 0.03
+        }
       ],
       "capabilities": {
-        "durations_seconds": [4, 6, 8],
+        "durations_seconds": [
+          4,
+          6,
+          8
+        ],
         "reference_images_max": 3,
-        "supports_extend": false,
-        "extend_seconds": 0,
-        "max_total_seconds": 8,
-        "aspect_ratios": ["16:9", "9:16"],
+        "aspect_ratios": [
+          "16:9",
+          "9:16"
+        ],
         "audio": "always_disabled"
       }
     },
@@ -157,12 +259,20 @@
       "status": "active",
       "default_variant": "default",
       "variants": [
-        { "key": "default", "label": "Voz clonada", "unit": "1m_characters", "price": 30.0 }
+        {
+          "key": "default",
+          "label": "Voz clonada",
+          "unit": "1m_characters",
+          "price": 30.0
+        }
       ],
       "capabilities": {
         "requires_voice_cloning_key": true,
         "sample_seconds": 10,
-        "output_encodings": ["LINEAR16", "MP3"]
+        "output_encodings": [
+          "LINEAR16",
+          "MP3"
+        ]
       }
     }
   ],

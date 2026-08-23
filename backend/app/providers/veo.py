@@ -7,7 +7,9 @@ here rather than trusted to callers:
   from Lyria and the spoken voice from Chirp, so paying Veo for audio would be
   paying twice for something the edit discards. It halves the price per second.
 * Clips are 4, 6 or 8 seconds, and 8 whenever the request is 1080p, 4K or uses
-  reference images, which is always the case in this pipeline.
+  reference images, which is always the case in this pipeline. There is no
+  continuation: every shot is generated from an approved image, eight seconds,
+  and the cut to the next shot is the Editor's job.
 
 Generation is a long running operation: start it, then poll. Jobs keep running
 in Google Cloud whether or not the phone stays open (PRD 37).
@@ -21,13 +23,12 @@ from typing import Any
 
 from ..domain.guards import (
     assert_aspect_ratio,
-    assert_extend_supported,
     assert_reference_images,
     enforce_video_audio_disabled,
     resolve_clip_duration,
 )
 from ..domain.registry import ModelSpec
-from ..errors import InvalidGenerationRequest, ProviderError
+from ..errors import ProviderError
 from .vertex import VertexClient
 
 
@@ -120,61 +121,6 @@ def start_generation(
             "Veo no devolvio una operacion.", details={"response": str(response)[:800]}
         )
     return VideoOperation(name=name, model=spec.id, parameters=parameters, seconds=seconds)
-
-
-EXTENSION_RESOLUTION = "720p"
-"""Veo devuelve la extension siempre a 720p, aunque el clip original sea 1080p
-o 4K. Documentado por Google y confirmado por los proveedores que exponen la
-API. Forzarlo aqui evita cobrar 1080p por algo que llega a 720p."""
-
-EXTENSION_MAX_TOTAL_SECONDS = 148
-
-
-def start_extension(
-    client: VertexClient,
-    spec: ModelSpec,
-    *,
-    prompt: str,
-    video_uri: str,
-    aspect_ratio: str = "16:9",
-    current_seconds: int = 8,
-) -> VideoOperation:
-    """Continua un clip ya generado, +7 s cada vez, hasta unos 148 s.
-
-    Tres cosas que conviene tener presentes y que el PRD no recoge:
-
-    * la peticion **no acepta imagenes de referencia**: solo el video anterior y
-      un texto. Veo deduce quien es el personaje mirando el ultimo segundo del
-      clip, asi que si ahi no se le ve la cara, se la inventa;
-    * la salida es siempre 720p, sea cual sea la resolucion del clip original;
-    * veo-3.1-lite no la soporta.
-    """
-    assert_extend_supported(spec.id, supports_extend=bool(spec.cap("supports_extend", False)))
-    added = int(spec.cap("extend_seconds", 7))
-    total = current_seconds + added
-    if total > EXTENSION_MAX_TOTAL_SECONDS:
-        raise InvalidGenerationRequest(
-            f"Una toma no puede pasar de {EXTENSION_MAX_TOTAL_SECONDS} segundos. "
-            f"Esta lleva {current_seconds} y quedaria en {total}."
-        )
-    parameters = enforce_video_audio_disabled(
-        {
-            "aspectRatio": assert_aspect_ratio(aspect_ratio),
-            "resolution": EXTENSION_RESOLUTION,
-            "sampleCount": 1,
-            "durationSeconds": added,
-        }
-    )
-    response = client.call(
-        spec.id,
-        "predictLongRunning",
-        {"instances": [{"prompt": prompt, "video": {"gcsUri": video_uri}}],
-         "parameters": parameters},
-    )
-    name = response.get("name")
-    if not name:
-        raise ProviderError("Veo no devolvio una operacion de extension.")
-    return VideoOperation(name=name, model=spec.id, parameters=parameters, seconds=added)
 
 
 def poll(client: VertexClient, operation: VideoOperation) -> VideoResult | None:

@@ -187,9 +187,25 @@ El Media Assembly Engine no es un servicio externo: es un componente de este
 sistema que corre en Google Cloud.
 
 - `assembly/ffmpeg_cmds.py`: funciones puras que devuelven líneas de comando, lo
-  que permite verificarlas sin FFmpeg instalado. El montaje puede ir a corte
-  seco o con fundidos encadenados; cada fundido solapa dos planos, así que la
-  imagen sale más corta que la suma de los clips y el resultado dice cuánto.
+  que permite verificarlas sin FFmpeg instalado.
+
+**Quién decide los cortes.** El Editor, no el usuario (PRD 43). Antes de
+renderizar, `plan_edit` le pasa a Gemini el storyboard y la canción y le pide,
+para cada unión entre dos planos, un corte seco o una transición blanda. La
+mayoría de las uniones de un videoclip son cortes secos; una transición además
+acorta la imagen respecto a la canción, así que no es gratis. Si el modelo no
+devuelve algo aprovechable, se monta a corte seco: es lo que hace la mayoría de
+los videoclips y nunca estropea un montaje.
+
+Cortes y fundidos conviven en **un solo comando** de FFmpeg —`concat` para los
+primeros, `xfade` para los segundos— porque encadenar codificaciones sucesivas
+degradaría la imagen una vez por cada corte.
+
+**Todos los planos duran 8 segundos y salen de una imagen aprobada.** Veo tiene
+una función para continuar un clip ya generado; está fuera del sistema a
+propósito. No acepta las imágenes de referencia del personaje, devuelve siempre
+720p, y sobre todo no habría imagen que aprobar antes de gastar, que es el
+mecanismo sobre el que está montado todo lo demás.
 - `assembly/engine.py`: resuelve la línea de tiempo, calcula offsets y escribe
   la lista de montaje (EDL) en Storage; después codifica.
 - `assembly/job.py`: punto de entrada del Cloud Run Job.
@@ -201,26 +217,7 @@ es fingir que produjo un video.
 La versión 9:16 se deriva del master 16:9 por recorte central y escalado. No
 cuesta nada generarla.
 
-## 10. Alargar una toma
-
-Veo genera 8 segundos y para. Para un plano continuo mas largo existe la
-extension: se le pasa el clip ya generado y continua 7 segundos mas, hasta unos
-148 s. `veo-3.1-lite` no la soporta.
-
-Tres limites de la API que conviene tener presentes, verificados en la
-documentacion de Google y no deducidos del PRD:
-
-- **la peticion no acepta imagenes de referencia.** Solo recibe el video
-  anterior y un texto, y deduce quien es el personaje del ultimo segundo de ese
-  clip. Si la toma termina sin verse la cara, Veo se la inventa;
-- **la salida es siempre 720p**, aunque el clip original sea 1080p o 4K. Por eso
-  `start_extension` fuerza esa resolucion en vez de repetir la del clip;
-- cada continuacion deja la escena **pendiente de aprobar otra vez**: dura mas y
-  llega con menos nitidez, asi que hay que volver a mirarla.
-
-La pantalla de la escena dice las tres cosas antes de que se pulse el boton.
-
-## 11. Content Studio
+## 10. Content Studio
 
 Dos caminos distintos, porque cuestan cosas distintas:
 
@@ -236,7 +233,7 @@ Los tres trabajos que no llaman a ningún modelo —`assembly`, `cut` y `mix`—
 pasan por `submit_local`, que salta la resolución de modelo pero crea el mismo
 Job que ve el teléfono.
 
-## 12. Autenticación
+## 11. Autenticación
 
 Una sola persona usa esto, así que no hay registro, ni roles, ni recuperación de
 contraseña, ni pantalla de consentimiento OAuth: nada que obligue a sacar una
@@ -253,7 +250,7 @@ la sesión de Google del navegador en una petición autorizada. Es el único pun
 donde el PRD necesita un matiz: la idea de «solo IAM» es correcta, pero en la
 práctica se implementa con IAM *más* IAP.
 
-## 13. Almacenamiento
+## 12. Almacenamiento
 
 Firestore para documentos, Cloud Storage para binarios, ambos detrás de una
 interfaz pequeña (`db/client.py`, `providers/storage.py`) con una
