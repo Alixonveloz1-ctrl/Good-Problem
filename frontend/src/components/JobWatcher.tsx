@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { api, money } from '../api/client'
+import { api } from '../api/client'
 import type { Job } from '../api/types'
 import { JobBadge } from './ui'
 
@@ -63,13 +63,9 @@ export function JobWatcher({
         <span className="mono">{job.kind}</span>
         <JobBadge state={job.state} />
       </div>
-      <div className="row between">
-        <span className="mono">{job.model}{job.variant ? ` · ${job.variant}` : ''}</span>
-        <span>
-          {job.state === 'READY' || job.state === 'APPROVED'
-            ? money(job.actual_cost_usd)
-            : `est. ${money(job.estimated_cost_usd)}`}
-        </span>
+      <div className="muted mono">
+        {job.model}
+        {job.variant ? ` · ${job.variant}` : ''}
       </div>
       {job.error && <div className="error" style={{ marginTop: 8 }}>{job.error}</div>}
     </div>

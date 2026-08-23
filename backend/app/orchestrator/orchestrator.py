@@ -6,20 +6,24 @@ that order, and does the fifteen things the PRD lists:
   1. receive the request with an idempotency key so a dropped connection on a
      phone cannot bill twice;
   2. identify the Universe;
-  3. check the budget, with a real cutoff;
-  4. recover the Artist Bible;
-  5. recover the Canon;
-  6. recover assets and references;
-  7. determine the creative role;
-  8. resolve the model: what the user chose, otherwise the Artist Bible's
+  3. recover the Artist Bible;
+  4. recover the Canon;
+  5. recover assets and references;
+  6. determine the creative role;
+  7. resolve the model: what the user chose, otherwise the Artist Bible's
      preference, otherwise the registry default;
-  9. build structured instructions;
- 10. run the model;
- 11. create the Job;
- 12. record consumption and its cost;
- 13. store the result;
- 14. wait for approval;
- 15. continue when told to.
+  8. build structured instructions;
+  9. run the model;
+ 10. create the Job;
+ 11. record what the generation cost, as part of provenance (PRD 46);
+ 12. store the result;
+ 13. wait for approval;
+ 14. continue when told to.
+
+The studio keeps no running total and enforces no ceiling: spending is watched
+in the Google Cloud console. What each piece cost is still written onto the Job
+and onto the asset's provenance, because that is part of knowing where an asset
+came from.
 
 Nothing here advances a stage on its own. Results land in READY and stay there
 until a human approves them.
@@ -194,11 +198,6 @@ class Orchestrator:
 
         resolved = self.resolve_model(request)
         estimate = self.estimate(request, resolved)
-        self.studio.budget.assert_can_spend(
-            estimate.amount_usd,
-            universe_id=request.universe_id,
-            label=_label_for(request),
-        )
 
         job = self.studio.jobs.create(
             request.universe_id,
@@ -270,15 +269,6 @@ class Orchestrator:
             return self.studio.jobs.mark_failed(universe_id, job_id, str(exc))
 
         cost = outcome.cost
-        if cost is not None and cost.amount_usd > 0:
-            self.studio.budget.record(
-                universe_id,
-                cost,
-                kind=job["kind"],
-                job_id=job_id,
-                target_type=job.get("target_type", ""),
-                target_id=job.get("target_id", ""),
-            )
         return self.studio.jobs.mark_ready(
             universe_id,
             job_id,
@@ -304,12 +294,3 @@ def _bible_preference(bible, model_kind: ModelKind) -> tuple[str | None, str | N
         return prefs.preferred_video_model, prefs.preferred_video_variant
     return None, None
 
-
-def _label_for(request: GenerationRequest) -> str:
-    return {
-        "image": "esta imagen",
-        "video": "este clip",
-        "music": "esta cancion",
-        "speech": "este audio hablado",
-        "text": "esta propuesta del Director",
-    }.get(request.kind, "esta generacion")

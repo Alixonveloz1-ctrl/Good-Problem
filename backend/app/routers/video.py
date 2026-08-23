@@ -166,17 +166,6 @@ def _stage_summary(studio, universe_id: str, project: dict, scenes: list[dict]) 
         1 for s in generated if s.get("image_status") == CanonStatus.APPROVED.value
     )
     clips_done = sum(1 for s in generated if s.get("clip_status") == CanonStatus.APPROVED.value)
-    image_cost = 0.0
-    clip_cost = 0.0
-    for image in Repository(studio.db, universe_id, IMAGES).list(
-        where={"project_id": project["id"]}, limit=500
-    ):
-        image_cost += float(image.get("cost_usd", 0.0))
-    for clip in Repository(studio.db, universe_id, VIDEOS).list(
-        where={"project_id": project["id"]}, limit=500
-    ):
-        clip_cost += float(clip.get("cost_usd", 0.0))
-
     def status_of(done: bool, started: bool) -> str:
         if done:
             return StageStatus.APPROVED.value
@@ -187,7 +176,7 @@ def _stage_summary(studio, universe_id: str, project: dict, scenes: list[dict]) 
          "status": status_of(bool(project.get("concept")), True), "detail": ""},
         {"key": StageKey.MUSIC.value, "label": "Musica",
          "status": status_of(song.get("status") == CanonStatus.APPROVED.value, True),
-         "detail": song.get("title", ""), "cost_usd": round(float(song.get("cost_usd", 0.0)), 2)},
+         "detail": song.get("title", "")},
         {"key": StageKey.STORY.value, "label": "Historia",
          "status": status_of(
              (project.get("story") or {}).get("status") == CanonStatus.APPROVED.value,
@@ -201,10 +190,10 @@ def _stage_summary(studio, universe_id: str, project: dict, scenes: list[dict]) 
          "detail": f"{len(scenes)} escenas, {len(scenes) - len(generated)} reutilizadas"},
         {"key": StageKey.IMAGES.value, "label": "Imagenes",
          "status": status_of(bool(generated) and images_done == len(generated), images_done > 0),
-         "detail": f"{images_done}/{len(generated)}", "cost_usd": round(image_cost, 2)},
+         "detail": f"{images_done}/{len(generated)}"},
         {"key": StageKey.VIDEO.value, "label": "Video",
          "status": status_of(bool(generated) and clips_done == len(generated), clips_done > 0),
-         "detail": f"{clips_done}/{len(generated)}", "cost_usd": round(clip_cost, 2)},
+         "detail": f"{clips_done}/{len(generated)}"},
         {"key": StageKey.ASSEMBLY.value, "label": "Ensamblaje",
          "status": status_of(bool(project.get("master_16x9_path")), False), "detail": ""},
         {"key": StageKey.EXPORT.value, "label": "Export",

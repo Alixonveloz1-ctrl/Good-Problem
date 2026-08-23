@@ -1,5 +1,4 @@
 import { Link, useParams } from 'react-router-dom'
-import { money } from '../api/client'
 import { useResource } from '../hooks/useApi'
 import type { Universe } from '../api/types'
 import { Card, ErrorNote, Loading, TopBar } from '../components/ui'
@@ -19,9 +18,7 @@ const SECTIONS: { to: string; label: string; hint: string; glyph: string }[] = [
 
 export function UniverseScreen() {
   const { universeId = '' } = useParams()
-  const { data, loading, error } = useResource<Universe & { budget: unknown }>(
-    `/api/universes/${universeId}`,
-  )
+  const { data, loading, error } = useResource<Universe>(`/api/universes/${universeId}`)
 
   return (
     <>
@@ -38,16 +35,6 @@ export function UniverseScreen() {
                   {data.tagline && <div className="sub">{data.tagline}</div>}
                 </div>
               </div>
-              <div className="row between">
-                <span className="muted">Gastado en este artista</span>
-                <strong>{money(data.spend_usd)}</strong>
-              </div>
-              {data.budget_usd !== null && (
-                <div className="row between muted">
-                  <span>Techo de este artista</span>
-                  <span>{money(data.budget_usd)}</span>
-                </div>
-              )}
             </Card>
 
             <div className="list">

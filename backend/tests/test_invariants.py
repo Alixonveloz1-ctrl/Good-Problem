@@ -10,7 +10,7 @@ from app.domain import guards
 from app.domain.enums import JobState, ModelKind
 from app.domain.pricing import estimate_images, estimate_song, estimate_text, estimate_video
 from app.domain.registry import ModelRegistry, load_seed
-from app.errors import BudgetExceeded, InvalidGenerationRequest, ModelNotAllowed
+from app.errors import InvalidGenerationRequest, ModelNotAllowed
 from app.orchestrator.orchestrator import GenerationRequest
 from app.providers import lyria, veo
 from app.providers.vertex import VertexClient
@@ -201,51 +201,6 @@ def test_switching_model_is_the_main_lever(registry):
     assert dear.amount_usd / cheap.amount_usd > 6
 
 
-# --- Budget cutoff is real (PRD 44) ---------------------------------------
-
-
-def test_budget_cutoff_rejects_new_jobs(studio, client):
-    uid = client.post("/api/universes", json={"name": "Nova"}).json()["id"]
-    studio.budget.update_config({"total_usd": 0.10, "hard_stop_enabled": True})
-    with pytest.raises(BudgetExceeded):
-        studio.orchestrator.submit(
-            GenerationRequest(
-                universe_id=uid, kind="video", target_type="scene", target_id="x",
-                model="veo-3.1", variant="4K",
-            )
-        )
-
-
-def test_per_artist_ceiling(studio, client):
-    uid = client.post(
-        "/api/universes", json={"name": "Nova", "budget_usd": 0.05}
-    ).json()["id"]
-    with pytest.raises(BudgetExceeded):
-        studio.orchestrator.submit(
-            GenerationRequest(
-                universe_id=uid, kind="image", target_type="scene", target_id="x",
-                model="gemini-3-pro-image", variant="4K",
-            )
-        )
-
-
-def test_expired_credit_stops_everything(studio, client):
-    uid = client.post("/api/universes", json={"name": "Nova"}).json()["id"]
-    studio.budget.update_config({"credit_started_on": "2020-01-01", "credit_days": 90})
-    with pytest.raises(BudgetExceeded) as excinfo:
-        studio.orchestrator.submit(
-            GenerationRequest(universe_id=uid, kind="image", target_type="scene", target_id="x")
-        )
-    assert "caduco" in str(excinfo.value)
-
-
-def test_credit_countdown_is_visible(client, studio):
-    studio.budget.update_config({"credit_started_on": "2026-08-01", "credit_days": 90})
-    body = client.get("/api/budget").json()
-    assert body["credit_expires_on"] == "2026-10-30"
-    assert body["credit_days_left"] is not None
-
-
 # --- Idempotency (PRD 42.1) -----------------------------------------------
 
 
@@ -280,3 +235,18 @@ def test_user_choice_beats_the_bible_preference(studio, client):
         GenerationRequest(universe_id=uid, kind="image")
     )
     assert (fallback.spec.id, fallback.source) == ("gemini-3.1-flash-lite-image", "bible")
+
+
+def test_an_unknown_api_route_is_a_404_not_the_pwa(client, tmp_path):
+    """Sin esto, una ruta /api que ya no existe devuelve el index.html con 200 y
+    el cliente falla al parsear JSON muy lejos de la causa."""
+    response = client.get("/api/universes/uni_x/ruta-que-no-existe")
+    assert response.status_code == 404
+    assert response.headers["content-type"].startswith("application/json")
+
+
+def test_the_studio_keeps_no_budget(client):
+    """El gasto se mira en Google Cloud, no aqui."""
+    assert client.get("/api/budget").status_code == 404
+    home = client.get("/api/home").json()
+    assert "budget" not in home

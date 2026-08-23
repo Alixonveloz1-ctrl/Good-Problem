@@ -93,7 +93,7 @@ if [[ -n "${BILLING}" ]]; then
     --threshold-rule=percent=0.5 \
     --threshold-rule=percent=0.9 \
     --threshold-rule=percent=1.0 2>/dev/null || \
-    echo "    (ya existe o falta permiso; el corte duro lo aplica la app igualmente)"
+    echo "    (ya existe o falta permiso; creala a mano en la consola)"
 fi
 
 echo "==> Cloud Build permissions"
@@ -125,8 +125,8 @@ Listo. Queda por hacer, una sola vez y desde el movil:
      una vez desplegado. IAP es lo que deja entrar desde Safari sin construir
      login dentro de la app.
 
-  3. En Ajustes de la app, poner la fecha real de alta del credito para que la
-     cuenta atras de 90 dias sirva de algo.
+  3. Revisar el budget alert en la consola de facturacion. La aplicacion no
+     controla el gasto: se mira aqui.
 
 Para un despliegue puntual sin GitHub:
      gcloud run deploy ${SERVICE} --source . --region ${REGION} \\

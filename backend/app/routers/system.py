@@ -1,4 +1,4 @@
-"""Health, identity, model registry, budget and the Home screen."""
+"""Health, identity, model registry and the Home screen."""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ from typing import Any
 
 from fastapi import APIRouter, Body, Query
 from fastapi.responses import FileResponse, RedirectResponse
-from pydantic import BaseModel
 
 from ..db.repositories import UNIVERSES
 from ..domain.enums import JobState
@@ -63,28 +62,6 @@ def reload_models(owner: OwnerDep, studio: StudioDep) -> dict[str, Any]:
     return studio.reload_registry().selector_payload()
 
 
-# --- Budget (PRD 44) -------------------------------------------------------
-
-
-class BudgetPatch(BaseModel):
-    total_usd: float | None = None
-    hard_stop_enabled: bool | None = None
-    credit_started_on: str | None = None
-    credit_total_usd: float | None = None
-    credit_days: int | None = None
-
-
-@router.get("/budget")
-def budget(owner: OwnerDep, studio: StudioDep) -> dict[str, Any]:
-    return studio.budget.status().to_dict()
-
-
-@router.patch("/budget")
-def patch_budget(owner: OwnerDep, studio: StudioDep, patch: BudgetPatch) -> dict[str, Any]:
-    studio.budget.update_config(patch.model_dump(exclude_none=True))
-    return studio.budget.status().to_dict()
-
-
 # --- Home (PRD 38) ---------------------------------------------------------
 
 
@@ -107,7 +84,6 @@ def home(owner: OwnerDep, studio: StudioDep) -> dict[str, Any]:
                     "target_type": job.get("target_type", ""),
                     "target_id": job.get("target_id", ""),
                     "model": job.get("model", ""),
-                    "cost_usd": job.get("actual_cost_usd", 0.0),
                     "finished_at": job.get("finished_at"),
                 }
             )
@@ -117,7 +93,6 @@ def home(owner: OwnerDep, studio: StudioDep) -> dict[str, Any]:
         "pending_approvals": sorted(
             pending, key=lambda j: j.get("finished_at") or "", reverse=True
         ),
-        "budget": studio.budget.status().to_dict(),
     }
 
 

@@ -40,7 +40,25 @@ Además: **el video se factura por segundo.** La consola de Vertex rotula la
 unidad como «1 count», que se lee como «por video», pero no lo es. Un clip de
 8 s a $0,05 factura $0,40. Toda la aritmética está en
 [`pricing.py`](backend/app/domain/pricing.py) y contrastada con los números del
-propio PRD.
+propio PRD. Por eso el selector muestra lo que cuesta el clip entero, no el
+precio por segundo.
+
+## El dinero se mira en Google Cloud
+
+**Apartado del PRD a petición del propietario.** El §44 pedía un contador de
+gasto dentro de la app, la cuenta atrás de los 90 días del crédito y un corte
+automático al llegar al presupuesto. Nada de eso existe: el estudio no lleva
+cuentas ni frena ninguna generación. El gasto se consulta en la consola de
+Google Cloud, y los avisos de presupuesto se configuran allí
+(`infra/setup.sh` los deja creados).
+
+Lo que sí queda es lo que cuesta cada cosa **antes** de lanzarla: el precio de
+cada opción en el selector de modelo y la estimación del Production Plan. Y cada
+generación deja registrado lo que costó dentro de su Job y de la procedencia del
+asset (PRD 46), que es trazabilidad, no un contador.
+
+El riesgo asumido: aquí cada generación es un botón que se pulsa a mano, no hay
+ningún «generar todo», así que no hay forma de que un bucle se dispare solo.
 
 ## Modelos
 

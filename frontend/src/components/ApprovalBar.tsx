@@ -1,15 +1,8 @@
 import type { ReactNode } from 'react'
-import { money } from '../api/client'
 
-/**
- * APPROVE / REGENERATE / EDIT / REJECT / SAVE TO CANON (PRD 36).
- *
- * The accumulated cost sits on the same screen as the regenerate button, on
- * purpose (PRD 44).
- */
+/** APPROVE / REGENERATE / EDIT / REJECT / SAVE TO CANON (PRD 36). */
 export function ApprovalBar({
   status,
-  costUsd,
   busy,
   onApprove,
   onRegenerate,
@@ -18,7 +11,6 @@ export function ApprovalBar({
   extra,
 }: {
   status?: string
-  costUsd?: number
   busy?: boolean
   onApprove?: () => void
   onRegenerate?: () => void
@@ -28,10 +20,6 @@ export function ApprovalBar({
 }) {
   return (
     <div className="approval">
-      <div className="row between">
-        <span className="muted">Gastado aqui</span>
-        <span className="cost">{money(costUsd ?? 0)}</span>
-      </div>
       <div className="btn-grid">
         {onApprove && (
           <button className="btn ok" onClick={onApprove} disabled={busy || status === 'APPROVED'}>

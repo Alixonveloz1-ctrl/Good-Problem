@@ -166,8 +166,20 @@ referencia del PRD 44:
 | Video | 288 s × $0,10 | $28,80 |
 | Director | ~1M tokens | ~$2,13 |
 
-El presupuesto se comprueba **antes** de crear el Job, no después de gastar. Al
-alcanzarlo, `BudgetExceeded` devuelve 402 y no se genera nada.
+**El estudio no lleva cuentas ni corta nada.** Es una desviación deliberada del
+PRD 44, pedida por el propietario: el gasto acumulado, la cuenta atrás del
+crédito y el corte automático se quitaron porque esa información se consulta en
+la consola de Google Cloud. No existe `BudgetService`, ni libro de gasto, ni
+`/api/budget`, ni techo por artista.
+
+Los precios siguen sirviendo para dos cosas, ambas *antes* de gastar:
+
+- el selector de modelo, que muestra lo que costará esa generación concreta;
+- el Production Plan, que estima una producción entera antes de lanzarla.
+
+Y cada Job guarda `estimated_cost_usd` y `actual_cost_usd`, que van también a la
+procedencia del asset (PRD 46). Eso es trazabilidad —de dónde salió esta pieza y
+qué costó— no un contador: ninguna pantalla los muestra y nada los suma.
 
 ## 9. Ensamblaje
 

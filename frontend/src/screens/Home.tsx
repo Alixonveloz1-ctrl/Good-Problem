@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, money } from '../api/client'
+import { api } from '../api/client'
 import { useAction, useResource } from '../hooks/useApi'
 import type { Home as HomeData } from '../api/types'
-import { CreditMeter } from '../components/CreditMeter'
 import { Card, Empty, ErrorNote, Field, JobBadge, Loading, Sheet, TopBar } from '../components/ui'
 
 export function HomeScreen() {
@@ -37,8 +36,6 @@ export function HomeScreen() {
 
         {data && (
           <>
-            <CreditMeter budget={data.budget} />
-
             {data.pending_approvals.length > 0 && (
               <>
                 <div className="section-title">Esperando tu decision</div>
@@ -57,10 +54,7 @@ export function HomeScreen() {
                         <span>{item.universe_name}</span>
                         <span className="mono">{item.model}</span>
                       </div>
-                      <div className="row between muted">
-                        <span>{money(item.cost_usd)}</span>
-                        <span>{item.target_id}</span>
-                      </div>
+                      <div className="muted mono">{item.target_id}</div>
                     </Link>
                   ))}
                 </div>
@@ -77,10 +71,7 @@ export function HomeScreen() {
                         <strong>{describeTarget(job.kind, job.target_type)}</strong>
                         <JobBadge state={job.state} />
                       </div>
-                      <div className="row between muted">
-                        <span className="mono">{job.model}</span>
-                        <span>est. {money(job.estimated_cost_usd)}</span>
-                      </div>
+                      <div className="muted mono">{job.model}</div>
                       <div className="muted">
                         Continua en Google Cloud aunque cierres el iPhone.
                       </div>
@@ -105,10 +96,7 @@ export function HomeScreen() {
               <div className="list">
                 {data.universes.map((universe) => (
                   <Link key={universe.id} to={`/u/${universe.id}`} className="card tappable">
-                    <div className="row between">
-                      <strong>{universe.name}</strong>
-                      <span className="muted">{money(universe.spend_usd)}</span>
-                    </div>
+                    <strong>{universe.name}</strong>
                     {universe.tagline && <div className="sub">{universe.tagline}</div>}
                     <div className="muted mono">{universe.id}</div>
                   </Link>

@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .container import get_studio
-from .errors import DomainError
+from .errors import DomainError, NotFound
 from .routers import characters, content, exports, jobs, music, system, universes, video
 from .settings import get_settings
 
@@ -78,7 +78,14 @@ if _static.is_dir():
 
     @app.get("/{full_path:path}", include_in_schema=False)
     def spa(full_path: str) -> Any:
-        """Serve the built PWA, letting the client router handle the path."""
+        """Serve the built PWA, letting the client router handle the path.
+
+        An unknown /api path must not fall through to index.html: a client
+        calling a route that no longer exists would get HTML and a 200, and the
+        mistake would surface as a JSON parse error somewhere far away.
+        """
+        if full_path.startswith("api/"):
+            raise NotFound(f"No existe la ruta /{full_path}")
         candidate = _static / full_path
         if full_path and candidate.is_file():
             return FileResponse(candidate)

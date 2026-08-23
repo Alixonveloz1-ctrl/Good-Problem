@@ -13,7 +13,6 @@ from ..errors import NotFound
 from .client import Database, Document
 
 CONFIG_MODELS = "config/models"
-CONFIG_BUDGET = "config/budget"
 UNIVERSES = "universes"
 
 # Sub collections of a universe (PRD 47).
@@ -28,7 +27,6 @@ VIDEOS = "videos"
 CONTENT = "content"
 CANON = "canon"
 JOBS = "jobs"
-SPEND = "spend"
 EXPORTS = "exports"
 IDEMPOTENCY = "idempotency"
 

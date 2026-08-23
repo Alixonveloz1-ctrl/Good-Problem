@@ -31,7 +31,6 @@ def settings(tmp_root) -> Settings:
         dry_run=True,
         local_data_dir=str(tmp_root),
         static_dir=str(tmp_root / "no-frontend"),
-        credit_started_on="2026-08-01",
     )
 
 

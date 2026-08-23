@@ -23,13 +23,11 @@ router = APIRouter(prefix="/api/universes", tags=["universes"])
 class UniverseIn(BaseModel):
     name: str
     tagline: str = ""
-    budget_usd: float | None = None
 
 
 class UniversePatch(BaseModel):
     name: str | None = None
     tagline: str | None = None
-    budget_usd: float | None = None
     cover_image: str | None = None
 
 
@@ -41,7 +39,6 @@ def create_universe(owner: OwnerDep, studio: StudioDep, body: UniverseIn) -> dic
         universe_id=universe_id,
         name=body.name,
         tagline=body.tagline,
-        budget_usd=body.budget_usd,
     )
     studio.db.set(universe_path(universe_id), universe.model_dump())
     # A universe starts with an empty Bible so every later call has something
@@ -60,11 +57,7 @@ def get_universe(owner: OwnerDep, studio: StudioDep, universe_id: str) -> dict[s
     universe = studio.db.get(universe_path(universe_id))
     if universe is None:
         raise NotFound(f"El universe {universe_id} no existe.")
-    return {
-        **universe,
-        "spend_usd": studio.budget.universe_spend(universe_id),
-        "budget": studio.budget.status().to_dict(),
-    }
+    return universe
 
 
 @router.patch("/{universe_id}")
@@ -80,17 +73,6 @@ def delete_universe(owner: OwnerDep, studio: StudioDep, universe_id: str) -> dic
     studio.orchestrator.require_universe(universe_id)
     studio.db.delete(universe_path(universe_id))
     return {"deleted": universe_id}
-
-
-@router.get("/{universe_id}/spend")
-def spend(owner: OwnerDep, studio: StudioDep, universe_id: str) -> dict[str, Any]:
-    studio.orchestrator.require_universe(universe_id)
-    return {
-        "universe_id": universe_id,
-        "spend_usd": studio.budget.universe_spend(universe_id),
-        "entries": studio.budget.ledger(universe_id, limit=200),
-        "budget": studio.budget.status().to_dict(),
-    }
 
 
 # --- Artist Bible ----------------------------------------------------------
@@ -184,7 +166,6 @@ class PreferencesIn(BaseModel):
     preferred_video_model: str | None = None
     preferred_video_variant: str | None = None
     working_resolution: str | None = None
-    budget_usd: float | None = None
 
 
 @router.put("/{universe_id}/bible/preferences")

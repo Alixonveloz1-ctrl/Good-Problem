@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { api, mediaUrl, money, newIdempotencyKey } from '../api/client'
+import { api, mediaUrl, newIdempotencyKey } from '../api/client'
 import { useAction, useResource } from '../hooks/useApi'
 import type { Song } from '../api/types'
 import { ApprovalBar } from '../components/ApprovalBar'
@@ -68,10 +68,7 @@ export function SongsScreen() {
                 <strong>{song.title || 'Sin titulo'}</strong>
                 <StatusBadge status={song.status} />
               </div>
-              <div className="row between muted">
-                <span>{song.genre || 'sin genero'}</span>
-                <span>{money(song.cost_usd)}</span>
-              </div>
+              <div className="muted">{song.genre || 'sin genero'}</div>
               <div className="muted">
                 {song.versions.length} version(es) · {song.requested_duration_seconds}s
               </div>
@@ -316,10 +313,7 @@ export function SongScreen() {
                       {version.url && (
                         <audio controls preload="none" src={version.url} style={{ width: '100%' }} />
                       )}
-                      <div className="row between muted">
-                        <span className="mono">{version.model}</span>
-                        <span>{money(version.cost_usd)}</span>
-                      </div>
+                      <div className="muted mono">{version.model}</div>
                       <button
                         className="btn ok block"
                         disabled={action.busy}
@@ -340,7 +334,6 @@ export function SongScreen() {
 
             <ApprovalBar
               status={data.status}
-              costUsd={data.cost_usd}
               busy={action.busy}
               onRegenerate={
                 lyricsApproved

@@ -35,24 +35,11 @@ export interface Registry {
   excluded: { id: string; kind: string; reason: string }[]
 }
 
-export interface Budget {
-  total_usd: number
-  spent_usd: number
-  remaining_usd: number
-  hard_stop: boolean
-  credit_total_usd: number
-  credit_started_on: string | null
-  credit_expires_on: string | null
-  credit_days_left: number | null
-}
-
 export interface Universe {
   id: string
   name: string
   tagline: string
   status: CanonStatus
-  spend_usd: number
-  budget_usd: number | null
   updated_at: string
 }
 
@@ -90,7 +77,6 @@ export interface Home {
   universes: Universe[]
   active_jobs: (Job & { universe_name: string })[]
   pending_approvals: PendingApproval[]
-  budget: Budget
 }
 
 export interface VoiceProfile {
@@ -113,7 +99,6 @@ export interface ArtistBible {
     preferred_video_model: string | null
     preferred_video_variant: string | null
     working_resolution: string
-    budget_usd: number | null
   }
   voice_profile: VoiceProfile
   summary?: string
@@ -164,7 +149,6 @@ export interface SongVersion {
   url?: string | null
   duration_seconds: number
   model: string
-  cost_usd: number
   status: CanonStatus
   created_at: string
 }
@@ -266,10 +250,6 @@ export interface ProductionPlan {
   reused_takes: number
   vertical_derivatives: number
   estimated_generation_cost_usd: number
-  spent_on_this_artist_usd: number
-  credit_remaining_usd: number
-  credit_days_left: number | null
-  fits_in_budget: boolean
   text?: string
 }
 

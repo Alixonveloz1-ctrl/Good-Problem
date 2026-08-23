@@ -134,21 +134,33 @@ siempre.
 
 ## 6. Control de gasto
 
-Tres capas, de menos a más contundente:
+**La aplicación no controla el gasto.** No lleva contador, no muestra el crédito
+restante y no rechaza ninguna generación por presupuesto. Es una desviación
+deliberada del PRD 44, a petición del propietario: el gasto se consulta en la
+consola de Google Cloud.
 
-1. **Budget alerts** de Google Cloud: avisan.
-2. **Corte automático de la app**: al alcanzar el presupuesto, los trabajos
-   nuevos se rechazan con 402. No es solo un aviso.
-3. **Techo por artista**: opcional, en `budget_usd` del Universe.
+Lo que hay que dejar montado allí, y `infra/setup.sh` ya lo crea:
 
-En Ajustes hay que poner la **fecha real de alta del crédito**. Los $300 de
-bienvenida caducan a los 90 días del alta, se usen o no; si se agotan por gasto
-o por calendario, la cuenta de prueba se cierra y los proyectos se detienen, con
-30 días de gracia para pasar a cuenta de pago. El Home muestra los días
-restantes.
+- **Budget alerts** sobre la cuenta de facturación, con avisos al 50 %, 90 % y
+  100 %. Avisan por correo; no detienen nada.
+- Si quieres un freno de verdad, se monta en Google Cloud, no aquí: un
+  presupuesto con una función de Cloud Functions suscrita al tema de Pub/Sub que
+  desactive la facturación del proyecto al llegar al tope.
+
+Dos cosas que conviene tener presentes de los $300 de bienvenida, porque la app
+ya no te las va a recordar:
+
+- **Caducan a los 90 días del alta**, se usen o no.
+- Si se agotan por gasto o por calendario, la cuenta de prueba se cierra y los
+  proyectos se detienen, con 30 días de gracia para pasar a cuenta de pago.
 
 El crédito no cubre la Gemini API de AI Studio ni modelos de socios en Vertex.
 Los modelos propios de Google —Gemini, Veo, Lyria— sí.
+
+Dentro de la app, lo único que sigue hablando de dinero es lo que cuesta algo
+**antes** de lanzarlo: el precio de cada opción en el selector de modelo y la
+estimación del Production Plan. El video se factura por segundo, así que el
+selector muestra el precio del clip completo.
 
 ## 7. Primer arranque
 

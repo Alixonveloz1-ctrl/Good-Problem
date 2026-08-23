@@ -125,7 +125,6 @@ class GenerationPreferences(Base):
     preferred_video_model: str | None = None
     preferred_video_variant: str | None = None
     working_resolution: str = "1K"
-    budget_usd: float | None = None
 
 
 class VoiceProfile(Base):
@@ -157,9 +156,6 @@ class Universe(Entity):
     tagline: str = ""
     cover_image: str | None = None
     status: CanonStatus = CanonStatus.DRAFT
-    spend_usd: float = 0.0
-    budget_usd: float | None = None
-    """Per artist ceiling. None means only the global budget applies."""
 
 
 # --- Characters, wardrobe, locations (PRD 17-20) ---------------------------
@@ -449,19 +445,6 @@ class Job(Entity):
     actual_cost_usd: float = 0.0
     started_at: str | None = None
     finished_at: str | None = None
-
-
-class SpendEntry(Entity):
-    job_id: str | None = None
-    kind: str
-    model: str
-    variant: str = ""
-    quantity: float = 0.0
-    unit: str = ""
-    amount_usd: float = 0.0
-    target_type: str = ""
-    target_id: str = ""
-    note: str = ""
 
 
 class CanonEntry(Entity):

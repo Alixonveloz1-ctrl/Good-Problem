@@ -1,10 +1,8 @@
-import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { api, money } from '../api/client'
 import { useAction, useResource } from '../hooks/useApi'
-import type { Budget, ExportPackage, Registry, Song } from '../api/types'
-import { CreditMeter } from '../components/CreditMeter'
-import { Card, Empty, ErrorNote, Field, Loading, StatusBadge, TopBar } from '../components/ui'
+import type { ExportPackage, Registry, Song } from '../api/types'
+import { Card, Empty, ErrorNote, Loading, StatusBadge, TopBar } from '../components/ui'
 
 export function CanonScreen() {
   const { universeId = '' } = useParams()
@@ -108,58 +106,17 @@ export function ExportsScreen() {
 }
 
 export function SettingsScreen() {
-  const budget = useResource<Budget>('/api/budget')
   const registry = useResource<Registry>('/api/registry/models')
   const health = useResource<{ dry_run: boolean; project: string | null; storage: string }>(
     '/api/health',
   )
   const action = useAction()
-  const [total, setTotal] = useState('')
-  const [started, setStarted] = useState('')
 
   return (
     <>
       <TopBar title="Ajustes" />
       <main className="screen">
         <ErrorNote error={action.error} onDismiss={action.clearError} />
-        {budget.data && <CreditMeter budget={budget.data} />}
-
-        <Card>
-          <h3>Presupuesto</h3>
-          <Field
-            label="Techo total en USD"
-            value={total}
-            onChange={setTotal}
-            type="number"
-            placeholder={String(budget.data?.total_usd ?? 300)}
-          />
-          <Field
-            label="Fecha de alta del credito (AAAA-MM-DD)"
-            value={started}
-            onChange={setStarted}
-            placeholder={budget.data?.credit_started_on ?? '2026-08-23'}
-          />
-          <div className="muted">
-            El credito de bienvenida caduca a los 90 dias del alta de la cuenta, se use o no. Pon
-            aqui la fecha real para que la cuenta atras sirva.
-          </div>
-          <button
-            className="btn block"
-            disabled={action.busy}
-            onClick={async () => {
-              const patch: Record<string, unknown> = {}
-              if (total) patch.total_usd = Number(total)
-              if (started) patch.credit_started_on = started
-              await action.run(() => api.patch('/api/budget', patch))
-              await budget.reload()
-            }}
-          >
-            Guardar
-          </button>
-          <div className="muted">
-            Al alcanzar el techo, los trabajos nuevos se rechazan. No es solo un aviso.
-          </div>
-        </Card>
 
         <Card>
           <h3>Registro de modelos</h3>

@@ -43,12 +43,6 @@ class Settings(BaseSettings):
     local_data_dir: str = str(BACKEND_ROOT / ".localdata")
     static_dir: str = str(REPO_ROOT / "frontend" / "dist")
 
-    # --- Credit window (PRD 44) ---------------------------------------------
-    credit_started_on: str = ""
-    """ISO date the $300 welcome credit started. Drives the 90 day countdown."""
-    credit_total_usd: float = 300.0
-    credit_days: int = 90
-
     @property
     def use_firestore(self) -> bool:
         return bool(self.project_id)

@@ -104,9 +104,16 @@ export function ModelPicker({
         <Sheet title={`Elegir modelo de ${kindLabel(kind)}`} onClose={() => setOpen(false)}>
           <p className="muted" style={{ margin: 0 }}>
             {kind === 'video'
-              ? 'Precio por segundo de video generado. Un clip de 8 s a $0,05 factura $0,40. El audio va siempre desactivado.'
+              ? 'El precio es el del clip completo. Veo cobra por segundo, no por video: 8 s a $0,05 el segundo son $0,40. El audio va siempre desactivado.'
               : 'El precio de cada opcion es el de una generacion.'}
           </p>
+          {kind === 'video' && (
+            <p className="muted" style={{ margin: 0 }}>
+              Todas las escenas duran 8 segundos. «Alarga tomas» significa que ese modelo puede
+              continuar un plano ya generado, +7 s cada vez, hasta unos 148 s; «Solo 8 s» que no
+              puede. El estudio todavia no usa esa funcion, asi que hoy la diferencia no te afecta.
+            </p>
+          )}
           {models.map((model) => (
             <div
               key={model.id}
@@ -169,10 +176,12 @@ function capabilityBadge(model: ModelSpec) {
     }
   }
   if (model.kind === 'video') {
+    // "Extension" no le dice nada a nadie: lo que cambia es si el modelo puede
+    // continuar un plano mas alla de los 8 segundos.
     return model.capabilities.supports_extend ? (
-      <span className="badge approved">Extension</span>
+      <span className="badge">Alarga tomas</span>
     ) : (
-      <span className="badge">Sin extension</span>
+      <span className="badge">Solo 8 s</span>
     )
   }
   return null

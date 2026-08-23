@@ -16,7 +16,6 @@ from .providers.chirp import ChirpClient, build_chirp_client
 from .providers.secrets import SecretStore, build_secret_store
 from .providers.storage import Storage, build_storage
 from .providers.vertex import CallLog, VertexClient, build_vertex_client
-from .services.budget import BudgetService
 from .services.idempotency import IdempotencyStore
 from .services.jobs import JobService
 from .settings import Settings, get_settings
@@ -43,7 +42,6 @@ class Studio:
         self.chirp = chirp or build_chirp_client(self.settings)
         self.secrets = secrets or build_secret_store(self.settings)
 
-        self.budget = BudgetService(self.db, self.settings)
         self.idempotency = IdempotencyStore(self.db)
         self.jobs = JobService(self.db, self.settings)
 

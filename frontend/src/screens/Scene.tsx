@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { api, money, newIdempotencyKey } from '../api/client'
+import { api, newIdempotencyKey } from '../api/client'
 import { useAction, useResource } from '../hooks/useApi'
 import type { Scene } from '../api/types'
 import { ApprovalBar } from '../components/ApprovalBar'
@@ -9,12 +9,11 @@ import { ModelPicker, type ModelChoice } from '../components/ModelPicker'
 import { Card, ErrorNote, Field, Loading, StatusBadge, TopBar } from '../components/ui'
 
 interface SceneDetail extends Scene {
-  image: { url: string; model: string; variant: string; cost_usd: number } | null
+  image: { url: string; model: string; variant: string } | null
   clip: {
     url: string
     model: string
     variant: string
-    cost_usd: number
     duration_seconds: number
     generate_audio: boolean
   } | null
@@ -221,11 +220,11 @@ export function SceneScreen() {
               />
             )}
 
-            <ApprovalBar costUsd={data.cost_usd} status={data.status} busy={action.busy} />
+            <ApprovalBar status={data.status} busy={action.busy} />
             {data.clip && (
               <div className="muted">
-                Clip: {data.clip.model} · {data.clip.variant} · {data.clip.duration_seconds}s ·{' '}
-                {money(data.clip.cost_usd)} · audio {String(data.clip.generate_audio)}
+                Clip: {data.clip.model} · {data.clip.variant} · {data.clip.duration_seconds}s ·
+                audio {String(data.clip.generate_audio)}
               </div>
             )}
           </>

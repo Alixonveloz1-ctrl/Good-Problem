@@ -43,13 +43,6 @@ class InvalidGenerationRequest(DomainError):
     code = "invalid_generation_request"
 
 
-class BudgetExceeded(DomainError):
-    """Hard cutoff: new work is rejected, not merely flagged (PRD 44)."""
-
-    status_code = 402
-    code = "budget_exceeded"
-
-
 class ApprovalRequired(DomainError):
     """A stage tried to advance without human approval (PRD 3, 36)."""
 

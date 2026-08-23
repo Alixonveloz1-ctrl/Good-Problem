@@ -1,9 +1,11 @@
 """Production Plan (PRD 27, 28).
 
-The Producer counts what a production will actually cost before anything
-expensive runs: how many scenes, how many of them reuse an existing take, how
-many images and clips are really needed, with which models, and what that adds
-up to against the money and the days that are left.
+The Producer counts what a production really involves before anything expensive
+runs: how many scenes, how many of them reuse an existing take, how many images
+and clips are actually needed, with which models, and what that adds up to.
+
+It is a forecast, not a ledger. The studio keeps no running total: what has been
+spent is read in the Google Cloud console.
 
 The user can approve it, modify it or cancel.
 """
@@ -71,7 +73,6 @@ def build(
     )
 
     total = image_cost.amount_usd + video_cost.amount_usd
-    budget = studio.budget.status()
 
     return {
         "project_id": project_id,
@@ -99,10 +100,6 @@ def build(
         "vertical_derivatives": inputs.vertical_derivatives,
         "vertical_cost_usd": 0.0,
         "estimated_generation_cost_usd": round(total, 2),
-        "spent_on_this_artist_usd": round(studio.budget.universe_spend(universe_id), 2),
-        "credit_remaining_usd": round(budget.remaining_usd, 2),
-        "credit_days_left": budget.credit_days_left,
-        "fits_in_budget": total <= budget.remaining_usd,
     }
 
 
@@ -110,8 +107,6 @@ def render_text(plan: dict[str, Any]) -> str:
     """The plain block shown on the phone (PRD 28)."""
     images = plan["scene_images"]
     clips = plan["video_clips"]
-    days = plan.get("credit_days_left")
-    days_line = f"   ·   caduca en {days} dias" if days is not None else ""
     return "\n".join(
         [
             "PROJECT:",
@@ -146,11 +141,5 @@ def render_text(plan: dict[str, Any]) -> str:
             "",
             "ESTIMATED GENERATION COST:",
             f"${plan['estimated_generation_cost_usd']:,.2f}",
-            "",
-            "GASTADO EN ESTE ARTISTA:",
-            f"${plan['spent_on_this_artist_usd']:,.2f}",
-            "",
-            "CREDITO RESTANTE:",
-            f"${plan['credit_remaining_usd']:,.2f}{days_line}",
         ]
     )

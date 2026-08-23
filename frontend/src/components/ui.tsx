@@ -64,14 +64,11 @@ export function JobBadge({ state }: { state: JobState | string }) {
 
 export function ErrorNote({ error, onDismiss }: { error: StudioError | Error | null; onDismiss?: () => void }) {
   if (!error) return null
-  const isBudget = error instanceof StudioError && error.code === 'budget_exceeded'
   const isApproval = error instanceof StudioError && error.code === 'approval_required'
   return (
     <div className="error" role="alert">
       <div className="row between">
-        <strong>
-          {isBudget ? 'Presupuesto' : isApproval ? 'Falta aprobar algo' : 'No se pudo hacer'}
-        </strong>
+        <strong>{isApproval ? 'Falta aprobar algo' : 'No se pudo hacer'}</strong>
         {onDismiss && (
           <button className="btn small ghost" onClick={onDismiss}>
             Cerrar

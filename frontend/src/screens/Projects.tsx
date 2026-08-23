@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { api, money, newIdempotencyKey } from '../api/client'
+import { api, newIdempotencyKey } from '../api/client'
 import { useAction, useResource } from '../hooks/useApi'
 import type { ProductionPlan, Scene, VideoProject } from '../api/types'
 import { JobWatcher } from '../components/JobWatcher'
@@ -98,9 +98,6 @@ export function ProjectScreen() {
                       <span className="name">{stage.label}</span>
                       {stage.detail && <div className="muted">{stage.detail}</div>}
                     </span>
-                    {stage.cost_usd !== undefined && stage.cost_usd > 0 && (
-                      <span className="muted">{money(stage.cost_usd)}</span>
-                    )}
                   </div>
                 ))}
               </div>
@@ -270,7 +267,6 @@ function SceneRow({ scene, onOpen }: { scene: Scene; onOpen: () => void }) {
         <span className={`badge ${scene.clip_status === 'APPROVED' ? 'approved' : 'draft'}`}>
           Clip {scene.clip_status === 'APPROVED' ? 'ok' : 'pendiente'}
         </span>
-        {scene.cost_usd > 0 && <span className="badge">{money(scene.cost_usd)}</span>}
       </div>
     </Card>
   )
@@ -320,17 +316,7 @@ function PlanSheet({
       >
         Calcular
       </button>
-      {plan && (
-        <>
-          <pre className="block">{plan.text}</pre>
-          {!plan.fits_in_budget && (
-            <div className="error">
-              El presupuesto no cubre este plan. Cambia de modelo o reduce escenas: los trabajos
-              nuevos se rechazan al alcanzar el limite.
-            </div>
-          )}
-        </>
-      )}
+      {plan && <pre className="block">{plan.text}</pre>}
     </Sheet>
   )
 }

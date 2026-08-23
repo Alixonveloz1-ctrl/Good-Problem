@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom'
-import { api, money } from '../api/client'
+import { api } from '../api/client'
 import { useAction, useResource } from '../hooks/useApi'
 import type { Job } from '../api/types'
 import { Card, Empty, ErrorNote, JobBadge, Loading, TopBar } from '../components/ui'
@@ -32,16 +32,9 @@ export function JobsScreen() {
                 <strong>{job.kind}</strong>
                 <JobBadge state={job.state} />
               </div>
-              <div className="row between muted">
-                <span className="mono">
-                  {job.model}
-                  {job.variant ? ` · ${job.variant}` : ''}
-                </span>
-                <span>
-                  {job.actual_cost_usd > 0
-                    ? money(job.actual_cost_usd)
-                    : `est. ${money(job.estimated_cost_usd)}`}
-                </span>
+              <div className="muted mono">
+                {job.model}
+                {job.variant ? ` · ${job.variant}` : ''}
               </div>
               <div className="muted mono">
                 {job.target_type}/{job.target_id}

@@ -164,12 +164,12 @@ def test_full_production_from_a_phone(client, studio):
          json={"text": "Hola, soy Nova."})
     _run(client, studio, "post", f"/api/universes/{uid}/content/{piece['id']}/approve")
 
-    # 35. Comparar el costo real con el estimado.
-    spend = client.get(f"/api/universes/{uid}/spend").json()
-    assert spend["spend_usd"] > 0
+    # 35. El estudio no lleva cuentas: el gasto se mira en Google Cloud. Lo que
+    # si queda es lo que costo cada pieza, como parte de su procedencia (PRD 46).
+    assert client.get(f"/api/universes/{uid}/spend").status_code != 200
     jobs = client.get(f"/api/universes/{uid}/jobs?limit=100").json()
     billed = [j for j in jobs if j["actual_cost_usd"] > 0]
-    assert billed, "cada generacion deja una fila de gasto"
+    assert billed, "cada generacion deja constancia de lo que costo"
     for job in billed:
         assert job["estimated_cost_usd"] >= 0
 
