@@ -232,6 +232,19 @@ paso "La identidad de la cola de trabajos"
 detalle "Es lo que hace que un vídeo siga generándose aunque cierres Safari."
 crear_cuenta "aaus-tasks" "Cola de generación"
 dar_rol "serviceAccount:${SA_COLA}" "roles/run.invoker"
+
+# Y lo que faltaba: para encargar un trabajo, la aplicación tiene que poder
+# actuar EN NOMBRE de la cuenta de la cola. Es un permiso sobre esa cuenta
+# concreta, no un rol del proyecto, y por eso no bastaba con los de arriba.
+#
+# Sin esto, cada generación muere nada más empezar con un
+# "lacks IAM permission iam.serviceAccounts.actAs", que en la pantalla se ve
+# como un ladrillo de texto de Google y no como lo que es: un permiso que el
+# instalador no dio.
+gcloud iam service-accounts add-iam-policy-binding "$SA_COLA" \
+  --member="serviceAccount:${SA_APP}" \
+  --role=roles/iam.serviceAccountUser \
+  --project="$PROJECT_ID" >/dev/null 2>&1 || true
 ok "Permisos de la cola"
 
 paso "Permisos para publicar actualizaciones"

@@ -22,7 +22,7 @@ from ..db.client import Database
 from ..db.repositories import JOBS, Repository
 from ..domain.enums import JobState
 from ..domain.guards import assert_same_model_on_retry
-from ..errors import Conflict, NotFound
+from ..errors import Conflict, NotFound, ProviderError
 from ..ids import new_id
 from ..settings import Settings
 
@@ -198,7 +198,19 @@ class JobService:
             self.settings.project_id, self.settings.location, self.settings.tasks_queue
         )
         task = self.build_task(universe_id, job_id, tasks_v2.HttpMethod.POST)
-        client.create_task(request={"parent": parent, "task": task})
+        try:
+            client.create_task(request={"parent": parent, "task": task})
+        except Exception as exc:
+            # Los fallos de permisos aqui llegan como un ladrillo de texto de
+            # Google que no dice que hacer. Casi siempre es lo mismo: falta que
+            # la aplicacion pueda actuar en nombre de la cuenta de la cola, y
+            # eso lo arregla el instalador. Decirlo asi ahorra buscar.
+            if "actAs" in str(exc) or "PermissionDenied" in type(exc).__name__:
+                raise ProviderError(
+                    "Falta un permiso para encargar el trabajo. Ejecuta ./setup.sh "
+                    "una vez en Cloud Shell y vuelve a intentarlo."
+                ) from exc
+            raise
         logger.info("job_enqueued %s %s", universe_id, job_id)
 
     def _run_inline(self, universe_id: str, job_id: str) -> None:
