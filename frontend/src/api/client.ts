@@ -77,8 +77,3 @@ export function mediaUrl(path: string | null | undefined): string | null {
   if (path.startsWith('http') || path.startsWith('/')) return path
   return `/media/${path}`
 }
-
-export function money(value: number | null | undefined): string {
-  if (value === null || value === undefined) return '—'
-  return value.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })
-}

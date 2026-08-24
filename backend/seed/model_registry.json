@@ -1,6 +1,6 @@
 {
-  "schema_version": 1,
-  "note": "Fuente de verdad de los modelos disponibles y sus precios. Vive en Firestore (config/models). Editar este documento NO requiere desplegar codigo. Los modelos de 'excluded' no se pueden reactivar desde aqui: estan tambien bloqueados en app/domain/guards.py.",
+  "schema_version": 2,
+  "note": "Los identificadores son los que Vertex AI reconoce, no los nombres comerciales. Al subir schema_version, la aplicacion reescribe este documento en el arranque siguiente.",
   "currency": "USD",
   "models": [
     {

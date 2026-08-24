@@ -7,46 +7,18 @@ export interface ModelChoice {
   model: string
   variant: string
   label: string
-  price: number
   unit: string
-}
-
-function priceOf(variant: Variant): number {
-  return variant.price ?? 0
-}
-
-function unitLabel(unit: string): string {
-  switch (unit) {
-    case 'second':
-      return 'por segundo'
-    case 'image':
-      return 'por imagen'
-    case 'song':
-      return 'por cancion'
-    case '1m_characters':
-      return 'por millon de caracteres'
-    default:
-      return ''
-  }
-}
-
-function formatPrice(variant: Variant): string {
-  const price = priceOf(variant)
-  const digits = price < 0.1 ? 3 : 2
-  return `$${price.toFixed(digits)}`
-}
-
-/** Estimated total for one generation, so the price is visible before tapping. */
-function estimate(kind: string, variant: Variant, seconds: number): string {
-  if (kind === 'video') return `$${(priceOf(variant) * seconds).toFixed(2)} / clip de ${seconds}s`
-  return `${formatPrice(variant)} ${unitLabel(variant.unit)}`
 }
 
 /**
  * The model selector (PRD 16, 39).
  *
- * A bottom sheet reachable from any generation screen, with the price of every
- * option visible in the list. Music has no selector: there is one model.
+ * Una hoja que sube desde abajo, desde cualquier pantalla de generacion. La
+ * musica no tiene selector: hay un solo modelo.
+ *
+ * No se habla de dinero aqui. El gasto se mira en la consola de Google Cloud,
+ * que es donde esta el de verdad; repetirlo en la app solo anade una cifra que
+ * hay que mantener al dia y que nadie va a creerse.
  */
 export function ModelPicker({
   kind,
@@ -79,7 +51,6 @@ export function ModelPicker({
       model: model.id,
       variant: variant.key,
       label: `${model.label} · ${variant.label}`,
-      price: priceOf(variant),
       unit: variant.unit,
     })
     setOpen(false)
@@ -91,26 +62,15 @@ export function ModelPicker({
         <span className="grow" style={{ textAlign: 'left' }}>
           {label}: {value ? value.label : 'elegir'}
         </span>
-        <span className="muted">
-          {value && kind === 'video'
-            ? `$${(value.price * seconds).toFixed(2)}`
-            : value
-              ? `$${value.price.toFixed(value.price < 0.1 ? 3 : 2)}`
-              : '›'}
-        </span>
+        <span className="muted">›</span>
       </button>
 
       {open && (
         <Sheet title={`Elegir modelo de ${kindLabel(kind)}`} onClose={() => setOpen(false)}>
-          <p className="muted" style={{ margin: 0 }}>
-            {kind === 'video'
-              ? 'El precio es el del clip completo. Veo cobra por segundo, no por video: 8 s a $0,05 el segundo son $0,40. El audio va siempre desactivado.'
-              : 'El precio de cada opcion es el de una generacion.'}
-          </p>
           {kind === 'video' && (
             <p className="muted" style={{ margin: 0 }}>
-              Los tres modelos hacen lo mismo: un plano de 8 segundos a partir de la imagen
-              aprobada. Lo unico que cambia entre ellos es el precio y la nitidez.
+              Todos generan un plano de {seconds} segundos a partir de la imagen
+              aprobada, con el audio desactivado.
             </p>
           )}
           {models.map((model) => (
@@ -136,7 +96,6 @@ export function ModelPicker({
                     onClick={() => select(model, variant)}
                   >
                     <span>{variant.label}</span>
-                    <span className="price">{estimate(kind, variant, seconds)}</span>
                   </button>
                 ))}
               </div>

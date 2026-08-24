@@ -56,13 +56,34 @@ class Studio:
 
     # -- model registry ----------------------------------------------------
     def ensure_registry_seeded(self) -> dict[str, Any]:
-        doc = self.db.get(CONFIG_MODELS)
-        if doc is None:
-            doc = load_seed()
-            doc["id"] = "models"
-            self.db.set(CONFIG_MODELS, doc)
-            logger.info("model_registry_seeded")
-        return doc
+        """Siembra el registro, y lo reescribe cuando la semilla trae una
+        version mas nueva.
+
+        Antes solo escribia si no habia nada, y eso dejo una correccion muerta:
+        los identificadores de los modelos estaban mal -eran nombres
+        comerciales y no los que Vertex reconoce-, se arreglaron en la semilla,
+        y en una instalacion que ya existia no cambio nada. El documento seguia
+        con los nombres viejos y cada generacion habria muerto en un 404.
+
+        Solo pisa lo guardado cuando schema_version sube, asi que una edicion
+        hecha a mano en Firestore sobrevive a los despliegues normales, que es
+        justo para lo que ese documento existe.
+        """
+        guardado = self.db.get(CONFIG_MODELS)
+        semilla = load_seed()
+        version_guardada = int((guardado or {}).get("schema_version", 0))
+        version_semilla = int(semilla.get("schema_version", 0))
+
+        if guardado is not None and version_guardada >= version_semilla:
+            return guardado
+
+        semilla["id"] = "models"
+        self.db.set(CONFIG_MODELS, semilla)
+        logger.info(
+            "model_registry_seeded de v%s a v%s", version_guardada, version_semilla
+        )
+        self._registry = None
+        return semilla
 
     @property
     def registry(self) -> ModelRegistry:

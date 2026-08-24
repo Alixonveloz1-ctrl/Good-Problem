@@ -679,3 +679,72 @@ def test_no_es_lo_mismo_sin_sesion_que_no_se_puede(client, studio):
     assert Forbidden("x").code == "forbidden"
     assert SinSesion("x").status_code == 403
     assert SinSesion("x").code == "sin_sesion"
+
+
+def test_una_correccion_de_la_semilla_llega_a_una_instalacion_que_ya_existe(studio):
+    """Antes solo se sembraba si no habia nada, y eso dejo muerta la correccion
+    de los identificadores: la instalacion seguia con los nombres comerciales y
+    cada generacion habria muerto en un 404.
+
+    Y al reves: una edicion hecha a mano en Firestore tiene que sobrevivir a los
+    despliegues, que es justo para lo que ese documento existe.
+    """
+    from app.db.repositories import CONFIG_MODELS
+    from app.domain.registry import load_seed
+
+    version_actual = int(load_seed()["schema_version"])
+
+    # Una instalacion vieja, con los nombres que no existen en Vertex.
+    studio.db.set(
+        CONFIG_MODELS,
+        {
+            "id": "models",
+            "schema_version": version_actual - 1,
+            "models": [{"id": "veo-3.1", "kind": "video", "label": "viejo",
+                        "status": "active", "variants": []}],
+            "excluded": [],
+        },
+    )
+    studio._registry = None
+    studio.ensure_registry_seeded()
+
+    ids = {spec.id for spec in studio.registry.all()}
+    assert "veo-3.1" not in ids
+    assert "veo-3.1-generate-001" in ids
+
+    # Ahora una edicion a mano, con la version al dia: no se toca.
+    studio.db.set(
+        CONFIG_MODELS,
+        {
+            "id": "models",
+            "schema_version": version_actual,
+            "models": [{"id": "veo-3.1-generate-001", "kind": "video",
+                        "label": "Editado a mano", "status": "active", "variants": []}],
+            "excluded": [],
+        },
+    )
+    studio._registry = None
+    studio.ensure_registry_seeded()
+    assert studio.registry.all()[0].label == "Editado a mano"
+
+
+def test_en_la_aplicacion_no_se_habla_de_dinero():
+    """El gasto se mira en la consola de Google Cloud. Que la app lo repita es
+    justo lo que se pidio quitar el primer dia, y se habia colado otra vez en
+    la pantalla de Ajustes."""
+    import pathlib
+
+    frontend = pathlib.Path(__file__).resolve().parents[2] / "frontend" / "src"
+    # Solo lo que se pinta. Los tipos de api/types.ts reflejan el documento de
+    # Firestore, que si lleva precios: los usa el backend para sus registros.
+    pintado = "\n".join(
+        p.read_text() for p in frontend.rglob("*.tsx") if p.is_file()
+    ) + "\n".join(
+        p.read_text() for p in frontend.rglob("*.ts")
+        if p.is_file() and p.name not in {"types.ts"}
+    )
+    # Señales de dinero y nada más: "toFixed" a secas tambien lo usan los
+    # segundos de una grabacion, y marcarlo seria una prueba que grita cuando
+    # no pasa nada, que es como se aprende a ignorarla.
+    for rastro in ("money(", "US$", "$${", "USD", "currency:"):
+        assert rastro not in pintado, f"quedo dinero en la interfaz: {rastro}"

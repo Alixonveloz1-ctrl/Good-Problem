@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { api, money } from '../api/client'
+import { api } from '../api/client'
 import { useAction, useResource } from '../hooks/useApi'
 import type { ExportPackage, Registry, Song } from '../api/types'
 import { Card, Empty, ErrorNote, Loading, StatusBadge, TopBar } from '../components/ui'
@@ -173,13 +173,9 @@ export function SettingsScreen() {
           {(registry.data?.models ?? []).map((model) => (
             <div key={model.id} className="row between">
               <span className="mono">{model.id}</span>
-              <span className="muted">
-                {model.variants
-                  .map((variant) =>
-                    variant.price !== undefined ? `${variant.key} ${money(variant.price)}` : variant.key,
-                  )
-                  .join(' · ')}
-              </span>
+              {/* Las calidades, sin precios: el gasto se mira en la consola de
+                  Google Cloud y no aquí. */}
+              <span className="muted">{model.variants.map((v) => v.key).join(' · ')}</span>
             </div>
           ))}
           <button
