@@ -5,13 +5,14 @@ import { useAction, useResource } from '../hooks/useApi'
 import type { Character } from '../api/types'
 import { ModelPicker, type ModelChoice } from '../components/ModelPicker'
 import { JobWatcher } from '../components/JobWatcher'
-import { Card, Empty, ErrorNote, Field, Loading, Sheet, StatusBadge, TopBar } from '../components/ui'
+import { Empty, ErrorNote, Field, Loading, Sheet, StatusBadge, TopBar, DeleteButton } from '../components/ui'
 
 export function CharactersScreen() {
   const { universeId = '' } = useParams()
   const { data, loading, error, reload } = useResource<Character[]>(
     `/api/universes/${universeId}/characters`,
   )
+  const borrado = useAction()
   const [creating, setCreating] = useState(false)
   const [open, setOpen] = useState<Character | null>(null)
   const [name, setName] = useState('')
@@ -67,20 +68,31 @@ export function CharactersScreen() {
 
         <div className="list">
           {(data ?? []).map((character) => (
-            <Card key={character.id} onClick={() => setOpen(character)}>
-              <div className="row between">
-                <strong>{character.name || 'Sin nombre'}</strong>
-                <StatusBadge status={character.status} />
-              </div>
-              <div className="sub">{character.appearance || 'Sin descripcion'}</div>
-              <div className="row between muted">
-                <span>{character.role === 'lead' ? 'Protagonista' : 'Secundario'}</span>
-                <span>
-                  {character.master_shots.filter((shot) => shot.storage_path).length}/
-                  {character.master_shots.length} tomas
-                </span>
-              </div>
-            </Card>
+            <div key={character.id} className="card fila-borrable">
+              <button type="button" className="grow destapado" onClick={() => setOpen(character)}>
+                <div className="row between">
+                  <strong>{character.name || 'Sin nombre'}</strong>
+                  <StatusBadge status={character.status} />
+                </div>
+                <div className="sub">{character.appearance || 'Sin descripcion'}</div>
+                <div className="row between muted">
+                  <span>{character.role === 'lead' ? 'Protagonista' : 'Secundario'}</span>
+                  <span>
+                    {character.master_shots.filter((shot) => shot.storage_path).length}/
+                    {character.master_shots.length} tomas
+                  </span>
+                </div>
+              </button>
+              <DeleteButton
+                busy={borrado.busy}
+                onDelete={async () => {
+                  await borrado.run(() =>
+                    api.del(`/api/universes/${universeId}/characters/${character.id}`),
+                  )
+                  await reload()
+                }}
+              />
+            </div>
           ))}
         </div>
       </main>

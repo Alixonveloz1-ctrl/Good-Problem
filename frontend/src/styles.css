@@ -809,3 +809,38 @@ video {
   overflow-wrap: anywhere;
   color: var(--muted);
 }
+
+/* Borrar. Rojo solo cuando ya está armado: un botón rojo permanente al lado de
+   cada cosa convierte la pantalla en un campo de minas y deja de leerse. */
+.btn.peligro {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: rgba(251, 113, 133, 0.12);
+}
+
+/* Una fila que se puede abrir y borrar. El enlace ocupa todo menos el botón,
+   para que el dedo caiga donde espera. */
+.fila-borrable {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fila-borrable > a {
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Un botón que no parece un botón: dentro de una fila hace de zona tocable
+   sin añadir un borde más a una pantalla que ya tiene bastantes. */
+.destapado {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  display: block;
+  width: 100%;
+}

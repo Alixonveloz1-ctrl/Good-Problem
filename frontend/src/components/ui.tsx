@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { CanonStatus, JobState } from '../api/types'
@@ -162,5 +163,51 @@ export function Sheet({
         {children}
       </div>
     </div>
+  )
+}
+
+/** Borrar algo, con una confirmación que no se puede tocar por accidente.
+ *
+ * En un teléfono, un botón de borrar al lado de uno de abrir se pulsa sin
+ * querer constantemente. Aquí hay que tocar dos veces: la primera cambia el
+ * botón a "¿Seguro?" y arranca una cuenta atrás que lo devuelve a su sitio.
+ * Sin esa vuelta atrás, un "¿Seguro?" olvidado en pantalla es una trampa que
+ * espera al siguiente dedo.
+ */
+export function DeleteButton({
+  onDelete,
+  label = 'Borrar',
+  busy = false,
+}: {
+  onDelete: () => void | Promise<void>
+  label?: string
+  busy?: boolean
+}) {
+  const [armado, setArmado] = useState(false)
+
+  useEffect(() => {
+    if (!armado) return
+    const reloj = setTimeout(() => setArmado(false), 4000)
+    return () => clearTimeout(reloj)
+  }, [armado])
+
+  return (
+    <button
+      type="button"
+      className={`btn small ${armado ? 'peligro' : 'ghost'}`}
+      disabled={busy}
+      onClick={(e) => {
+        e.stopPropagation()
+        e.preventDefault()
+        if (armado) {
+          setArmado(false)
+          void onDelete()
+        } else {
+          setArmado(true)
+        }
+      }}
+    >
+      {busy ? '…' : armado ? '¿Seguro?' : label}
+    </button>
   )
 }

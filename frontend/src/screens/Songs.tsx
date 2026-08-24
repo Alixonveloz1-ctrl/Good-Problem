@@ -5,7 +5,7 @@ import { useAction, useResource } from '../hooks/useApi'
 import type { Song } from '../api/types'
 import { ApprovalBar } from '../components/ApprovalBar'
 import { JobWatcher } from '../components/JobWatcher'
-import { Card, Empty, ErrorNote, Field, Loading, Sheet, StatusBadge, TopBar } from '../components/ui'
+import { Card, Empty, ErrorNote, Field, Loading, Sheet, StatusBadge, TopBar, DeleteButton } from '../components/ui'
 
 export function SongsScreen() {
   const { universeId = '' } = useParams()
@@ -13,6 +13,7 @@ export function SongsScreen() {
   const { data, loading, error, reload } = useResource<Song[]>(
     `/api/universes/${universeId}/songs`,
   )
+  const borrado = useAction()
   const [creating, setCreating] = useState(false)
   const [title, setTitle] = useState('')
   const [duration, setDuration] = useState('150')
@@ -59,20 +60,27 @@ export function SongsScreen() {
         )}
         <div className="list">
           {(data ?? []).map((song) => (
-            <Link
-              key={song.id}
-              to={`/u/${universeId}/songs/${song.id}`}
-              className="card tappable"
-            >
-              <div className="row between">
-                <strong>{song.title || 'Sin titulo'}</strong>
-                <StatusBadge status={song.status} />
-              </div>
-              <div className="muted">{song.genre || 'sin genero'}</div>
-              <div className="muted">
-                {song.versions.length} version(es) · {song.requested_duration_seconds}s
-              </div>
-            </Link>
+            <div key={song.id} className="card fila-borrable">
+              <Link to={`/u/${universeId}/songs/${song.id}`} className="grow">
+                <div className="row between">
+                  <strong>{song.title || 'Sin titulo'}</strong>
+                  <StatusBadge status={song.status} />
+                </div>
+                <div className="muted">{song.genre || 'sin genero'}</div>
+                <div className="muted">
+                  {song.versions.length} version(es) · {song.requested_duration_seconds}s
+                </div>
+              </Link>
+              <DeleteButton
+                busy={borrado.busy}
+                onDelete={async () => {
+                  await borrado.run(() =>
+                    api.del(`/api/universes/${universeId}/songs/${song.id}`),
+                  )
+                  await reload()
+                }}
+              />
+            </div>
           ))}
         </div>
       </main>

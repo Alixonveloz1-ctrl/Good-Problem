@@ -5,19 +5,31 @@ import { useAction, useResource } from '../hooks/useApi'
 import type { ProductionPlan, Scene, VideoProject } from '../api/types'
 import { JobWatcher } from '../components/JobWatcher'
 import { ModelPicker, type ModelChoice } from '../components/ModelPicker'
-import { Card, Empty, ErrorNote, Loading, Sheet, StatusBadge, TopBar } from '../components/ui'
+import {
+  Card,
+  DeleteButton,
+  Empty,
+  ErrorNote,
+  Loading,
+  Sheet,
+  StatusBadge,
+  TopBar,
+} from '../components/ui'
 
 export function ProjectsScreen() {
   const { universeId = '' } = useParams()
-  const { data, loading, error } = useResource<VideoProject[]>(
+  const { data, loading, error, reload } = useResource<VideoProject[]>(
     `/api/universes/${universeId}/video-projects`,
   )
+  const action = useAction()
+
   return (
     <>
       <TopBar title="Videoclips" back />
       <main className="screen">
         {loading && !data && <Loading />}
-        <ErrorNote error={error} />
+        <ErrorNote error={error} onDismiss={action.clearError} />
+        <ErrorNote error={action.error} onDismiss={action.clearError} />
         {data && data.length === 0 && (
           <Empty
             title="Sin videoclips"
@@ -26,17 +38,24 @@ export function ProjectsScreen() {
         )}
         <div className="list">
           {(data ?? []).map((project) => (
-            <Link
-              key={project.id}
-              to={`/u/${universeId}/projects/${project.id}`}
-              className="card tappable"
-            >
-              <div className="row between">
-                <strong>{project.title || 'Sin titulo'}</strong>
-                <StatusBadge status={project.status} />
-              </div>
-              <div className="muted">{project.video_type}</div>
-            </Link>
+            <div key={project.id} className="card fila-borrable">
+              <Link to={`/u/${universeId}/projects/${project.id}`} className="grow">
+                <div className="row between">
+                  <strong>{project.title || 'Sin titulo'}</strong>
+                  <StatusBadge status={project.status} />
+                </div>
+                <div className="muted">{project.video_type}</div>
+              </Link>
+              <DeleteButton
+                busy={action.busy}
+                onDelete={async () => {
+                  await action.run(() =>
+                    api.del(`/api/universes/${universeId}/video-projects/${project.id}`),
+                  )
+                  await reload()
+                }}
+              />
+            </div>
           ))}
         </div>
       </main>

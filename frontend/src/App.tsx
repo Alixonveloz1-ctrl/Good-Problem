@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { NavLink, Navigate, Route, Routes, useParams } from 'react-router-dom'
+import { recordarUniverso, ultimoUniverso } from './lib/ultimoUniverso'
 import { HomeScreen } from './screens/Home'
 import { UniverseScreen } from './screens/Universe'
 import { BibleScreen } from './screens/Bible'
@@ -14,11 +16,20 @@ import { CanonScreen, ExportsScreen, SettingsScreen } from './screens/Misc'
 
 function TabBar() {
   const { universeId } = useParams()
-  const prefix = universeId ? `/u/${universeId}` : ''
+
+  // El artista de la ruta manda; si no hay -en Inicio o en Ajustes- vale el
+  // último que se abrió. Sin ese recuerdo, Música y Video no llevan a ningún
+  // sitio desde la primera pantalla.
+  useEffect(() => {
+    if (universeId) recordarUniverso(universeId)
+  }, [universeId])
+
+  const activo = universeId ?? ultimoUniverso()
+  const prefix = activo ? `/u/${activo}` : ''
   const tabs = [
     { to: '/', glyph: '🏠', label: 'Inicio', end: true },
-    { to: universeId ? `${prefix}/songs` : '/', glyph: '🎵', label: 'Musica', end: false },
-    { to: universeId ? `${prefix}/projects` : '/', glyph: '🎬', label: 'Video', end: false },
+    { to: activo ? `${prefix}/songs` : '/', glyph: '🎵', label: 'Musica', end: false },
+    { to: activo ? `${prefix}/projects` : '/', glyph: '🎬', label: 'Video', end: false },
     { to: '/settings', glyph: '⚙️', label: 'Ajustes', end: false },
   ]
   return (

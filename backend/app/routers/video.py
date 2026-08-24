@@ -201,6 +201,33 @@ def _stage_summary(studio, universe_id: str, project: dict, scenes: list[dict]) 
     ]
 
 
+@router.delete("/video-projects/{project_id}")
+def delete_project(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, project_id: str
+) -> dict[str, str]:
+    """Borra un videoclip y sus escenas.
+
+    Las escenas se borran con él porque no existen fuera de su proyecto: dejar
+    una escena sin videoclip es dejar basura que nadie puede ver ni alcanzar.
+
+    Los archivos generados se quedan en el almacenamiento. Saber cuáles se
+    pueden borrar exigiría saber quién más los usa, y equivocarse deja huecos
+    negros en videos ya terminados.
+    """
+    proyecto = Repository(studio.db, universe_id, VIDEO_PROJECTS)
+    proyecto.require(project_id)
+
+    escenas = Repository(studio.db, universe_id, SCENES)
+    borradas = 0
+    for escena in escenas.list(limit=500):
+        if escena.get("project_id") == project_id:
+            escenas.delete(escena["id"])
+            borradas += 1
+
+    proyecto.delete(project_id)
+    return {"deleted": project_id, "scenes": str(borradas)}
+
+
 @router.post("/video-projects/{project_id}/concept")
 def propose_video_concept(
     owner: OwnerDep, studio: StudioDep, universe_id: str, project_id: str, body: DirectorIn

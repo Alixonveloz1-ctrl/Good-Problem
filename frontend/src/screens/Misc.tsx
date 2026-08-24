@@ -112,6 +112,7 @@ export function ExportsScreen() {
  * montaje tira, asi que conviene poder mirarlo sin fiarse de nadie.
  */
 function ComprobacionAudio() {
+  const [abierto, setAbierto] = useState(false)
   const [resultado, setResultado] = useState<{ count: number; audio: number } | null>(null)
   const action = useAction()
 
@@ -124,13 +125,26 @@ function ComprobacionAudio() {
     if (datos) setResultado({ count: datos.count, audio: datos.calls_requesting_audio })
   }
 
+  if (!abierto) {
+    return (
+      <button className="btn small block ghost" onClick={() => setAbierto(true)}>
+        Comprobar el audio del video
+      </button>
+    )
+  }
+
   return (
     <Card>
-      <h3>Comprobar que el video no lleva audio</h3>
+      <div className="row between">
+        <h3 style={{ margin: 0 }}>Comprobar el audio del video</h3>
+        <button className="btn small ghost" onClick={() => setAbierto(false)}>
+          Cerrar
+        </button>
+      </div>
       <p className="muted" style={{ margin: 0 }}>
-        La musica sale de Lyria y la voz de Chirp, asi que Veo se llama siempre con el audio
-        apagado. Generarlo costaria el doble por segundo para tirarlo en el montaje. Aqui puedes
-        comprobar que asi ha sido.
+        La musica sale de Lyria y la voz de Chirp, asi que Veo se llama siempre
+        con el audio apagado y el montaje lo tiraria igual. Aqui se comprueba
+        que asi ha sido.
       </p>
       <button className="btn block" onClick={comprobar} disabled={action.busy}>
         {action.busy ? 'Mirando…' : 'Comprobar'}
@@ -152,7 +166,6 @@ function ComprobacionAudio() {
 }
 
 export function SettingsScreen() {
-  const registry = useResource<Registry>('/api/registry/models')
   const health = useResource<{ dry_run: boolean; project: string | null; storage: string }>(
     '/api/health',
   )
@@ -164,36 +177,7 @@ export function SettingsScreen() {
       <main className="screen">
         <ErrorNote error={action.error} onDismiss={action.clearError} />
 
-        <Card>
-          <h3>Registro de modelos</h3>
-          <p className="muted" style={{ margin: 0 }}>
-            Los modelos no son constantes del codigo: viven en un documento de Firestore. Cuando
-            Google apague o anada uno, se edita ese documento sin desplegar nada.
-          </p>
-          {(registry.data?.models ?? []).map((model) => (
-            <div key={model.id} className="row between">
-              <span className="mono">{model.id}</span>
-              {/* Las calidades, sin precios: el gasto se mira en la consola de
-                  Google Cloud y no aquí. */}
-              <span className="muted">{model.variants.map((v) => v.key).join(' · ')}</span>
-            </div>
-          ))}
-          <button
-            className="btn small block"
-            onClick={async () => {
-              await action.run(() => api.post('/api/registry/reload'))
-              await registry.reload()
-            }}
-          >
-            Recargar desde Firestore
-          </button>
-          {(registry.data?.excluded ?? []).map((entry) => (
-            <div key={entry.id} className="notice">
-              <strong className="mono">{entry.id}</strong>
-              <div>{entry.reason}</div>
-            </div>
-          ))}
-        </Card>
+        <RegistroDeModelos />
 
         <ComprobacionAudio />
 
@@ -220,6 +204,62 @@ export function SettingsScreen() {
         <Cuenta />
       </main>
     </>
+  )
+}
+
+/** El registro de modelos, plegado.
+ *
+ * Es un panel de mantenimiento: se abre el dia que Google apaga o anade un
+ * modelo, y ese dia no es hoy. Desplegado ocupaba la pantalla entera de
+ * Ajustes con una lista que no se toca nunca.
+ */
+function RegistroDeModelos() {
+  const [abierto, setAbierto] = useState(false)
+  const registro = useResource<Registry>(abierto ? '/api/registry/models' : null)
+  const accion = useAction()
+
+  if (!abierto) {
+    return (
+      <button className="btn small block ghost" onClick={() => setAbierto(true)}>
+        Modelos de IA
+      </button>
+    )
+  }
+
+  return (
+    <Card>
+      <div className="row between">
+        <h3 style={{ margin: 0 }}>Modelos de IA</h3>
+        <button className="btn small ghost" onClick={() => setAbierto(false)}>
+          Cerrar
+        </button>
+      </div>
+      <p className="muted" style={{ margin: 0 }}>
+        No son constantes del codigo: viven en un documento de Firestore. Cuando
+        Google apague o anada uno, se edita ese documento sin desplegar nada.
+      </p>
+      {(registro.data?.models ?? []).map((model) => (
+        <div key={model.id} className="row between">
+          <span className="mono">{model.id}</span>
+          <span className="muted">{model.variants.map((v) => v.key).join(' · ')}</span>
+        </div>
+      ))}
+      <button
+        className="btn small block"
+        onClick={async () => {
+          await accion.run(() => api.post('/api/registry/reload'))
+          await registro.reload()
+        }}
+      >
+        Recargar desde Firestore
+      </button>
+      {(registro.data?.excluded ?? []).map((entry) => (
+        <div key={entry.id} className="notice">
+          <strong className="mono">{entry.id}</strong>
+          <div>{entry.reason}</div>
+        </div>
+      ))}
+    </Card>
   )
 }
 

@@ -209,6 +209,23 @@ def approve_character(
     return updated
 
 
+@router.delete("/characters/{character_id}")
+def delete_character(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, character_id: str
+) -> dict[str, str]:
+    """Borra un personaje.
+
+    Lo generado se queda en el almacenamiento: borrar los archivos exigiria
+    saber quien mas los usa —una toma reutilizada en otra escena, una imagen que
+    ya salio en un video montado— y equivocarse ahi deja huecos negros en
+    videos ya terminados. Un archivo huerfano cuesta centimos; un video roto
+    cuesta volver a generarlo entero.
+    """
+    _repo(studio, universe_id, CHARACTERS).require(character_id)
+    _repo(studio, universe_id, CHARACTERS).delete(character_id)
+    return {"deleted": character_id}
+
+
 @router.post("/characters/{character_id}/reject")
 def reject_character(
     owner: OwnerDep, studio: StudioDep, universe_id: str, character_id: str
@@ -307,6 +324,15 @@ class LocationIn(BaseModel):
     mood: str = ""
 
 
+@router.delete("/wardrobe/{outfit_id}")
+def delete_outfit(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, outfit_id: str
+) -> dict[str, str]:
+    _repo(studio, universe_id, WARDROBE).require(outfit_id)
+    _repo(studio, universe_id, WARDROBE).delete(outfit_id)
+    return {"deleted": outfit_id}
+
+
 @router.post("/locations")
 def create_location(
     owner: OwnerDep, studio: StudioDep, universe_id: str, body: LocationIn
@@ -373,3 +399,12 @@ def approve_location(
         storage_path=(location.get("reference_paths") or [None])[0],
     )
     return updated
+
+
+@router.delete("/locations/{location_id}")
+def delete_location(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, location_id: str
+) -> dict[str, str]:
+    _repo(studio, universe_id, LOCATIONS).require(location_id)
+    _repo(studio, universe_id, LOCATIONS).delete(location_id)
+    return {"deleted": location_id}

@@ -117,6 +117,21 @@ def patch_song(
 # --- Director on the song --------------------------------------------------
 
 
+@router.delete("/{song_id}")
+def delete_song(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, song_id: str
+) -> dict[str, str]:
+    """Borra una cancion.
+
+    Los archivos generados se quedan: pueden estar dentro de un videoclip ya
+    montado, y borrarlos dejaria ese video sin audio sin que nadie se entere.
+    """
+    repo = Repository(studio.db, universe_id, SONGS)
+    repo.require(song_id)
+    repo.delete(song_id)
+    return {"deleted": song_id}
+
+
 @router.post("/{song_id}/concept")
 def propose_concept(
     owner: OwnerDep, studio: StudioDep, universe_id: str, song_id: str, body: DirectorIn
