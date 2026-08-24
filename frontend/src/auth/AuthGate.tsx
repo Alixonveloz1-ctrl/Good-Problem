@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { api, StudioError, onUnauthorized } from '../api/client'
-import { entrarConGoogle, mensajeDeError, type ConfigWeb } from './firebase'
+import {
+  entrarConGoogle,
+  mensajeDeError,
+  recogerRedireccion,
+  type ConfigWeb,
+} from './firebase'
 
 type AuthConfig = {
   login_required: boolean
@@ -96,19 +101,55 @@ function Login({
 }) {
   const [error, setError] = useState<string | null>(null)
   const [entrando, setEntrando] = useState(false)
+  const [comprobando, setComprobando] = useState(true)
 
   // Firebase Authentication sólo necesita estas tres. appId lo piden Analytics
   // e Installations, que esta app no lleva; exigirlo dejaría la entrada rota
   // esperando un dato que no hace falta.
   const listo = Boolean(firebase.apiKey && firebase.authDomain && firebase.projectId)
 
+  const canjear = async (token: string) => {
+    await api.post('/api/auth/session', { credential: token })
+    await onEntrar()
+  }
+
+  // Al volver de Google por redirección, el token llega en esta carga y no en
+  // una pulsación. Sin recogerlo aquí, la vuelta se pierde y la pantalla de
+  // entrada aparece otra vez como si no hubiera pasado nada.
+  useEffect(() => {
+    if (!listo) {
+      setComprobando(false)
+      return
+    }
+    let vivo = true
+    recogerRedireccion(firebase as ConfigWeb)
+      .then(async (token) => {
+        if (!vivo) return
+        if (token) {
+          setEntrando(true)
+          await canjear(token)
+        }
+      })
+      .catch((err) => {
+        if (!vivo) return
+        setError(err instanceof StudioError ? err.message : mensajeDeError(err))
+      })
+      .finally(() => {
+        if (vivo) setComprobando(false)
+      })
+    return () => {
+      vivo = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listo])
+
   const entrar = async () => {
     setEntrando(true)
     setError(null)
     try {
       const token = await entrarConGoogle(firebase as ConfigWeb)
-      await api.post('/api/auth/session', { credential: token })
-      await onEntrar()
+      // null = se fue por redirección; la página está a punto de irse a Google.
+      if (token) await canjear(token)
     } catch (err) {
       setError(err instanceof StudioError ? err.message : mensajeDeError(err))
       setEntrando(false)
@@ -129,7 +170,11 @@ function Login({
   return (
     <Portada>
       <p className="muted">Entra con la cuenta de Google del estudio.</p>
-      <button className="primary block" disabled={entrando} onClick={() => void entrar()}>
+      <button
+        className="primary block"
+        disabled={entrando || comprobando}
+        onClick={() => void entrar()}
+      >
         {entrando ? 'Entrando…' : 'Entrar con Google'}
       </button>
       {error && (

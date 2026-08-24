@@ -1,8 +1,10 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app'
 import {
   getAuth,
+  getRedirectResult,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   type Auth,
 } from 'firebase/auth'
@@ -33,18 +35,62 @@ function auth(config: ConfigWeb): Auth {
   return getAuth(arrancar(config))
 }
 
+function proveedor(): GoogleAuthProvider {
+  const p = new GoogleAuthProvider()
+  p.setCustomParameters({ prompt: 'select_account' })
+  return p
+}
+
+/** Los fallos que significan "por aquí no, prueba por el otro camino". */
+function hayQueRedirigir(error: unknown): boolean {
+  const codigo =
+    typeof error === 'object' && error !== null && 'code' in error
+      ? String((error as { code: unknown }).code)
+      : ''
+  return (
+    codigo === 'auth/popup-blocked' ||
+    codigo === 'auth/operation-not-supported-in-this-environment' ||
+    codigo === 'auth/cancelled-popup-request'
+  )
+}
+
 /** Entra con Google y devuelve el token que el servidor va a comprobar.
  *
- * Ventana emergente y no redirección, a propósito: el dominio donde Google
- * pregunta (…firebaseapp.com) no es el de la app (…run.app), y los navegadores
- * que bloquean almacenamiento de terceros rompen el camino por redirección
- * justo en el móvil, que es donde se va a usar esto.
+ * Primero por ventana emergente, que devuelve el token en el acto. Si el
+ * navegador la bloquea se cae a la redirección: la página se va a Google y
+ * vuelve. Safari en un iPhone bloquea las ventanas emergentes de serie, y
+ * cuando la app está añadida a la pantalla de inicio directamente no existen,
+ * así que este segundo camino no es un remedio raro: es el normal aquí.
+ *
+ * Devuelve null cuando se fue por redirección: no hay token todavía y la
+ * página está a punto de irse. Lo recoge `recogerRedireccion` al volver.
  */
-export async function entrarConGoogle(config: ConfigWeb): Promise<string> {
-  const proveedor = new GoogleAuthProvider()
-  proveedor.setCustomParameters({ prompt: 'select_account' })
-  const credencial = await signInWithPopup(auth(config), proveedor)
-  return credencial.user.getIdToken()
+export async function entrarConGoogle(config: ConfigWeb): Promise<string | null> {
+  const identidad = auth(config)
+  try {
+    const credencial = await signInWithPopup(identidad, proveedor())
+    return await credencial.user.getIdToken()
+  } catch (error) {
+    if (!hayQueRedirigir(error)) throw error
+    await signInWithRedirect(identidad, proveedor())
+    return null
+  }
+}
+
+/** Recoge la vuelta de Google cuando se entró por redirección.
+ *
+ * Devuelve el token, o null si esta carga no viene de una redirección, que es
+ * lo normal.
+ */
+export async function recogerRedireccion(config: ConfigWeb): Promise<string | null> {
+  try {
+    const resultado = await getRedirectResult(auth(config))
+    return resultado ? await resultado.user.getIdToken() : null
+  } catch {
+    // Una vuelta que no cuadra no es motivo para no pintar la pantalla de
+    // entrada: se ignora y se ofrece entrar otra vez.
+    return null
+  }
 }
 
 export async function salir(config: ConfigWeb): Promise<void> {
@@ -64,10 +110,7 @@ export function mensajeDeError(error: unknown): string {
 
   switch (codigo) {
     case 'auth/popup-closed-by-user':
-    case 'auth/cancelled-popup-request':
       return 'Cerraste la ventana antes de terminar. Toca otra vez.'
-    case 'auth/popup-blocked':
-      return 'El navegador bloqueó la ventana. Permite ventanas emergentes para este sitio.'
     case 'auth/unauthorized-domain':
       return 'Falta añadir esta dirección en Firebase → Authentication → Settings → Authorized domains.'
     case 'auth/operation-not-allowed':
