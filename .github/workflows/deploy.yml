@@ -1,0 +1,75 @@
+# Cada cambio en main se publica solo (PRD 40).
+#
+# Sin claves. GitHub le prueba a Google quién es con un token de un solo uso
+# —Workload Identity Federation— y Google le presta la identidad de la cuenta
+# de servicio. No hay ningún JSON de credenciales aquí ni en los secretos del
+# repositorio, que es justo lo que el PRD pedía evitar.
+#
+# Lo monta `./setup.sh`, incluidas estas variables. Si no están, este flujo se
+# salta solo en vez de fallar en rojo en cada empujón.
+
+name: Publicar
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write        # sin esto GitHub no emite el token que prueba quién es
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ¿Está configurado?
+        id: puede
+        run: |
+          if [ -n "${{ vars.GCP_WIF_PROVIDER }}" ] && [ -n "${{ vars.GCP_SERVICE_ACCOUNT }}" ]; then
+            echo "si=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "si=false" >> "$GITHUB_OUTPUT"
+            echo "Falta configurar la publicación automática. Ejecuta ./setup.sh en Cloud Shell."
+          fi
+
+      - uses: google-github-actions/auth@v2
+        if: steps.puede.outputs.si == 'true'
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+        if: steps.puede.outputs.si == 'true'
+
+      # Sólo el código. El correo del dueño, la clave de sesión y la
+      # configuración de Firebase los puso el instalador y no se tocan desde
+      # aquí: --update-env-vars conserva lo que ya hay, --set-env-vars lo
+      # borraría y dejaría el estudio público y sin puerta.
+      - name: Publicar en Cloud Run
+        if: steps.puede.outputs.si == 'true'
+        run: |
+          gcloud run deploy "${{ vars.GCP_SERVICE || 'aaus' }}" \
+            --source . \
+            --region "${{ vars.GCP_REGION || 'us-central1' }}" \
+            --project "${{ vars.GCP_PROJECT }}" \
+            --service-account "${{ vars.GCP_RUNTIME_SA }}" \
+            --allow-unauthenticated \
+            --memory 2Gi --cpu 2 --timeout 3600 --concurrency 20 --max-instances 4 \
+            --update-env-vars "AAUS_DRY_RUN=false" \
+            --quiet
+
+      - name: Comprobar que sigue habiendo puerta
+        if: steps.puede.outputs.si == 'true'
+        run: |
+          CORREO=$(gcloud run services describe "${{ vars.GCP_SERVICE || 'aaus' }}" \
+            --region "${{ vars.GCP_REGION || 'us-central1' }}" \
+            --project "${{ vars.GCP_PROJECT }}" \
+            --format="value(spec.template.spec.containers[0].env.filter(\"name:AAUS_OWNER_EMAIL\").extract(value))")
+          if [ -z "$CORREO" ] || [ "$CORREO" = "[]" ]; then
+            echo "AAUS_OWNER_EMAIL está vacío: el estudio quedaría abierto." >&2
+            exit 1
+          fi
+          echo "Puerta configurada para $CORREO"

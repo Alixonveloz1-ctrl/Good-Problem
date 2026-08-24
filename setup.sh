@@ -151,6 +151,7 @@ gcloud services enable \
   aiplatform.googleapis.com texttospeech.googleapis.com firestore.googleapis.com \
   storage.googleapis.com cloudtasks.googleapis.com secretmanager.googleapis.com \
   iamcredentials.googleapis.com logging.googleapis.com monitoring.googleapis.com \
+  iam.googleapis.com sts.googleapis.com \
   firebase.googleapis.com identitytoolkit.googleapis.com apikeys.googleapis.com \
   --project="$PROJECT_ID" >/dev/null
 ok "Servicios encendidos"
@@ -539,39 +540,85 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
-#  8 · Que se actualice sola
+#  8 · Que se publique sola en cada cambio
 # ══════════════════════════════════════════════════════════════════════
 titulo "Publicación automática"
+detalle "Para no volver a pasar por aquí nunca más."
 
 AUTO_LISTO="no"
-DISPARADOR="$(gcloud builds triggers list --project="$PROJECT_ID" --region="$REGION" \
-              --format='value(name)' 2>/dev/null | head -1 || true)"
+POOL="github"
+PROVEEDOR_ID="good-problem"
+REPO_GH="Alixonveloz1-ctrl/Good-Problem"
+SA_DESPLIEGUE="aaus-deploy@${PROJECT_ID}.iam.gserviceaccount.com"
 
-if [[ -n "$DISPARADOR" ]]; then
-  AUTO_LISTO="si"
-  ok "Ya estaba conectada: cada cambio se publica solo"
+# Sin claves. GitHub le prueba a Google quién es con un token de un solo uso y
+# Google le presta esta identidad. No se genera ni se guarda ningún JSON de
+# credenciales, que es exactamente lo que el PRD pedía evitar (PRD 40).
+paso "La identidad con la que GitHub publica"
+crear_cuenta "aaus-deploy" "Publicación automática"
+for ROL in roles/run.admin roles/cloudbuild.builds.editor roles/artifactregistry.writer \
+           roles/storage.admin roles/iam.serviceAccountUser roles/logging.logWriter; do
+  dar_rol "serviceAccount:${SA_DESPLIEGUE}" "$ROL"
+done
+ok "Lista"
+
+paso "El puente entre GitHub y Google"
+if gcloud iam workload-identity-pools describe "$POOL" --location=global \
+     --project="$PROJECT_ID" >/dev/null 2>&1; then
+  ok "Ya existía"
 else
-  # Autorizar la app de GitHub es una pantalla del navegador y no hay forma de
-  # hacerlo desde aquí: es Google pidiéndole permiso a GitHub en tu nombre.
-  # Lo que sí se puede es todo lo demás, así que si esa autorización ya existe
-  # de antes, el disparador se crea aquí sin que nadie toque nada.
-  CONEXION="$(gcloud builds connections list --project="$PROJECT_ID" --region="$REGION" \
-              --format='value(name)' 2>/dev/null | head -1 || true)"
+  gcloud iam workload-identity-pools create "$POOL" --location=global \
+    --display-name="GitHub" --project="$PROJECT_ID" >/dev/null 2>&1 \
+    && ok "Creado" || aviso "No se pudo crear."
+fi
 
-  if [[ -n "$CONEXION" ]]; then
-    detalle "GitHub ya está autorizado; creando el disparador…"
-    REPO_CB="$(gcloud builds repositories list --project="$PROJECT_ID" --region="$REGION" \
-               --connection="${CONEXION##*/}" --format='value(name)' 2>/dev/null \
-               | grep -i 'good-problem' | head -1 || true)"
-    if [[ -n "$REPO_CB" ]] && gcloud builds triggers create github \
-         --name="${SERVICIO}-main" --project="$PROJECT_ID" --region="$REGION" \
-         --repository="$REPO_CB" --branch-pattern='^main$' \
-         --build-config=cloudbuild.yaml >/dev/null 2>&1; then
-      AUTO_LISTO="si"
-      ok "Conectada: cada cambio se publica solo"
-    else
-      aviso "No pude crearlo solo. Te digo los toques al final."
-    fi
+if gcloud iam workload-identity-pools providers describe "$PROVEEDOR_ID" \
+     --workload-identity-pool="$POOL" --location=global \
+     --project="$PROJECT_ID" >/dev/null 2>&1; then
+  ok "Conexión con GitHub: ya existía"
+else
+  # La condición es lo que impide que CUALQUIER repositorio de GitHub pueda
+  # pedir esta identidad. Sin ella, el puente lo cruza todo el mundo.
+  gcloud iam workload-identity-pools providers create-oidc "$PROVEEDOR_ID" \
+    --workload-identity-pool="$POOL" --location=global --project="$PROJECT_ID" \
+    --display-name="Good-Problem" \
+    --issuer-uri="https://token.actions.githubusercontent.com" \
+    --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
+    --attribute-condition="assertion.repository=='${REPO_GH}'" >/dev/null 2>&1 \
+    && ok "Conexión con GitHub: creada" || aviso "No se pudo crear la conexión."
+fi
+
+# Sólo este repositorio puede tomar prestada la identidad.
+gcloud iam service-accounts add-iam-policy-binding "$SA_DESPLIEGUE" \
+  --project="$PROJECT_ID" --role=roles/iam.workloadIdentityUser \
+  --member="principalSet://iam.googleapis.com/projects/${NUMERO}/locations/global/workloadIdentityPools/${POOL}/attribute.repository/${REPO_GH}" \
+  >/dev/null 2>&1 || true
+
+PROVEEDOR_COMPLETO="projects/${NUMERO}/locations/global/workloadIdentityPools/${POOL}/providers/${PROVEEDOR_ID}"
+
+# --- Decírselo a GitHub, con la sesión de gh que ya está abierta -------
+paso "Guardando los datos en GitHub"
+if ! command -v gh >/dev/null 2>&1; then
+  aviso "Falta la herramienta gh. Te digo qué hacer al final."
+elif ! gh auth status >/dev/null 2>&1; then
+  aviso "gh no tiene sesión. Te digo qué hacer al final."
+else
+  GUARDADAS="si"
+  poner_var() {
+    gh variable set "$1" --body "$2" --repo "$REPO_GH" >/dev/null 2>&1 || GUARDADAS="no"
+  }
+  poner_var GCP_WIF_PROVIDER  "$PROVEEDOR_COMPLETO"
+  poner_var GCP_SERVICE_ACCOUNT "$SA_DESPLIEGUE"
+  poner_var GCP_PROJECT       "$PROJECT_ID"
+  poner_var GCP_REGION        "$REGION"
+  poner_var GCP_SERVICE       "$SERVICIO"
+  poner_var GCP_RUNTIME_SA    "$SA_APP"
+
+  if [[ "$GUARDADAS" == "si" ]]; then
+    AUTO_LISTO="si"
+    ok "Guardados. A partir de ahora cada cambio se publica solo."
+  else
+    aviso "gh no pudo guardarlas. Te digo qué hacer al final."
   fi
 fi
 
@@ -647,19 +694,12 @@ NOSE
 
   if [[ "$AUTO_LISTO" == "no" ]]; then
     cat <<CONTINUA_PENDIENTE
-  ${BOLD}${YELLOW}Queda esto, y es de una sola vez:${RESET} que la app se publique sola.
-  ${DIM}Sin esto tienes que volver aquí a ejecutar ./setup.sh en cada cambio.
-  Con esto, no vuelves nunca.${RESET}
+  ${BOLD}${YELLOW}Falta que se publique sola.${RESET} No pude guardar los datos en GitHub.
 
-  ${DIM}No lo puedo hacer yo desde aquí: es Google pidiéndole permiso a GitHub
-  en tu nombre, y eso solo se autoriza desde el navegador.${RESET}
+  ${BOLD}1.${RESET} Escribe:  ${BOLD}gh auth login${RESET}   ${DIM}(elige GitHub.com y HTTPS)${RESET}
+  ${BOLD}2.${RESET} Escribe:  ${BOLD}./setup.sh${RESET}
 
-  ${BOLD}1.${RESET} Abre:  https://console.cloud.google.com/run/detail/${REGION}/${SERVICIO}/revisions?project=${PROJECT_ID}&${CUENTA}
-  ${BOLD}2.${RESET} Toca:  ${BOLD}Configurar implementación continua${RESET}
-  ${BOLD}3.${RESET} Conectar tu cuenta de GitHub  ${DIM}(te pedirá autorizar; acepta)${RESET}
-  ${BOLD}4.${RESET} Repositorio: ${BOLD}Good-Problem${RESET}   ·   Rama: ${BOLD}main${RESET}
-  ${BOLD}5.${RESET} Tipo de compilación: ${BOLD}Dockerfile${RESET}
-  ${BOLD}6.${RESET} Guardar
+  ${DIM}Con eso queda conectado y no vuelves a escribir nada más.${RESET}
 
 CONTINUA_PENDIENTE
   else
