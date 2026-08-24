@@ -221,69 +221,9 @@ export function SettingsScreen() {
           </Card>
         )}
 
-        <ModelosDeVerdad />
-
         <Cuenta />
       </main>
     </>
-  )
-}
-
-type FilaModelo = { id: string; label: string; kind: string; exists: boolean | null }
-
-/** Comprueba que los modelos del registro existen de verdad en Google.
- *
- * Esta pantalla existe por un error concreto: los IDs venian del PRD, que traia
- * nombres comerciales ("Veo 3.1") y no los identificadores que Vertex quiere
- * ("veo-3.1-generate-001"). Con un ID que no existe, cada generacion muere en
- * un 404 y aqui solo se veria un trabajo fallido sin explicacion.
- *
- * Preguntarselo a Google desde tu propio proyecto es la unica respuesta fiable,
- * y no cuesta nada.
- */
-function ModelosDeVerdad() {
-  const [filas, setFilas] = useState<FilaModelo[] | null>(null)
-  const [comprobado, setComprobado] = useState(true)
-  const accion = useAction()
-
-  const marca = (existe: boolean | null) =>
-    existe === true ? 'approved' : existe === false ? 'rejected' : 'draft'
-  const texto = (existe: boolean | null) =>
-    existe === true ? 'Existe' : existe === false ? 'NO EXISTE' : 'Sin comprobar'
-
-  return (
-    <Card>
-      <h3>Comprobar los modelos</h3>
-      <p className="muted" style={{ margin: 0 }}>
-        Le pregunta a Google si cada modelo del registro existe con ese nombre. Si
-        alguno sale en rojo, sus generaciones fallarian sin decir por que.
-      </p>
-      <button
-        className="btn small block"
-        onClick={async () => {
-          const datos = await accion.run(() =>
-            api.get<{ checked: boolean; models: FilaModelo[] }>('/api/diagnostics/models'),
-          )
-          if (datos) {
-            setFilas(datos.models)
-            setComprobado(datos.checked)
-          }
-        }}
-      >
-        {accion.busy ? 'Preguntando a Google...' : 'Comprobar'}
-      </button>
-      {filas && !comprobado && (
-        <p className="muted" style={{ margin: 0 }}>
-          En dry run no se le pregunta a Google, asi que no se puede saber.
-        </p>
-      )}
-      {filas?.map((fila) => (
-        <div key={fila.id} className="row between">
-          <span className="mono">{fila.id}</span>
-          <span className={`badge ${marca(fila.exists)}`}>{texto(fila.exists)}</span>
-        </div>
-      ))}
-    </Card>
   )
 }
 

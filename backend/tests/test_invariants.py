@@ -313,8 +313,13 @@ def test_la_cookie_de_sesion_no_se_puede_falsificar():
 
     assert read_session(cookie, "un-secreto-de-treinta-y-dos-caracteres") == "yo@gmail.com"
     assert read_session(cookie, "otro-secreto-cualquiera-de-32-chars") is None
-    assert read_session(cookie[:-1] + "0", "un-secreto-de-treinta-y-dos-caracteres") is None
     assert read_session("basura", "un-secreto-de-treinta-y-dos-caracteres") is None
+
+    # La firma es hexadecimal, asi que cambiar el ultimo caracter por un "0"
+    # fijo no la altera una de cada dieciseis veces. Se elige uno distinto del
+    # que hay: una prueba que a veces no prueba nada es peor que ninguna.
+    distinto = "1" if cookie[-1] == "0" else "0"
+    assert read_session(cookie[:-1] + distinto, "un-secreto-de-treinta-y-dos-caracteres") is None
 
 
 def test_la_sesion_caduca():
@@ -518,22 +523,3 @@ def test_el_guardia_de_musica_apunta_a_un_modelo_que_existe(registry):
     from app.domain.guards import MUSIC_MODEL_ID
 
     assert MUSIC_MODEL_ID in {spec.id for spec in registry.all()}
-
-
-def test_no_confundir_no_existe_con_no_se_sabe():
-    """Un tropiezo de red no puede hacerse pasar por un modelo inexistente: eso
-    mandaria a cambiar un ID que estaba bien."""
-    from app.providers.vertex import VertexClient
-
-    # En dry run no hay a quien preguntar, y eso es "no se sabe", no "no existe".
-    assert VertexClient("p", dry_run=True).model_exists("veo-3.1-generate-001") is None
-
-
-def test_la_ficha_del_modelo_no_lleva_proyecto(registry):
-    """El catalogo de modelos de Google es global. Meterle el proyecto delante
-    da un 404 en todos, y pareceria que no existe ninguno."""
-    from app.providers.vertex import VertexClient
-
-    url = VertexClient("mi-proyecto", location="us-central1").publisher_url("veo-3.1-generate-001")
-    assert url.endswith("/v1/publishers/google/models/veo-3.1-generate-001")
-    assert "mi-proyecto" not in url

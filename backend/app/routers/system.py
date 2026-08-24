@@ -126,34 +126,6 @@ def vertex_calls(
     }
 
 
-@router.get("/diagnostics/models")
-def check_models(owner: OwnerDep, studio: StudioDep) -> dict[str, Any]:
-    """Pregunta a Vertex cuales de los modelos del registro existen de verdad.
-
-    Existe por un error concreto: los IDs salieron del PRD, que traia nombres
-    comerciales ("Veo 3.1") y no los identificadores que Vertex quiere
-    ("veo-3.1-generate-001"). Con un ID que no existe, cada generacion muere en
-    un 404 y en la pantalla solo se ve un trabajo fallido sin explicacion.
-
-    Preguntarselo al catalogo de Google desde este mismo proyecto es la unica
-    fuente fiable, y no cuesta nada: pedir la ficha de un modelo no genera nada.
-    """
-    filas = [
-        {
-            "id": spec.id,
-            "label": spec.label,
-            "kind": spec.kind.value,
-            "exists": studio.vertex.model_exists(spec.id),
-        }
-        for spec in studio.registry.all()
-    ]
-    return {
-        "checked": not studio.settings.dry_run,
-        "models": filas,
-        "missing": [fila["id"] for fila in filas if fila["exists"] is False],
-    }
-
-
 # --- Media (local development only) ---------------------------------------
 
 media_router = APIRouter(tags=["media"])
