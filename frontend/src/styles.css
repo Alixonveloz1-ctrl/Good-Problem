@@ -844,3 +844,56 @@ video {
   display: block;
   width: 100%;
 }
+
+/* La cara del artista, presidiendo su pantalla. */
+.lema {
+  margin: 0;
+  text-align: center;
+}
+
+.presenta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.presenta-foto {
+  width: 100%;
+  max-width: 260px;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+}
+
+/* El hueco sin foto es un marcador, no una foto: cuadrado ocupaba la pantalla
+   entera y empujaba la pregunta y el botón por debajo del borde, que es
+   justamente lo que no puede pasar en la primera pantalla que se ve. */
+.presenta-hueco {
+  width: 100%;
+  max-width: 260px;
+  height: 108px;
+  display: grid;
+  place-items: center;
+  font-size: 40px;
+  border-radius: var(--radius);
+  border: 1px dashed var(--line);
+  background: var(--bg-sunken);
+}
+
+/* Lo que existe pero todavía no toca. Se ve, para saber que está ahí, y no se
+   esconde: una sección que aparece de la nada más tarde desorienta más. */
+.apagado {
+  opacity: 0.45;
+}
+
+/* Lo técnico: presente, en pequeño, al final. */
+.tecnico {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
