@@ -28,6 +28,9 @@ TASK_ROLES: dict[str, CreativeRole] = {
     "video_concept": CreativeRole.DIRECTOR,
     "storyboard": CreativeRole.CINEMATOGRAPHER,
     "character": CreativeRole.CASTING_DIRECTOR,
+    "wardrobe_set": CreativeRole.CREATIVE_DIRECTOR,
+    "location_set": CreativeRole.CREATIVE_DIRECTOR,
+    "cast_set": CreativeRole.CASTING_DIRECTOR,
     "content_script": CreativeRole.DIRECTOR,
     "interview": CreativeRole.DIRECTOR,
     "edit_plan": CreativeRole.EDITOR,
@@ -41,6 +44,9 @@ TASK_SCHEMAS: dict[str, dict[str, Any]] = {
     "video_concept": S.VIDEO_CONCEPT_SCHEMA,
     "storyboard": S.STORYBOARD_SCHEMA,
     "character": S.CHARACTER_SCHEMA,
+    "wardrobe_set": S.WARDROBE_SET_SCHEMA,
+    "location_set": S.LOCATION_SET_SCHEMA,
+    "cast_set": S.CAST_SET_SCHEMA,
     "content_script": S.CONTENT_SCHEMA,
     "interview": S.INTERVIEW_SCHEMA,
     "edit_plan": S.EDIT_PLAN_SCHEMA,
@@ -146,8 +152,55 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
             "emotional expressions and relevant poses. The prompts go to a Gemini image model in "
             "US English and must describe the same person every time."
         )
+        # Lo que el usuario ya decidio no se propone: se obedece. Sin esto, el
+        # Director devolvia otro nombre y otro sexo -"Feri" entraba y salia
+        # "Leo Castillo"- y lo que el usuario habia escrito desaparecia.
+        fijo = payload.get("locked") or {}
+        if fijo:
+            sections.append(
+                "THESE ARE GIVEN, NOT YOURS TO CHOOSE. Use them exactly as written in every "
+                "field and in every image prompt. Never rename, never change the gender, "
+                "never propose an alternative:\n" + _kv(fijo)
+            )
         if brief:
             sections.append(f"WHAT THE PRODUCTION NEEDS\n{brief}")
+
+    elif task == "wardrobe_set":
+        cuantos = int(payload.get("count") or 4)
+        sections.append(
+            f"Propose {cuantos} outfits that this artist would actually wear, as their stylist "
+            "would build a wardrobe: one signature look that reads as theirs on sight, and the "
+            "rest covering what the year needs -stage, video, interview, off duty. Each one "
+            "coherent with the artist's identity, era and genre, and distinct from the others. "
+            "Name them the way a wardrobe department does, short and recognisable."
+        )
+        if brief:
+            sections.append(f"USER DIRECTION\n{brief}")
+
+    elif task == "location_set":
+        cuantos = int(payload.get("count") or 4)
+        sections.append(
+            f"Propose {cuantos} locations where this artist's videos happen. Places that belong "
+            "to this artist's world, not a stock list: somewhere intimate, somewhere with scale, "
+            "somewhere that says where they are from. Say what is seen, the light and the time "
+            "of day, concretely enough to shoot."
+        )
+        if brief:
+            sections.append(f"USER DIRECTION\n{brief}")
+
+    elif task == "cast_set":
+        cuantos = int(payload.get("count") or 3)
+        sections.append(
+            f"Propose {cuantos} secondary characters around this artist -the people who appear "
+            "in their videos and their story. Not extras: each one with a reason to be there and "
+            "a relation to the artist. Describe each face precisely enough that two separate "
+            "generations look like the same person."
+        )
+        principal = payload.get("lead") or {}
+        if principal:
+            sections.append(f"THE ARTIST THEY ORBIT\n{_kv(principal)}")
+        if brief:
+            sections.append(f"USER DIRECTION\n{brief}")
 
     elif task == "content_script":
         kind = payload.get("content_kind", "short")

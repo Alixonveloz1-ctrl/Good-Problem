@@ -14,16 +14,16 @@ export function JobsScreen() {
 
   return (
     <>
-      <TopBar title="Jobs" back />
+      <TopBar title="En marcha" back />
       <main className="screen">
         {loading && !data && <Loading />}
         <ErrorNote error={error ?? action.error} onDismiss={action.clearError} />
         <p className="muted" style={{ margin: 0 }}>
-          Los jobs continuan en Google Cloud aunque cierres el iPhone. Un reintento usa el mismo
-          modelo que se pidio.
+          Las generaciones siguen en Google Cloud aunque cierres el iPhone. Si algo falla y lo
+          reintentas, se vuelve a pedir con el mismo modelo, nunca con uno peor.
         </p>
 
-        {data && data.length === 0 && <Empty title="Sin jobs todavia" />}
+        {data && data.length === 0 && <Empty title="No hay nada en marcha" />}
 
         <div className="list">
           {(data ?? []).map((job) => (

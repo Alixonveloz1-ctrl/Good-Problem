@@ -1192,3 +1192,20 @@ video {
 .crear-universo:active {
   background: var(--accent-soft);
 }
+
+/* La salida a mano, que existe pero no manda.
+ *
+ * Escribir un atuendo, una locación o un personaje a mano sigue siendo posible
+ * —a veces se sabe exactamente lo que se quiere—, pero es la excepción: lo
+ * normal es que lo proponga el estudio. Por eso está abajo y en pequeño. */
+.a-mano {
+  margin: 4px 16px calc(var(--safe-bottom) + 88px);
+  color: var(--muted);
+}
+
+/* Los botones de una respuesta corta: mujer / hombre / no binario. */
+.opciones {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

@@ -12,15 +12,15 @@ export function CanonScreen() {
   >(`/api/universes/${universeId}/canon`)
   return (
     <>
-      <TopBar title="Canon" back />
+      <TopBar title="Aprobado" back />
       <main className="screen">
         {loading && !data && <Loading />}
         <ErrorNote error={error} />
         <p className="muted" style={{ margin: 0 }}>
-          Lo aprobado se convierte en Canon y se usa como contexto preferente y como imagen de
-          referencia en las generaciones posteriores.
+          Lo que apruebas queda fijado, y a partir de ahí viaja como referencia en todo lo que se
+          genere después. Es lo que hace que el artista sea siempre el mismo.
         </p>
-        {data && data.length === 0 && <Empty title="El Canon esta vacio" />}
+        {data && data.length === 0 && <Empty title="Todavía no has aprobado nada" />}
         <div className="list">
           {(data ?? []).map((entry) => (
             <Card key={entry.id}>
@@ -48,7 +48,7 @@ export function ExportsScreen() {
 
   return (
     <>
-      <TopBar title="Export" back />
+      <TopBar title="Descargas" back />
       <main className="screen">
         {exports.loading && !exports.data && <Loading />}
         <ErrorNote error={exports.error ?? action.error} onDismiss={action.clearError} />

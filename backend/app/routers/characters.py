@@ -30,6 +30,7 @@ def _repo(studio, universe_id: str, collection: str) -> Repository:
 class CharacterIn(BaseModel):
     name: str
     role: CharacterRole = CharacterRole.SUPPORTING
+    gender: str = ""
     apparent_age: str = ""
     appearance: str = ""
     personality: str = ""
@@ -37,6 +38,7 @@ class CharacterIn(BaseModel):
 
 class CharacterPatch(BaseModel):
     name: str | None = None
+    gender: str | None = None
     apparent_age: str | None = None
     appearance: str | None = None
     personality: str | None = None
@@ -109,7 +111,7 @@ def design_character(
     owner: OwnerDep, studio: StudioDep, universe_id: str, character_id: str, body: DesignIn
 ) -> dict[str, Any]:
     """The Casting Director writes the character and the Master shot prompts."""
-    _repo(studio, universe_id, CHARACTERS).require(character_id)
+    personaje = _repo(studio, universe_id, CHARACTERS).require(character_id)
     return studio.orchestrator.submit(
         GenerationRequest(
             universe_id=universe_id,
@@ -119,9 +121,77 @@ def design_character(
             model=body.model,
             role=CreativeRole.CASTING_DIRECTOR,
             idempotency_key=body.idempotency_key,
-            payload={"task": "character", "brief": body.brief, "overrides": body.overrides},
+            payload={
+                "task": "character",
+                "brief": body.brief,
+                "overrides": body.overrides,
+                "locked": _lo_que_ya_decidio(personaje),
+            },
         )
     )
+
+
+def _lo_que_ya_decidio(personaje: dict[str, Any]) -> dict[str, Any]:
+    """Lo que el usuario escribio y el Director no puede tocar.
+
+    Escribio "Feri", una artista, y el Director devolvio "Leo Castillo". Un
+    generador que cambia el nombre y el sexo de lo que le das no esta
+    proponiendo: esta empezando otra cosa.
+    """
+    return {
+        clave: personaje[clave]
+        for clave in ("name", "gender")
+        if personaje.get(clave)
+    }
+
+
+def _proponer(studio, universe_id: str, tarea: str, cuantos: int, brief: str, modelo: str | None):
+    """Un departamento entero, propuesto de una vez.
+
+    Antes cada atuendo y cada locacion habia que crearlos a mano: un nombre, una
+    descripcion, una categoria, uno por uno. Para eso no hacen falta directores.
+    """
+    studio.orchestrator.require_universe(universe_id)
+    return studio.orchestrator.submit(
+        GenerationRequest(
+            universe_id=universe_id,
+            kind="text",
+            target_type="universe",
+            target_id=universe_id,
+            model=modelo,
+            payload={"task": tarea, "count": cuantos, "brief": brief},
+        )
+    )
+
+
+class ProponerIn(BaseModel):
+    count: int = Field(4, ge=1, le=8)
+    brief: str = ""
+    model: str | None = None
+
+
+@router.post("/wardrobe/propose")
+def propose_wardrobe(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, body: ProponerIn
+) -> dict[str, Any]:
+    """El Director creativo monta el vestuario del artista."""
+    return _proponer(studio, universe_id, "wardrobe_set", body.count, body.brief, body.model)
+
+
+@router.post("/locations/propose")
+def propose_locations(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, body: ProponerIn
+) -> dict[str, Any]:
+    """El Director creativo elige donde ocurren los videos."""
+    return _proponer(studio, universe_id, "location_set", body.count, body.brief, body.model)
+
+
+@router.post("/characters/propose")
+def propose_cast(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, body: ProponerIn
+) -> dict[str, Any]:
+    """El Director de casting propone quien acompana al artista."""
+    return _proponer(studio, universe_id, "cast_set", body.count, body.brief, body.model)
 
 
 @router.post("/characters/{character_id}/master/{shot_key}")

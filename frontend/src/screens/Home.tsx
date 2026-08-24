@@ -24,14 +24,33 @@ export function HomeScreen() {
   const [creando, setCreando] = useState(false)
   const [menu, setMenu] = useState(false)
   const [nombre, setNombre] = useState('')
+  const [sexo, setSexo] = useState('')
+  const [genero, setGenero] = useState('')
+  const [notas, setNotas] = useState('')
+  const navegarA = useNavigate()
   const accion = useAction()
 
+  // Un solo formulario. Antes se creaba un universo con un nombre y dentro
+  // habia que crear otra vez al artista con otro nombre, y el Director de
+  // casting cambiaba el segundo por su cuenta.
   const crear = async () => {
-    const creado = await accion.run(() => api.post('/api/universes', { name: nombre.trim() }))
+    const creado = await accion.run(() =>
+      api.post<{ id: string }>('/api/universes', {
+        name: nombre.trim(),
+        gender: sexo,
+        genre: genero.trim(),
+        notes: notas.trim(),
+      }),
+    )
     if (creado) {
       setCreando(false)
       setNombre('')
+      setSexo('')
+      setGenero('')
+      setNotas('')
       await reload()
+      // Directo a su pantalla: el estudio ya esta diseñandolo.
+      navegarA(`/u/${creado.id}`)
     }
   }
 
@@ -106,18 +125,52 @@ export function HomeScreen() {
       {menu && <MenuEsquina onClose={() => setMenu(false)} />}
 
       {creando && (
-        <Sheet title="Nuevo universo" onClose={() => setCreando(false)}>
-          <Field label="Nombre del artista" value={nombre} onChange={setNombre} placeholder="Nova" />
+        <Sheet title="¿Quién es tu artista?" onClose={() => setCreando(false)}>
+          <Field
+            label="Nombre artístico"
+            value={nombre}
+            onChange={setNombre}
+            placeholder="Feri"
+          />
+          <div className="field">
+            <label>Es</label>
+            <div className="opciones">
+              {['mujer', 'hombre', 'no binario'].map((cual) => (
+                <button
+                  key={cual}
+                  type="button"
+                  className={`chip ${sexo === cual ? 'active' : ''}`}
+                  onClick={() => setSexo(cual)}
+                >
+                  {cual}
+                </button>
+              ))}
+            </div>
+          </div>
+          <Field
+            label="Estilo musical"
+            value={genero}
+            onChange={setGenero}
+            placeholder="Reggaetón triste"
+          />
+          <Field
+            label="Algo más (opcional)"
+            value={notas}
+            onChange={setNotas}
+            placeholder="De Caracas, 24 años, canta a la gente que se fue"
+            multiline
+          />
           <ErrorNote error={accion.error} onDismiss={accion.clearError} />
           <button
             className="btn primary block"
             disabled={!nombre.trim() || accion.busy}
             onClick={crear}
           >
-            {accion.busy ? 'Creando…' : 'Crear universo'}
+            {accion.busy ? 'Creando…' : 'Crear artista'}
           </button>
           <p className="muted" style={{ margin: 0 }}>
-            Se crea vacío. Lo primero que pedirá es la cara del artista.
+            Con esto basta. El estudio le escribe la identidad y prepara sus
+            retratos; el nombre y el resto no te los cambia nadie.
           </p>
         </Sheet>
       )}

@@ -6,6 +6,7 @@ import type { Character } from '../api/types'
 import { ModelPicker, type ModelChoice } from '../components/ModelPicker'
 import { JobWatcher } from '../components/JobWatcher'
 import { Empty, ErrorNote, Field, Loading, Sheet, StatusBadge, TopBar, DeleteButton } from '../components/ui'
+import { Proponer } from '../components/Proponer'
 
 export function CharactersScreen() {
   const { universeId = '' } = useParams()
@@ -37,32 +38,28 @@ export function CharactersScreen() {
 
   return (
     <>
-      <TopBar
-        title="Personajes"
-        back
-        action={
-          <button className="btn small primary" onClick={() => setCreating(true)}>
-            Nuevo
-          </button>
-        }
-      />
+      <TopBar title="Personajes" back />
       <main className="screen">
         {loading && !data && <Loading />}
         <ErrorNote error={error} />
         <p className="muted" style={{ margin: 0 }}>
-          El Character Master aprobado se adjunta como referencia en toda generacion posterior donde
-          aparezca el personaje. Es lo que sostiene la consistencia visual.
+          El artista está el primero. Los demás son quienes salen con él en los
+          videos, y su cara aprobada viaja como referencia en todo lo que se
+          genere después: es lo que hace que sea siempre la misma persona.
         </p>
+
+        <Proponer
+          universeId={universeId}
+          ruta="characters"
+          cuantos={3}
+          etiqueta="Que el estudio proponga quién le acompaña"
+          onListo={reload}
+        />
 
         {data && data.length === 0 && (
           <Empty
-            title="Sin personajes"
-            hint="Crea al menos el artista antes de las escenas."
-            action={
-              <button className="btn primary" onClick={() => setCreating(true)}>
-                Crear personaje
-              </button>
-            }
+            title="Sin personajes todavía"
+            hint="El Director de casting los escribe a partir de quién es el artista."
           />
         )}
 
@@ -96,6 +93,10 @@ export function CharactersScreen() {
           ))}
         </div>
       </main>
+
+      <button className="btn small ghost block a-mano" onClick={() => setCreating(true)}>
+        …o escribir uno a mano
+      </button>
 
       {creating && (
         <Sheet title="Nuevo personaje" onClose={() => setCreating(false)}>

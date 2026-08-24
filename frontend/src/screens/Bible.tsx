@@ -59,7 +59,7 @@ export function BibleScreen() {
 
   return (
     <>
-      <TopBar title="Artist Bible" back action={data && <StatusBadge status={data.status} />} />
+      <TopBar title="Identidad" back action={data && <StatusBadge status={data.status} />} />
       <main className="screen">
         {loading && !data && <Loading />}
         <ErrorNote error={error ?? action.error} onDismiss={action.clearError} />

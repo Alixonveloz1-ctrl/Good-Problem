@@ -311,3 +311,86 @@ INTERVIEW_SCHEMA: dict[str, Any] = {
     },
     "required": ["title", "exchanges"],
 }
+
+
+# --- Lo que los departamentos proponen solos (PRD 19, 20) -------------------
+#
+# El estudio tiene un Director de casting y un Director creativo, y hasta ahora
+# solo rellenaban fichas vacias que habia que crear a mano, con su nombre y su
+# descripcion escritos a dedo. Eso no es dirigir: es tomar dictado.
+#
+# Con estos esquemas proponen la tanda entera —el vestuario, las locaciones, el
+# reparto— a partir de quien es el artista. Lo que sobra se borra de un toque,
+# que es mucho menos trabajo que escribirlo.
+
+WARDROBE_SET_SCHEMA: dict[str, Any] = {
+    "type": "OBJECT",
+    "properties": {
+        "outfits": _arr(
+            {
+                "type": "OBJECT",
+                "properties": {
+                    "name": _str("Nombre corto y reconocible, en espanol"),
+                    "category": {
+                        "type": "STRING",
+                        "enum": [
+                            "signature",
+                            "casual",
+                            "performance",
+                            "interview",
+                            "music_video",
+                            "night",
+                            "special",
+                        ],
+                    },
+                    "description": _str("Como es, en espanol"),
+                    "pieces": _arr(_str()),
+                    "accessories": _arr(_str()),
+                    "colors": _arr(_str()),
+                    "usage": _str("Cuando lo lleva, en espanol"),
+                },
+                "required": ["name", "category", "description"],
+            }
+        )
+    },
+    "required": ["outfits"],
+}
+
+LOCATION_SET_SCHEMA: dict[str, Any] = {
+    "type": "OBJECT",
+    "properties": {
+        "locations": _arr(
+            {
+                "type": "OBJECT",
+                "properties": {
+                    "name": _str("Nombre corto, en espanol"),
+                    "description": _str("Que se ve, en espanol"),
+                    "lighting": _str("La luz, en espanol"),
+                    "time_of_day": _str("Momento del dia, en espanol"),
+                },
+                "required": ["name", "description"],
+            }
+        )
+    },
+    "required": ["locations"],
+}
+
+CAST_SET_SCHEMA: dict[str, Any] = {
+    "type": "OBJECT",
+    "properties": {
+        "characters": _arr(
+            {
+                "type": "OBJECT",
+                "properties": {
+                    "name": _str("Nombre del personaje"),
+                    "apparent_age": _str(),
+                    "appearance": _str("Descripcion fisica detallada, en espanol"),
+                    "personality": _str("En espanol"),
+                    "relation": _str("Que es del artista, en espanol"),
+                },
+                "required": ["name", "appearance"],
+            }
+        )
+    },
+    "required": ["characters"],
+}

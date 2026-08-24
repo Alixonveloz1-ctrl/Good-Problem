@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from ..db.repositories import CANON, UNIVERSES, Repository, universe_path
-from ..domain.enums import CanonStatus, CreativeRole
-from ..domain.schemas import ArtistBible, Universe
+from ..db.repositories import CANON, CHARACTERS, UNIVERSES, Repository, universe_path
+from ..domain.enums import CanonStatus, CharacterRole, CreativeRole
+from ..domain.schemas import MASTER_SHOTS, ArtistBible, Universe
 from ..errors import NotFound
 from ..ids import new_id
 from ..orchestrator.orchestrator import GenerationRequest
@@ -19,10 +20,22 @@ from .deps import OwnerDep, StudioDep
 
 router = APIRouter(prefix="/api/universes", tags=["universes"])
 
+logger = logging.getLogger("aaus.universes")
+
 
 class UniverseIn(BaseModel):
+    """Quien es el artista. Se pregunta una vez y no se vuelve a preguntar.
+
+    Antes se creaba un universo con un nombre, y dentro habia que crear otra vez
+    al artista con otro nombre. Dos nombres para la misma persona, y el segundo
+    lo cambiaba el Director por su cuenta.
+    """
+
     name: str
     tagline: str = ""
+    gender: str = ""
+    genre: str = ""
+    notes: str = ""
 
 
 class UniversePatch(BaseModel):
@@ -33,18 +46,82 @@ class UniversePatch(BaseModel):
 
 @router.post("")
 def create_universe(owner: OwnerDep, studio: StudioDep, body: UniverseIn) -> dict[str, Any]:
+    """Crea el artista entero: su mundo, su ficha y el encargo al Director.
+
+    Un solo formulario. Antes eran dos pantallas y dos nombres, y lo que se
+    escribia en la segunda lo reescribia el Director de casting.
+    """
     universe_id = new_id("uni")
     universe = Universe(
         id=universe_id,
         universe_id=universe_id,
         name=body.name,
-        tagline=body.tagline,
+        tagline=body.tagline or body.genre,
     )
     studio.db.set(universe_path(universe_id), universe.model_dump())
     # A universe starts with an empty Bible so every later call has something
     # to read (PRD 42.4).
     save_bible(studio.db, universe_id, ArtistBible(id="current", universe_id=universe_id))
-    return universe.model_dump()
+
+    # Y el artista, que ES el universo. El nombre y el sexo quedan puestos desde
+    # aqui: son lo unico que el Director tiene prohibido cambiar.
+    protagonista = Repository(studio.db, universe_id, CHARACTERS).create(
+        new_id("char"),
+        {
+            "name": body.name,
+            "role": CharacterRole.LEAD.value,
+            "gender": body.gender,
+            "apparent_age": "",
+            "appearance": "",
+            "personality": "",
+            "master_shots": [
+                {"key": key, "label": label, "storage_path": None,
+                 "status": CanonStatus.DRAFT.value, "prompt": ""}
+                for key, label in MASTER_SHOTS
+            ],
+            "reference_image_paths": [],
+            "status": CanonStatus.DRAFT.value,
+        },
+    )
+
+    # Y se pone a trabajar solo. Nadie tiene que acordarse de pedirselo: sin el
+    # diseno no hay prompts, y sin prompts ningun boton de "Generar" funciona,
+    # que es exactamente donde se quedaba encallado.
+    encargo = None
+    try:
+        encargo = studio.orchestrator.submit(
+            GenerationRequest(
+                universe_id=universe_id,
+                kind="text",
+                target_type="character",
+                target_id=protagonista["id"],
+                role=CreativeRole.CASTING_DIRECTOR,
+                payload={
+                    "task": "character",
+                    "brief": _quien_es(body),
+                    "locked": {"name": body.name, "gender": body.gender},
+                },
+            )
+        )
+    except Exception:  # pragma: no cover - el artista existe igual
+        # Si el encargo no sale, el artista ya esta creado y se puede volver a
+        # pedir el diseno desde su pantalla. Perder el universo por esto seria
+        # mucho peor que empezar sin retrato.
+        logger.exception("no se pudo encargar el diseno inicial de %s", universe_id)
+
+    return {**universe.model_dump(), "lead_character_id": protagonista["id"], "job": encargo}
+
+
+def _quien_es(body: UniverseIn) -> str:
+    """Lo que el usuario conto del artista, en una sola nota para el Director."""
+    partes = [f"Artist stage name: {body.name}."]
+    if body.gender:
+        partes.append(f"Gender: {body.gender}.")
+    if body.genre:
+        partes.append(f"Musical genre: {body.genre}.")
+    if body.notes:
+        partes.append(body.notes.strip())
+    return " ".join(partes)
 
 
 @router.get("")

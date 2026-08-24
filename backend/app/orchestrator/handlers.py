@@ -26,7 +26,7 @@ from ..db.repositories import (
     WARDROBE,
     Repository,
 )
-from ..domain.enums import CanonStatus, LyricsAuthor
+from ..domain.enums import CanonStatus, CharacterRole, LyricsAuthor, WardrobeCategory
 from ..domain.guards import resolve_clip_duration
 from ..domain.pricing import estimate_images, estimate_song, estimate_speech, estimate_text
 from ..domain.pricing import estimate_video as price_video
@@ -228,11 +228,83 @@ def _apply_director_result(
             "master_shots": shots,
             "status": CanonStatus.DRAFT.value,
         }
+        # Y por encima de todo, lo que el usuario ya habia decidido. Al Director
+        # se le pide en el prompt que lo respete, pero un prompt es una peticion:
+        # esto es la garantia. El nombre que se escribio es el nombre.
+        patch.update({k: v for k, v in (_payload(job).get("locked") or {}).items() if v})
         if repo.get(target_id) is None:
             repo.create(target_id, patch)
         else:
             repo.update(target_id, patch)
         return {"entity": "character", "id": target_id}
+
+    if task == "wardrobe_set":
+        repo = _repo(studio, universe_id, WARDROBE)
+        creados = [
+            repo.create(
+                new_id("fit"),
+                {
+                    "name": fit.get("name", "Sin nombre"),
+                    "category": fit.get("category") or WardrobeCategory.SIGNATURE.value,
+                    "description": fit.get("description", ""),
+                    "pieces": fit.get("pieces") or [],
+                    "accessories": fit.get("accessories") or [],
+                    "colors": fit.get("colors") or [],
+                    "usage": fit.get("usage", ""),
+                    "restrictions": [],
+                    "image_path": None,
+                    "status": CanonStatus.DRAFT.value,
+                },
+            )["id"]
+            for fit in (data.get("outfits") or [])
+        ]
+        return {"entity": "wardrobe", "created": creados}
+
+    if task == "location_set":
+        repo = _repo(studio, universe_id, LOCATIONS)
+        creados = [
+            repo.create(
+                new_id("loc"),
+                {
+                    "name": sitio.get("name", "Sin nombre"),
+                    "description": sitio.get("description", ""),
+                    "lighting": sitio.get("lighting", ""),
+                    "time_of_day": sitio.get("time_of_day", ""),
+                    "reference_paths": [],
+                    "status": CanonStatus.DRAFT.value,
+                },
+            )["id"]
+            for sitio in (data.get("locations") or [])
+        ]
+        return {"entity": "locations", "created": creados}
+
+    if task == "cast_set":
+        repo = _repo(studio, universe_id, CHARACTERS)
+        creados = []
+        for persona in data.get("characters") or []:
+            creados.append(
+                repo.create(
+                    new_id("char"),
+                    {
+                        "name": persona.get("name", "Sin nombre"),
+                        "role": CharacterRole.SUPPORTING.value,
+                        "gender": "",
+                        "apparent_age": persona.get("apparent_age", ""),
+                        "appearance": persona.get("appearance", ""),
+                        "personality": persona.get("personality", ""),
+                        # Sin prompts todavia: se piden al disenar cada uno, que
+                        # es cuando hay algo concreto que retratar.
+                        "master_shots": [
+                            {"key": key, "label": label, "storage_path": None,
+                             "status": CanonStatus.DRAFT.value, "prompt": ""}
+                            for key, label in MASTER_SHOTS
+                        ],
+                        "reference_image_paths": [],
+                        "status": CanonStatus.DRAFT.value,
+                    },
+                )["id"]
+            )
+        return {"entity": "characters", "created": creados}
 
     if task in {"content_script", "interview"}:
         repo = _repo(studio, universe_id, CONTENT)

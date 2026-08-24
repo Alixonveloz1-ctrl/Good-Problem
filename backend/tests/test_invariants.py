@@ -194,6 +194,111 @@ def test_switching_model_is_the_main_lever(registry):
     assert dear.amount_usd / cheap.amount_usd > 6
 
 
+# --- El artista se crea una vez, y es suyo --------------------------------
+
+
+def test_crear_el_artista_es_un_solo_paso(client, studio):
+    """Un formulario, un nombre, y el estudio se pone a trabajar solo.
+
+    Antes eran dos: se creaba un universo con un nombre y dentro habia que
+    crear otra vez al artista con otro nombre. Dos nombres para la misma
+    persona. Y hasta que no se pedia el diseno a mano no habia prompts, asi que
+    todos los botones de "Generar" contestaban que no habia prompt.
+    """
+    creado = client.post(
+        "/api/universes",
+        json={"name": "Feri", "gender": "mujer", "genre": "reggaeton triste"},
+    ).json()
+
+    assert creado["lead_character_id"]
+    # Y ya esta encargado el diseno: nadie tiene que acordarse de pedirlo.
+    assert creado["job"] is not None
+
+    personajes = client.get(f"/api/universes/{creado['id']}/characters").json()
+    assert len(personajes) == 1
+    assert personajes[0]["name"] == "Feri"
+    assert personajes[0]["role"] == "lead"
+    assert personajes[0]["gender"] == "mujer"
+
+
+def test_el_director_no_puede_cambiarle_el_nombre_ni_el_sexo(client, studio):
+    """Escribio "Feri", una artista, y el Director devolvio "Leo Castillo".
+
+    Al Director se le pide en el prompt que respete lo que ya se decidio, pero
+    un prompt es una peticion, no una garantia. Esto es la garantia: pase lo que
+    pase con el modelo, el nombre que se escribio es el nombre.
+    """
+    from app.orchestrator.handlers import _apply_director_result
+
+    creado = client.post(
+        "/api/universes", json={"name": "Feri", "gender": "mujer"}
+    ).json()
+    uid, char_id = creado["id"], creado["lead_character_id"]
+    studio.jobs.wait_for_idle(20)  # que termine el diseno que se encargo solo
+
+    # Lo que devolveria un modelo que se va por su cuenta.
+    _apply_director_result(
+        studio,
+        uid,
+        {"target_id": char_id,
+         "request": {"payload": {"task": "character",
+                                 "locked": {"name": "Feri", "gender": "mujer"}}}},
+        "character",
+        {
+            "name": "Leo Castillo",
+            "apparent_age": "35",
+            "appearance": "hombre de barba",
+            "master_prompts": [{"key": "portrait", "prompt": "portrait of a man"}],
+        },
+    )
+
+    personaje = client.get(f"/api/universes/{uid}/characters/{char_id}").json()
+    assert personaje["name"] == "Feri"
+    assert personaje["gender"] == "mujer"
+    # Lo demas si lo escribe el Director: para eso esta.
+    assert personaje["apparent_age"] == "35"
+    assert personaje["master_shots"][0]["prompt"] == "portrait of a man"
+
+
+def test_el_estudio_propone_el_vestuario_y_las_locaciones(client, studio):
+    """Sin escribir un nombre ni una descripcion.
+
+    "Para que estan los directores." Tenia razon: cada atuendo y cada locacion
+    habia que crearlos a mano, con su nombre y su categoria, uno por uno. Eso no
+    es dirigir un estudio, es rellenar un formulario.
+    """
+    from app.orchestrator.handlers import _apply_director_result
+
+    uid = client.post("/api/universes", json={"name": "Feri"}).json()["id"]
+    studio.jobs.wait_for_idle(20)
+
+    # Las rutas existen, encargan el trabajo, y lo que vuelve se guarda solo:
+    # el vestuario aparece sin que nadie escriba un nombre.
+    for ruta in ("wardrobe", "locations", "characters"):
+        respuesta = client.post(f"/api/universes/{uid}/{ruta}/propose", json={"count": 2})
+        assert respuesta.status_code == 200, respuesta.text
+    studio.jobs.wait_for_idle(20)
+    assert client.get(f"/api/universes/{uid}/wardrobe").json(), "no propuso ningun atuendo"
+    assert client.get(f"/api/universes/{uid}/locations").json(), "no propuso ninguna locacion"
+
+    # Y los campos se guardan donde toca.
+    _apply_director_result(
+        studio, uid, {"request": {"payload": {}}}, "wardrobe_set",
+        {"outfits": [{"name": "Chandal de terciopelo", "category": "signature",
+                      "description": "verde botella"}]},
+    )
+    _apply_director_result(
+        studio, uid, {"request": {"payload": {}}}, "location_set",
+        {"locations": [{"name": "Azotea de Caracas", "description": "de noche"}]},
+    )
+
+    atuendos = {a["name"]: a for a in client.get(f"/api/universes/{uid}/wardrobe").json()}
+    sitios = {s["name"]: s for s in client.get(f"/api/universes/{uid}/locations").json()}
+    assert atuendos["Chandal de terciopelo"]["category"] == "signature"
+    assert atuendos["Chandal de terciopelo"]["description"] == "verde botella"
+    assert sitios["Azotea de Caracas"]["description"] == "de noche"
+
+
 # --- Idempotency (PRD 42.1) -----------------------------------------------
 
 
@@ -207,7 +312,13 @@ def test_the_same_key_never_generates_twice(studio, client):
     second = studio.orchestrator.submit(request)
     assert first["id"] == second["id"]
     studio.jobs.wait_for_idle(20)
-    assert len(studio.jobs.list(uid, limit=50)) == 1
+    # Se cuentan los de ESTA clave: crear el artista ya encarga su diseno, y
+    # esa es otra generacion legitima que no tiene nada que ver con esta.
+    con_esta_clave = [
+        job for job in studio.jobs.list(uid, limit=50)
+        if job.get("idempotency_key") == "abc-123"
+    ]
+    assert len(con_esta_clave) == 1
 
 
 # --- Model resolution order (PRD 42.8) ------------------------------------
@@ -905,6 +1016,26 @@ def test_todo_lo_que_se_crea_se_puede_borrar(client, universe):
         r"api\.del\(`/api/universes/\$\{[A-Za-z.]+\}`\)", codigo
     )
     assert borra_artista, "sin boton: el artista"
+
+
+def test_ninguna_pantalla_obliga_a_escribir_un_nombre():
+    """Las dos mitades: que la ruta exista y que el boton este puesto.
+
+    "Para que estan los directores. Mi intencion es automatizar; si no, mejor lo
+    hago yo a mano desde el principio." Tenia razon: cada atuendo, cada locacion
+    y cada personaje habia que crearlos escribiendo un nombre y una descripcion.
+
+    Se comprueba lo mismo que con los botones de borrar, y por la misma razon:
+    una ruta sin boton no existe para quien usa la app, y un boton sin ruta es
+    un error rojo.
+    """
+    import pathlib as rutas
+
+    fuente = rutas.Path(__file__).resolve().parents[2] / "frontend" / "src"
+    codigo = "\n".join(f.read_text() for f in fuente.rglob("*.tsx"))
+    for ruta in ("wardrobe", "locations", "characters"):
+        assert f'ruta="{ruta}"' in codigo, f"sin boton de proponer: {ruta}"
+    assert "/${ruta}/propose" in codigo, "el boton no llama a ninguna ruta"
 
 
 def test_la_cola_puede_entrar_con_su_pase(client, studio):

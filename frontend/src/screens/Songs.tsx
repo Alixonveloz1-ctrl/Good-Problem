@@ -36,7 +36,7 @@ export function SongsScreen() {
   return (
     <>
       <TopBar
-        title="Musica"
+        title="Música"
         back
         action={
           <button className="btn small primary" onClick={() => setCreating(true)}>

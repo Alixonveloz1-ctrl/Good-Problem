@@ -5,6 +5,7 @@ import { useAction, useResource } from '../hooks/useApi'
 import type { Location, Outfit } from '../api/types'
 import { JobWatcher } from '../components/JobWatcher'
 import { ModelPicker, type ModelChoice } from '../components/ModelPicker'
+import { Proponer } from '../components/Proponer'
 import {
   Card,
   DeleteButton,
@@ -75,22 +76,26 @@ export function WardrobeScreen() {
 
   return (
     <>
-      <TopBar
-        title="Vestuario"
-        back
-        action={
-          <button className="btn small primary" onClick={() => setCreating(true)}>
-            Nuevo
-          </button>
-        }
-      />
+      <TopBar title="Vestuario" back />
       <main className="screen">
         {loading && !data && <Loading />}
         <ErrorNote error={error ?? action.error} onDismiss={action.clearError} />
         <ModelPicker kind="image" value={choice} onChange={setChoice} label="Modelo de imagen" />
 
+        <Proponer
+          universeId={universeId}
+          ruta="wardrobe"
+          etiqueta={
+            data && data.length > 0 ? 'Que el estudio proponga más' : 'Que el estudio le monte el vestuario'
+          }
+          onListo={reload}
+        />
+
         {data && data.length === 0 && (
-          <Empty title="Sin atuendos" hint="Signature, performance, interview, night…" />
+          <Empty
+            title="Sin atuendos todavía"
+            hint="El Director creativo los escribe a partir de quién es el artista. Borra lo que no encaje."
+          />
         )}
 
         <div className="list">
@@ -139,6 +144,10 @@ export function WardrobeScreen() {
           />
         )}
       </main>
+
+      <button className="btn small ghost block a-mano" onClick={() => setCreating(true)}>
+        …o escribir uno a mano
+      </button>
 
       {creating && (
         <Sheet title="Nuevo atuendo" onClose={() => setCreating(false)}>
@@ -211,22 +220,26 @@ export function LocationsScreen() {
 
   return (
     <>
-      <TopBar
-        title="Locaciones"
-        back
-        action={
-          <button className="btn small primary" onClick={() => setCreating(true)}>
-            Nueva
-          </button>
-        }
-      />
+      <TopBar title="Locaciones" back />
       <main className="screen">
         {loading && !data && <Loading />}
         <ErrorNote error={error ?? action.error} onDismiss={action.clearError} />
         <ModelPicker kind="image" value={choice} onChange={setChoice} label="Modelo de imagen" />
 
+        <Proponer
+          universeId={universeId}
+          ruta="locations"
+          etiqueta={
+            data && data.length > 0 ? 'Que el estudio proponga más' : 'Que el estudio elija sus locaciones'
+          }
+          onListo={reload}
+        />
+
         {data && data.length === 0 && (
-          <Empty title="Sin locaciones" hint="Apartamento, estudio, azotea, calle, backstage…" />
+          <Empty
+            title="Sin locaciones todavía"
+            hint="El Director creativo elige dónde ocurren sus videos. Borra lo que no encaje."
+          />
         )}
 
         <div className="list">
@@ -283,6 +296,10 @@ export function LocationsScreen() {
           />
         )}
       </main>
+
+      <button className="btn small ghost block a-mano" onClick={() => setCreating(true)}>
+        …o escribir una a mano
+      </button>
 
       {creating && (
         <Sheet title="Nueva locacion" onClose={() => setCreating(false)}>
