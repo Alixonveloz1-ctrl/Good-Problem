@@ -87,6 +87,32 @@ def domain_error_handler(request: Request, exc: DomainError) -> JSONResponse:
     return JSONResponse(status_code=exc.status_code, content=exc.to_payload())
 
 
+@app.exception_handler(Exception)
+def unexpected_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Cualquier fallo no previsto, contado en JSON y no en texto plano.
+
+    Sin esto, un fallo del servidor sale como "Internal Server Error" a secas, y
+    la aplicación —que espera JSON— muestra "JSON Parse error: Unexpected
+    identifier". Es decir: el único mensaje que llega al teléfono habla del
+    formato de la respuesta y no del problema, y no hay forma de saber qué pasó
+    sin ir a leer los registros de Cloud Run desde un móvil.
+
+    El texto del error va dentro. Aquí no es una fuga: entra una sola persona,
+    la dueña, y es justo quien necesita leerlo.
+    """
+    logger.exception("fallo_no_previsto %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "code": "internal_error",
+                "message": f"{type(exc).__name__}: {exc}"[:800],
+                "details": {"ruta": request.url.path},
+            }
+        },
+    )
+
+
 app.include_router(auth.router)
 app.include_router(system.router)
 app.include_router(system.media_router)

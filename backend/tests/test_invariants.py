@@ -567,3 +567,32 @@ def test_la_app_arranca_con_lo_que_pone_el_instalador(tmp_root, monkeypatch):
     finally:
         get_settings.cache_clear()
         set_studio(None)
+
+
+def test_un_fallo_del_servidor_se_cuenta_en_json(studio, monkeypatch):
+    """Sin esto, el unico mensaje que llega al telefono es "JSON Parse error:
+    Unexpected identifier", que habla del formato de la respuesta y no del
+    problema. Paso de verdad, en la primera pantalla.
+
+    El cliente de pruebas relanza por defecto los fallos del servidor, que es lo
+    contrario de lo que hay que comprobar aqui: lo que importa es la respuesta
+    que sale por el cable.
+    """
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    def revienta(*_args, **_kwargs):
+        raise RuntimeError("la base de datos dijo que no")
+
+    monkeypatch.setattr(studio.db, "list", revienta)
+    app.state.studio = studio
+    cliente = TestClient(app, raise_server_exceptions=False)
+
+    respuesta = cliente.get("/api/home")
+    assert respuesta.status_code == 500
+    cuerpo = respuesta.json()          # y no texto plano
+    assert cuerpo["error"]["code"] == "internal_error"
+    assert "la base de datos dijo que no" in cuerpo["error"]["message"]
+    assert cuerpo["error"]["details"]["ruta"] == "/api/home"
+    app.state.studio = None
