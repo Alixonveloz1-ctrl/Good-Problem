@@ -49,6 +49,16 @@ COLA="aaus-generation"
 # archivo además se pueden probar por separado.
 AYUDA="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/infra/setup"
 
+# Si faltan, lo de Firebase se cae mucho mas adelante y con un mensaje que no
+# tiene nada que ver ("no pude conseguir la clave del navegador"). Mejor aqui.
+for AYUDANTE in primer_app_id limpiar_config elegir_clave nombre_clave_nueva \
+                armar_config dominios; do
+  [[ -f "${AYUDA}/${AYUDANTE}.py" ]] || {
+    echo "Falta ${AYUDA}/${AYUDANTE}.py. Haz 'git pull' y vuelve a intentarlo." >&2
+    exit 1
+  }
+done
+
 # ══════════════════════════════════════════════════════════════════════
 #  1 · Quién eres y dónde vamos a montar esto
 # ══════════════════════════════════════════════════════════════════════
@@ -99,6 +109,7 @@ titulo "Encendiendo servicios"
 paso "Esto tarda un par de minutos la primera vez"
 
 gcloud services enable \
+  cloudresourcemanager.googleapis.com serviceusage.googleapis.com \
   run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com \
   aiplatform.googleapis.com texttospeech.googleapis.com firestore.googleapis.com \
   storage.googleapis.com cloudtasks.googleapis.com secretmanager.googleapis.com \
@@ -106,6 +117,8 @@ gcloud services enable \
   firebase.googleapis.com identitytoolkit.googleapis.com apikeys.googleapis.com \
   --project="$PROJECT_ID" >/dev/null
 ok "Servicios encendidos"
+detalle "esperando 25 s a que Google propague los permisos…"
+sleep 25
 
 # ══════════════════════════════════════════════════════════════════════
 #  3 · Dónde se guardan los datos y los vídeos
@@ -231,14 +244,42 @@ paso "Activando Firebase sobre el proyecto"
 if firebase_activo; then
   ok "Ya estaba activo"
 else
-  CODIGO_FB="$(curl -sS -o "$TMP_FB" -w '%{http_code}' -X POST \
-    -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
-    "https://firebase.googleapis.com/v1beta1/projects/${PROJECT_ID}:addFirebase" \
-    -d '{}' 2>/dev/null || echo 000)"
-  if [[ "$CODIGO_FB" != "200" ]]; then
-    error "Google rechazó activar Firebase (HTTP ${CODIGO_FB}). Respondió:"
-    head -6 "$TMP_FB" | sed 's/^/      /'
-    morir "Sin Firebase no hay forma de entrar en la app."
+  # Se reintenta. Un 403 justo despues de encender una API casi nunca es
+  # "no tienes permiso": es que el permiso todavia no existe. Rendirse al
+  # primer intento manda a buscar un problema que no esta.
+  CODIGO_FB="000"
+  for intento in 1 2 3 4; do
+    CODIGO_FB="$(curl -sS -o "$TMP_FB" -w '%{http_code}' -X POST \
+      -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
+      "https://firebase.googleapis.com/v1beta1/projects/${PROJECT_ID}:addFirebase" \
+      -d '{}' 2>/dev/null || echo 000)"
+    [[ "$CODIGO_FB" == "200" ]] && break
+    # 409 es que ya estaba: no es un fallo.
+    [[ "$CODIGO_FB" == "409" ]] && break
+    detalle "Google aun no deja (HTTP ${CODIGO_FB}); reintento $intento de 4…"
+    sleep 20
+  done
+
+  # Lo que respondio Google se guarda ANTES de volver a comprobar: esa
+  # comprobacion escribe encima del mismo archivo y se llevaria por delante la
+  # unica pista de por que fallo.
+  MOTIVO="$(head -6 "$TMP_FB" 2>/dev/null || true)"
+
+  if [[ "$CODIGO_FB" != "200" && "$CODIGO_FB" != "409" ]] && ! firebase_activo; then
+    echo
+    error "Google no deja activar Firebase desde aquí (HTTP ${CODIGO_FB}):"
+    printf '%s\n' "$MOTIVO" | sed 's/^/      /'
+    cat <<AMANO
+
+  ${BOLD}Actívalo tú en dos toques y vuelve a ejecutar el script:${RESET}
+
+  ${BOLD}1.${RESET} Abre:  https://console.firebase.google.com/?authuser=${CORREO}
+  ${BOLD}2.${RESET} Toca:  ${BOLD}Crear un proyecto${RESET}  →  elige ${BOLD}${PROJECT_ID}${RESET} de la lista
+     ${DIM}Es el mismo proyecto, no uno nuevo. Acepta y sigue hasta el final.${RESET}
+  ${BOLD}3.${RESET} Vuelve aquí:  ./setup.sh
+
+AMANO
+    exit 1
   fi
   # Se espera a que la activación sea CIERTA. Dar el visto bueno sin comprobar
   # deja todo lo de después chocando contra un 404 que no dice nada.
