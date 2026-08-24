@@ -38,13 +38,38 @@ export function onUnauthorized(listener: Listener): () => void {
 
 const PUERTA = '/api/auth/'
 
+/** Lo que se espera a una respuesta antes de darla por perdida.
+ *
+ * Sin esto, una peticion que no vuelve deja la pantalla girando para siempre:
+ * sin datos, sin error y sin nada que hacer. Paso en la portada, y media hora
+ * despues seguia diciendo "Cargando…". Un error se lee y se arregla; un giro
+ * infinito solo se sufre. */
+const ESPERA_MS = 45_000
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const response = await fetch(path, {
-    method,
-    headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-    credentials: 'same-origin',
-  })
+  const corte = new AbortController()
+  const reloj = setTimeout(() => corte.abort(), ESPERA_MS)
+  let response: Response
+  try {
+    response = await fetch(path, {
+      method,
+      headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      credentials: 'same-origin',
+      signal: corte.signal,
+    })
+  } catch (caught) {
+    if ((caught as Error)?.name === 'AbortError') {
+      throw new StudioError(504, {
+        code: 'sin_respuesta',
+        message: 'El estudio tardó demasiado en contestar. Vuelve a intentarlo.',
+        details: {},
+      })
+    }
+    throw caught
+  } finally {
+    clearTimeout(reloj)
+  }
   const text = await response.text()
   const payload = text ? JSON.parse(text) : null
   if (!response.ok) {

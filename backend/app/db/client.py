@@ -131,6 +131,16 @@ class MemoryDatabase:
         return rows[:limit] if limit else rows
 
 
+ESPERA = 20.0
+"""Segundos que se le dan a Firestore antes de darlo por perdido.
+
+Sin esto, una consulta se queda esperando para siempre y la pantalla con ella:
+girando, sin datos y sin error que mirar. Eso es peor que fallar, porque no hay
+nada que hacer ni nada que contar. Con un limite, lo que sale es un error, y un
+error se lee y se arregla.
+"""
+
+
 class FirestoreDatabase:
     """Thin wrapper over google-cloud-firestore."""
 
@@ -143,25 +153,25 @@ class FirestoreDatabase:
         return self._client.document("/".join(_split(path)))
 
     def get(self, path: str) -> Document | None:
-        snap = self._ref(path).get()
+        snap = self._ref(path).get(timeout=ESPERA)
         return snap.to_dict() if snap.exists else None
 
     def set(self, path: str, data: Document) -> Document:
         parts = _split(path)
         payload = {**data, "id": data.get("id") or parts[-1]}
-        self._ref(path).set(payload)
+        self._ref(path).set(payload, timeout=ESPERA)
         return payload
 
     def update(self, path: str, patch: Document) -> Document:
         ref = self._ref(path)
-        snap = ref.get()
+        snap = ref.get(timeout=ESPERA)
         if not snap.exists:
             raise KeyError(path)
-        ref.update(patch)
+        ref.update(patch, timeout=ESPERA)
         return {**snap.to_dict(), **patch}
 
     def delete(self, path: str) -> None:
-        self._ref(path).delete()
+        self._ref(path).delete(timeout=ESPERA)
 
     def list(
         self,
@@ -196,7 +206,7 @@ class FirestoreDatabase:
         if limit and not ordenar_en_memoria:
             query = query.limit(limit)
 
-        filas = [snap.to_dict() for snap in query.stream()]
+        filas = [snap.to_dict() for snap in query.stream(timeout=ESPERA)]
 
         if ordenar_en_memoria:
             # El mismo criterio que MemoryDatabase, para que las pruebas y la

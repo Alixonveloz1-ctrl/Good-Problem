@@ -217,7 +217,7 @@ def test_user_choice_beats_the_bible_preference(studio, client):
     uid = client.post("/api/universes", json={"name": "Nova"}).json()["id"]
     client.put(
         f"/api/universes/{uid}/bible/preferences",
-        json={"preferred_image_model": "gemini-3.1-flash-lite-image"},
+        json={"preferred_image_model": "gemini-2.5-flash-image"},
     )
     chosen = studio.orchestrator.resolve_model(
         GenerationRequest(universe_id=uid, kind="image", model="gemini-3-pro-image")
@@ -227,7 +227,7 @@ def test_user_choice_beats_the_bible_preference(studio, client):
     fallback = studio.orchestrator.resolve_model(
         GenerationRequest(universe_id=uid, kind="image")
     )
-    assert (fallback.spec.id, fallback.source) == ("gemini-3.1-flash-lite-image", "bible")
+    assert (fallback.spec.id, fallback.source) == ("gemini-2.5-flash-image", "bible")
 
 
 def test_an_unknown_api_route_is_a_404_not_the_pwa(client, tmp_path):
@@ -301,6 +301,93 @@ def test_el_pase_de_la_cola_va_atado_a_su_trabajo(settings, studio):
     cuerpo, firma = pase.rsplit(".", 1)
     otra = firmar_encargo("uni_1", "job_2", settings.session_secret).rsplit(".", 1)[1]
     assert leer_encargo(f"{cuerpo}.{otra}", settings.session_secret) is None
+
+
+COMPROBADOS = {
+    "gemini-3.1-pro-preview",
+    "gemini-3-pro-image",
+    "gemini-3.1-flash-image",
+    "gemini-2.5-flash-image",
+    "lyria-3-pro-preview",
+    "veo-3.1-generate-001",
+    "veo-3.1-fast-generate-001",
+    "veo-3.1-lite-generate-001",
+    "chirp-3-instant-custom-voice",
+}
+"""Los modelos que existen de verdad, uno por uno.
+
+No salen de la documentacion ni de acordarse: estan copiados de una instalacion
+del mismo dueño que ya genera con ellos todos los dias. Un identificador de
+modelo no se deduce del nombre comercial -"Veo 3.1" no es "veo-3.1"- y cuando se
+inventa uno, Vertex contesta 404 y ese 404 no dice "te lo inventaste": dice lo
+mismo que si el modelo existiera y estuviera en otro sitio.
+
+Ya paso dos veces. Por eso esto es una prueba y no un comentario.
+"""
+
+
+def test_no_hay_ningun_modelo_inventado_en_el_registro(registry):
+    """Cada modelo del registro tiene que ser uno comprobado, y ninguno mas."""
+    del registry  # el registro se lee de la semilla, que es lo que se despliega
+    from app.domain.registry import load_seed
+
+    en_la_semilla = {m["id"] for m in load_seed()["models"]}
+    assert en_la_semilla == COMPROBADOS, (
+        "Modelos que sobran: " + str(sorted(en_la_semilla - COMPROBADOS)) +
+        " | Modelos que faltan: " + str(sorted(COMPROBADOS - en_la_semilla))
+    )
+
+
+def test_cada_modelo_se_pide_donde_vive():
+    """El 404 que parecia un nombre inventado y era una direccion equivocada.
+
+    "Vertex AI devolvio 404 para gemini-3.1-pro-preview:generateContent". Ese
+    error se lee como "ese modelo no existe", asi que uno se pasa la tarde
+    cambiando el nombre. El nombre estaba bien. Lo que estaba mal era el sitio:
+    los gemini-3.* y Lyria 3 Pro no viven en us-central1 sino en "global", y la
+    region global ademas no lleva prefijo en el host.
+
+    Comprobado contra una instalacion que ya funciona.
+    """
+    from app.providers.vertex import VertexClient
+
+    cliente = VertexClient("mi-proyecto", location="us-central1", dry_run=True)
+
+    for modelo in ("gemini-3.1-pro-preview", "gemini-3-pro-image", "lyria-3-pro-preview"):
+        url = cliente.model_url(modelo, "generateContent")
+        assert url.startswith("https://aiplatform.googleapis.com/"), url
+        assert "/locations/global/" in url, url
+
+    for modelo in ("gemini-2.5-flash-image", "veo-3.1-generate-001"):
+        url = cliente.model_url(modelo, "predictLongRunning")
+        assert url.startswith("https://us-central1-aiplatform.googleapis.com/"), url
+        assert "/locations/us-central1/" in url, url
+
+
+def test_lyria_se_pide_como_gemini_no_como_una_prediccion():
+    """Lyria no tiene endpoint propio: es :generateContent con audio.
+
+    Pedirsela con :predict, que es como se pide un modelo de generacion
+    normal, devuelve el mismo 404 de arriba. Y la duracion no es un parametro:
+    si no se le dice en el propio texto que no pare, entrega 30 segundos.
+    """
+    from app.providers import lyria
+    from app.providers.vertex import CallLog, VertexClient
+
+    registro = CallLog()
+    cliente = VertexClient("mi-proyecto", dry_run=True, call_log=registro)
+    resultado = lyria.generate_song(cliente, prompt="cumbia triste", duration_seconds=95)
+
+    llamada = registro.all()[-1]
+    assert llamada.method == "generateContent"
+    assert llamada.payload["generationConfig"]["responseModalities"] == ["AUDIO", "TEXT"]
+    # Sin maxOutputTokens: Vertex contesta "invalid argument" si se le anade.
+    assert set(llamada.payload["generationConfig"]) == {"responseModalities"}
+    texto = llamada.payload["contents"][0]["parts"][0]["text"]
+    assert "95 seconds" in texto and "cumbia triste" in texto
+    # Y los trozos de audio vienen pegados, sin la cabecera RIFF repetida.
+    assert resultado.data[:4] == b"RIFF"
+    assert resultado.data.count(b"RIFF") == 1
 
 
 # --- La puerta (PRD 41) -----------------------------------------------------
@@ -630,7 +717,10 @@ def test_no_se_pide_ningun_indice_compuesto_a_firestore():
             pedido["limit"] = n
             return self
 
-        def stream(self):
+        def stream(self, timeout=None):
+            # El plazo importa: sin el, una consulta colgada deja la pantalla
+            # girando para siempre. Que la falsa lo exija evita quitarlo.
+            assert timeout, "toda consulta a Firestore lleva un plazo"
             return iter(())
 
     class ClienteFalso:

@@ -28,6 +28,18 @@ from ..errors import ProviderError
 logger = logging.getLogger("aaus.vertex")
 
 SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
+
+EN_GLOBAL = ("gemini-3", "lyria-3")
+"""Los modelos que NO viven en una region, sino en "global".
+
+Esto no se deduce del nombre ni sale en un listado: se sabe porque se prueba.
+Pedirle gemini-3.1-pro-preview a us-central1 devuelve 404 -el mismo 404 que un
+modelo inventado- y con ese error uno se pasa la tarde cambiando el nombre del
+modelo, que es exactamente lo que paso aqui. El nombre estaba bien; el sitio no.
+
+Comprobado contra una instalacion que funciona: los gemini-3.* y Lyria 3 Pro en
+"global"; Veo, los gemini-2.5 y todo lo demas en la region configurada.
+"""
 _REDACTED = "<bytes>"
 _MAX_LOGGED_REQUESTS = 500
 
@@ -143,14 +155,21 @@ class VertexClient:
         self._credentials = None
 
     # -- plumbing ----------------------------------------------------------
-    def _host(self) -> str:
-        if self.location == "global":
-            return "https://aiplatform.googleapis.com"
-        return f"https://{self.location}-aiplatform.googleapis.com"
+    def location_for(self, model: str) -> str:
+        """Donde vive cada modelo. No todos estan en el mismo sitio."""
+        return "global" if model.startswith(EN_GLOBAL) else self.location
 
     def model_url(self, model: str, method: str) -> str:
+        location = self.location_for(model)
+        # La region "global" no lleva prefijo en el host; las demas si. Poner el
+        # prefijo donde no toca es un 404 identico al de un modelo que no existe.
+        host = (
+            "https://aiplatform.googleapis.com"
+            if location == "global"
+            else f"https://{location}-aiplatform.googleapis.com"
+        )
         return (
-            f"{self._host()}/v1/projects/{self.project}/locations/{self.location}"
+            f"{host}/v1/projects/{self.project}/locations/{location}"
             f"/publishers/google/models/{model}:{method}"
         )
 
@@ -207,9 +226,27 @@ class VertexClient:
     # -- dry run -----------------------------------------------------------
     def _simulate(self, model: str, method: str, payload: dict[str, Any]) -> dict[str, Any]:
         if method == "generateContent":
-            wants_image = "IMAGE" in (
-                payload.get("generationConfig", {}).get("responseModalities") or []
-            )
+            modalidades = payload.get("generationConfig", {}).get("responseModalities") or []
+            if "AUDIO" in modalidades:
+                # Lyria contesta por aqui, no por :predict. Devuelve el audio en
+                # dos trozos a proposito: es como vienen las piezas largas de
+                # verdad, y pegarlos mal solo se nota en produccion.
+                trozo = _wav(seconds=2)
+                return {
+                    "candidates": [
+                        {
+                            "content": {
+                                "parts": [
+                                    {"inlineData": {"mimeType": "audio/wav",
+                                                    "data": base64.b64encode(trozo).decode()}}
+                                    for _ in range(2)
+                                ]
+                            },
+                            "finishReason": "STOP",
+                        }
+                    ]
+                }
+            wants_image = "IMAGE" in modalidades
             if wants_image:
                 return {
                     "candidates": [

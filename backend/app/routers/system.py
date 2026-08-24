@@ -8,7 +8,14 @@ from fastapi import APIRouter, Body, Query
 from fastapi.responses import FileResponse, RedirectResponse
 
 from ..container import Studio
-from ..db.repositories import CHARACTERS, SONGS, UNIVERSES, VIDEO_PROJECTS, Repository
+from ..db.repositories import (
+    CHARACTERS,
+    JOBS,
+    SONGS,
+    UNIVERSES,
+    VIDEO_PROJECTS,
+    Repository,
+)
 from ..domain.enums import CanonStatus, JobState, StageStatus
 from ..errors import NotFound
 from ..providers.storage import LocalStorage
@@ -66,44 +73,89 @@ def reload_models(owner: OwnerDep, studio: StudioDep) -> dict[str, Any]:
 # --- Home (PRD 38) ---------------------------------------------------------
 
 
+MAX_ARTISTAS = 12
+"""Cuantos artistas se pintan en la portada.
+
+No es un limite de la aplicacion: es lo que cabe en una pantalla antes de que
+haya que desplazarse un rato. Y cada uno cuesta consultas, asi que sin tope la
+portada se vuelve mas lenta cuanto mas trabajo hay hecho, que es justo al reves
+de como tiene que ser.
+"""
+
+
 @router.get("/home")
 def home(owner: OwnerDep, studio: StudioDep) -> dict[str, Any]:
-    universes = studio.db.list(UNIVERSES, order_by="updated_at", limit=50)
+    """La portada, con UNA lectura por coleccion y artista.
+
+    Antes eran cinco, dos de ellas leyendo lo mismo dos veces, y sin limite de
+    tiempo: bastaba que una se quedara colgada para que la pantalla se quedara
+    girando indefinidamente, sin datos y sin error. Eso paso.
+    """
+    universes = studio.db.list(UNIVERSES, order_by="updated_at", limit=MAX_ARTISTAS)
+
+    tarjetas: list[dict[str, Any]] = []
     active_jobs: list[dict[str, Any]] = []
     pending: list[dict[str, Any]] = []
+    proyectos_todos: list[dict[str, Any]] = []
+
     for universe in universes:
         uid = universe["id"]
-        for job in studio.jobs.active(uid, limit=10):
-            active_jobs.append({**job, "universe_name": universe.get("name", uid)})
-        for job in studio.jobs.list(uid, state=JobState.READY.value, limit=10):
-            pending.append(
-                {
-                    "job_id": job["id"],
-                    "universe_id": uid,
-                    "universe_name": universe.get("name", uid),
-                    "kind": job["kind"],
-                    "target_type": job.get("target_type", ""),
-                    "target_id": job.get("target_id", ""),
-                    "model": job.get("model", ""),
-                    "finished_at": job.get("finished_at"),
-                }
-            )
+        nombre = universe.get("name", uid)
+
+        # Una lectura de trabajos, no dos: de la misma lista salen los que estan
+        # en marcha y los que esperan una decision.
+        trabajos = Repository(studio.db, uid, JOBS).list(limit=60)
+        for job in trabajos:
+            estado = job.get("state")
+            if estado in {JobState.QUEUED.value, JobState.PROCESSING.value}:
+                active_jobs.append({**job, "universe_name": nombre})
+            elif estado == JobState.READY.value:
+                pending.append(
+                    {
+                        "job_id": job["id"],
+                        "universe_id": uid,
+                        "universe_name": nombre,
+                        "kind": job["kind"],
+                        "target_type": job.get("target_type", ""),
+                        "target_id": job.get("target_id", ""),
+                        "model": job.get("model", ""),
+                        "finished_at": job.get("finished_at"),
+                    }
+                )
+
+        # Y una lectura de videoclips, que sirve para la tarjeta y para la lista
+        # de abajo. Antes se leian dos veces los mismos documentos.
+        proyectos = Repository(studio.db, uid, VIDEO_PROJECTS).list(limit=50)
+        tarjetas.append(_tarjeta(studio, universe, proyectos))
+        if proyectos:
+            # La portada de un videoclip es la de su cancion. Se piden todas de
+            # una vez: preguntarlo proyecto por proyecto seria una lectura por
+            # fila. Y si no hay videoclips no hace falta preguntar nada.
+            portadas = {
+                cancion["id"]: cancion.get("cover_path") or ""
+                for cancion in Repository(studio.db, uid, SONGS).list(limit=100)
+            }
+            proyectos_todos.extend(_filas(universe, proyectos, portadas))
+
     return {
-        "universes": [_tarjeta(studio, universe) for universe in universes],
+        "universes": tarjetas,
         "active_jobs": sorted(active_jobs, key=lambda j: j.get("created_at", ""), reverse=True),
         "pending_approvals": sorted(
             pending, key=lambda j: j.get("finished_at") or "", reverse=True
         ),
-        "recent_projects": _ultimos_proyectos(studio, universes),
+        "recent_projects": sorted(
+            proyectos_todos, key=lambda f: f.get("updated_at") or "", reverse=True
+        )[:8],
     }
 
 
-def _tarjeta(studio: Studio, universe: dict[str, Any]) -> dict[str, Any]:
-    """Lo que la pantalla de inicio ensena de cada artista.
+def _tarjeta(
+    studio: Studio, universe: dict[str, Any], proyectos: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Lo que la pantalla de inicio ensena de cada artista: su cara y su estado.
 
-    La cara y el estado se calculan aqui y no en el navegador: pedirlos artista
-    por artista serian tantas peticiones como artistas, y desde un movil eso se
-    nota.
+    La cara se calcula aqui y no en el navegador: pedirla artista por artista
+    serian tantas peticiones como artistas, y desde un movil eso se nota.
     """
     uid = universe["id"]
     personajes = Repository(studio.db, uid, CHARACTERS).list(limit=50)
@@ -117,9 +169,7 @@ def _tarjeta(studio: Studio, universe: dict[str, Any]) -> dict[str, Any]:
             portada = toma["storage_path"]
             break
 
-    proyectos = Repository(studio.db, uid, VIDEO_PROJECTS).list(limit=100)
     en_marcha = sum(1 for p in proyectos if p.get("status") != CanonStatus.APPROVED.value)
-
     return {
         **universe,
         "cover_path": portada,
@@ -129,35 +179,31 @@ def _tarjeta(studio: Studio, universe: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _ultimos_proyectos(studio: Studio, universes: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Los videoclips mas recientes de todos los artistas, juntos.
+def _filas(
+    universe: dict[str, Any],
+    proyectos: list[dict[str, Any]],
+    portadas: dict[str, str],
+) -> list[dict[str, Any]]:
+    """Los videoclips de un artista, como los ensena la portada.
 
-    Sin esto hay que entrar artista por artista para acordarse de que habia a
-    medias, que es justo lo que una pantalla de inicio tiene que ahorrar.
+    Juntos con los de los demas es lo que ahorra entrar artista por artista para
+    acordarse de que habia a medias.
     """
-    filas: list[dict[str, Any]] = []
-    for universe in universes:
-        uid = universe["id"]
-        # La portada de un videoclip es la de su cancion. Se piden todas de una
-        # vez: preguntarlo proyecto por proyecto seria una lectura por fila.
-        portadas = {
-            cancion["id"]: cancion.get("cover_path") or ""
-            for cancion in Repository(studio.db, uid, SONGS).list(limit=100)
+    uid = universe["id"]
+    nombre = universe.get("name", uid)
+    return [
+        {
+            "id": proyecto["id"],
+            "universe_id": uid,
+            "universe_name": nombre,
+            "title": proyecto.get("title") or "Sin titulo",
+            "status": proyecto.get("status", ""),
+            "stage": _etapa_actual(proyecto),
+            "cover_path": portadas.get(proyecto.get("song_id", ""), ""),
+            "updated_at": proyecto.get("updated_at", ""),
         }
-        for proyecto in Repository(studio.db, uid, VIDEO_PROJECTS).list(limit=20):
-            filas.append(
-                {
-                    "id": proyecto["id"],
-                    "universe_id": uid,
-                    "universe_name": universe.get("name", uid),
-                    "title": proyecto.get("title") or "Sin titulo",
-                    "status": proyecto.get("status", ""),
-                    "stage": _etapa_actual(proyecto),
-                    "cover_path": portadas.get(proyecto.get("song_id", ""), ""),
-                    "updated_at": proyecto.get("updated_at", ""),
-                }
-            )
-    return sorted(filas, key=lambda f: f.get("updated_at") or "", reverse=True)[:8]
+        for proyecto in proyectos
+    ]
 
 
 def _etapa_actual(proyecto: dict[str, Any]) -> str:

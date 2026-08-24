@@ -11,9 +11,14 @@ interface State<T> {
 export function useResource<T>(path: string | null, pollMs = 0) {
   const [state, setState] = useState<State<T>>({ data: null, loading: !!path, error: null })
   const alive = useRef(true)
+  // Si una peticion tarda mas que el intervalo, la siguiente no debe salir. Sin
+  // esto se van apilando: la pantalla que se refresca cada ocho segundos acaba
+  // con varias en vuelo a la vez, cada una haciendo mas lenta a la siguiente.
+  const enVuelo = useRef(false)
 
   const load = useCallback(async () => {
-    if (!path) return
+    if (!path || enVuelo.current) return
+    enVuelo.current = true
     try {
       const data = await api.get<T>(path)
       if (alive.current) setState({ data, loading: false, error: null })
@@ -21,6 +26,8 @@ export function useResource<T>(path: string | null, pollMs = 0) {
       if (alive.current) {
         setState((prev) => ({ ...prev, loading: false, error: error as StudioError }))
       }
+    } finally {
+      enVuelo.current = false
     }
   }, [path])
 
