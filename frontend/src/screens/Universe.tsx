@@ -1,8 +1,8 @@
-import { Link, useParams } from 'react-router-dom'
-import { mediaUrl } from '../api/client'
-import { useResource } from '../hooks/useApi'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { api, mediaUrl } from '../api/client'
+import { useAction, useResource } from '../hooks/useApi'
 import type { Character, Universe } from '../api/types'
-import { ErrorNote, Loading, StatusBadge, TopBar } from '../components/ui'
+import { DeleteButton, ErrorNote, Loading, StatusBadge, TopBar } from '../components/ui'
 
 /**
  * La pantalla del artista.
@@ -19,33 +19,32 @@ import { ErrorNote, Loading, StatusBadge, TopBar } from '../components/ui'
  * locaciones, la voz— queda debajo, y lo técnico al final y en pequeño.
  */
 
-type Seccion = { to: string; label: string; hint: string; glyph: string }
+type Seccion = { to: string; label: string; hint: string }
 
 const PRODUCCION: Seccion[] = [
-  { to: 'songs', label: 'Música', hint: 'Concepto, letra y canción', glyph: '🎵' },
-  { to: 'projects', label: 'Videoclips', hint: 'Historia, planos y montaje', glyph: '🎬' },
-  { to: 'content', label: 'Contenido', hint: 'Shorts, detrás de cámara, entrevistas', glyph: '📱' },
+  { to: 'songs', label: 'Música', hint: 'Concepto, letra y canción' },
+  { to: 'projects', label: 'Videoclips', hint: 'Historia, planos y montaje' },
+  { to: 'content', label: 'Contenido', hint: 'Shorts, detrás de cámara, entrevistas' },
 ]
 
 const BIBLIOTECA: Seccion[] = [
-  { to: 'characters', label: 'Personajes', hint: 'El artista y quien le acompaña', glyph: '🧍' },
-  { to: 'wardrobe', label: 'Vestuario', hint: 'Cómo va vestido en cada cosa', glyph: '🧥' },
-  { to: 'locations', label: 'Locaciones', hint: 'Dónde ocurre', glyph: '🏙️' },
-  { to: 'voz', label: 'Su voz', hint: 'Grabar la voz con la que habla', glyph: '🎙️' },
-  { to: 'bible', label: 'Identidad', hint: 'Cómo es, cómo suena, de qué habla', glyph: '📖' },
+  { to: 'characters', label: 'Personajes', hint: 'El artista y quien le acompaña' },
+  { to: 'wardrobe', label: 'Vestuario', hint: 'Cómo va vestido en cada cosa' },
+  { to: 'locations', label: 'Locaciones', hint: 'Dónde ocurre' },
+  { to: 'voz', label: 'Su voz', hint: 'Grabar la voz con la que habla' },
+  { to: 'bible', label: 'Identidad', hint: 'Cómo es, cómo suena, de qué habla' },
 ]
 
 const TECNICO: Seccion[] = [
-  { to: 'jobs', label: 'En marcha', hint: '', glyph: '⚙️' },
-  { to: 'canon', label: 'Aprobado', hint: '', glyph: '✅' },
-  { to: 'exports', label: 'Descargas', hint: '', glyph: '📦' },
+  { to: 'jobs', label: 'En marcha', hint: '' },
+  { to: 'canon', label: 'Aprobado', hint: '' },
+  { to: 'exports', label: 'Descargas', hint: '' },
 ]
 
 function Fila({ base, seccion }: { base: string; seccion: Seccion }) {
   return (
     <Link to={`${base}/${seccion.to}`} className="card tappable">
       <div className="row">
-        <span style={{ fontSize: 22 }}>{seccion.glyph}</span>
         <div className="grow">
           <strong>{seccion.label}</strong>
           {seccion.hint && <div className="sub">{seccion.hint}</div>}
@@ -63,7 +62,6 @@ function Retrato({ base, artista }: { base: string; artista: Character | null })
   if (!artista) {
     return (
       <div className="card presenta">
-        <div className="presenta-hueco">🧍</div>
         <h2>¿Quién es tu artista?</h2>
         <p className="muted">
           Es lo primero. Su cara manda en todo lo demás: las canciones se le
@@ -81,7 +79,9 @@ function Retrato({ base, artista }: { base: string; artista: Character | null })
       {foto ? (
         <img className="presenta-foto" src={mediaUrl(foto.storage_path) ?? ''} alt={artista.name} />
       ) : (
-        <div className="presenta-hueco">🧍</div>
+        // Sin retrato, la inicial del nombre. Un dibujo de persona generico
+        // seria un adorno donde tiene que haber una cara.
+        <div className="presenta-hueco">{(artista.name.trim()[0] ?? '·').toUpperCase()}</div>
       )}
       <div className="row between" style={{ width: '100%' }}>
         <h2 style={{ margin: 0 }}>{artista.name || 'Sin nombre'}</h2>
@@ -100,8 +100,10 @@ function Retrato({ base, artista }: { base: string; artista: Character | null })
 export function UniverseScreen() {
   const { universeId = '' } = useParams()
   const base = `/u/${universeId}`
+  const navegar = useNavigate()
   const universo = useResource<Universe>(`/api/universes/${universeId}`)
   const personajes = useResource<Character[]>(`/api/universes/${universeId}/characters`)
+  const accion = useAction()
 
   const lista = personajes.data ?? []
   // El protagonista si lo hay; si no, el primero que exista. Un universo con
@@ -116,6 +118,7 @@ export function UniverseScreen() {
         {universo.loading && !universo.data && <Loading />}
         <ErrorNote error={universo.error} />
         <ErrorNote error={personajes.error} />
+        <ErrorNote error={accion.error} onDismiss={accion.clearError} />
 
         {universo.data && (
           <>
@@ -145,9 +148,25 @@ export function UniverseScreen() {
             <div className="tecnico">
               {TECNICO.map((s) => (
                 <Link key={s.to} to={`${base}/${s.to}`} className="btn small ghost">
-                  {s.glyph} {s.label}
+                  {s.label}
                 </Link>
               ))}
+            </div>
+
+            {/* Borrar el artista se hace desde dentro del artista, no desde la
+                portada: es donde se ve lo que se va por delante —sus canciones,
+                sus videoclips y todo lo aprobado— y donde no se roza sin
+                querer al buscar en la lista. */}
+            <div className="tecnico">
+              <DeleteButton
+                label="Borrar este artista"
+                confirmLabel="¿Borrarlo todo?"
+                busy={accion.busy}
+                onDelete={async () => {
+                  const hecho = await accion.run(() => api.del(`/api/universes/${universeId}`))
+                  if (hecho !== null) navegar('/', { replace: true })
+                }}
+              />
             </div>
           </>
         )}

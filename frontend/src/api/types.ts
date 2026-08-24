@@ -73,10 +73,31 @@ export interface PendingApproval {
   finished_at: string | null
 }
 
+/** Un artista tal y como lo enseña la pantalla de inicio: con su cara, su
+ *  género y cuántos videoclips tiene a medias. */
+export interface UniverseCard extends Universe {
+  cover_path: string
+  artist_name: string
+  projects_active: number
+  projects_total: number
+}
+
+export interface RecentProject {
+  id: string
+  universe_id: string
+  universe_name: string
+  title: string
+  status: string
+  stage: string
+  cover_path: string
+  updated_at: string
+}
+
 export interface Home {
-  universes: Universe[]
+  universes: UniverseCard[]
   active_jobs: (Job & { universe_name: string })[]
   pending_approvals: PendingApproval[]
+  recent_projects: RecentProject[]
 }
 
 export interface VoiceProfile {

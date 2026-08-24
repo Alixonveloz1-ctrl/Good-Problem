@@ -7,8 +7,9 @@ from typing import Any
 from fastapi import APIRouter, Body, Query
 from fastapi.responses import FileResponse, RedirectResponse
 
-from ..db.repositories import UNIVERSES
-from ..domain.enums import JobState
+from ..container import Studio
+from ..db.repositories import CHARACTERS, SONGS, UNIVERSES, VIDEO_PROJECTS, Repository
+from ..domain.enums import CanonStatus, JobState, StageStatus
 from ..errors import NotFound
 from ..providers.storage import LocalStorage
 from ..providers.vertex import redact
@@ -88,12 +89,86 @@ def home(owner: OwnerDep, studio: StudioDep) -> dict[str, Any]:
                 }
             )
     return {
-        "universes": universes,
+        "universes": [_tarjeta(studio, universe) for universe in universes],
         "active_jobs": sorted(active_jobs, key=lambda j: j.get("created_at", ""), reverse=True),
         "pending_approvals": sorted(
             pending, key=lambda j: j.get("finished_at") or "", reverse=True
         ),
+        "recent_projects": _ultimos_proyectos(studio, universes),
     }
+
+
+def _tarjeta(studio: Studio, universe: dict[str, Any]) -> dict[str, Any]:
+    """Lo que la pantalla de inicio ensena de cada artista.
+
+    La cara y el estado se calculan aqui y no en el navegador: pedirlos artista
+    por artista serian tantas peticiones como artistas, y desde un movil eso se
+    nota.
+    """
+    uid = universe["id"]
+    personajes = Repository(studio.db, uid, CHARACTERS).list(limit=50)
+    protagonista = next((p for p in personajes if p.get("role") == "lead"), None)
+    if protagonista is None and personajes:
+        protagonista = personajes[0]
+
+    portada = ""
+    for toma in (protagonista or {}).get("master_shots", []):
+        if toma.get("storage_path"):
+            portada = toma["storage_path"]
+            break
+
+    proyectos = Repository(studio.db, uid, VIDEO_PROJECTS).list(limit=100)
+    en_marcha = sum(1 for p in proyectos if p.get("status") != CanonStatus.APPROVED.value)
+
+    return {
+        **universe,
+        "cover_path": portada,
+        "artist_name": (protagonista or {}).get("name", ""),
+        "projects_active": en_marcha,
+        "projects_total": len(proyectos),
+    }
+
+
+def _ultimos_proyectos(studio: Studio, universes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Los videoclips mas recientes de todos los artistas, juntos.
+
+    Sin esto hay que entrar artista por artista para acordarse de que habia a
+    medias, que es justo lo que una pantalla de inicio tiene que ahorrar.
+    """
+    filas: list[dict[str, Any]] = []
+    for universe in universes:
+        uid = universe["id"]
+        # La portada de un videoclip es la de su cancion. Se piden todas de una
+        # vez: preguntarlo proyecto por proyecto seria una lectura por fila.
+        portadas = {
+            cancion["id"]: cancion.get("cover_path") or ""
+            for cancion in Repository(studio.db, uid, SONGS).list(limit=100)
+        }
+        for proyecto in Repository(studio.db, uid, VIDEO_PROJECTS).list(limit=20):
+            filas.append(
+                {
+                    "id": proyecto["id"],
+                    "universe_id": uid,
+                    "universe_name": universe.get("name", uid),
+                    "title": proyecto.get("title") or "Sin titulo",
+                    "status": proyecto.get("status", ""),
+                    "stage": _etapa_actual(proyecto),
+                    "cover_path": portadas.get(proyecto.get("song_id", ""), ""),
+                    "updated_at": proyecto.get("updated_at", ""),
+                }
+            )
+    return sorted(filas, key=lambda f: f.get("updated_at") or "", reverse=True)[:8]
+
+
+def _etapa_actual(proyecto: dict[str, Any]) -> str:
+    """Por donde va el videoclip: la primera etapa que aun no esta aprobada.
+
+    "BORRADOR" no dice nada; "Storyboard" dice que toca hacer hoy.
+    """
+    for etapa in proyecto.get("stages", []):
+        if etapa.get("status") != StageStatus.APPROVED.value:
+            return str(etapa.get("label") or etapa.get("key") or "")
+    return "Terminado"
 
 
 # --- Diagnostics -----------------------------------------------------------

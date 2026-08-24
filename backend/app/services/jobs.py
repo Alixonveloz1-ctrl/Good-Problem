@@ -158,10 +158,24 @@ class JobService:
 
     # -- dispatch ----------------------------------------------------------
     def enqueue(self, universe_id: str, job_id: str) -> None:
-        if self.settings.tasks_queue and self.settings.tasks_target_url:
-            self._enqueue_cloud_task(universe_id, job_id)
-            return
-        self._run_inline(universe_id, job_id)
+        """Encarga el trabajo, y si no se puede lo deja marcado como fallido.
+
+        El documento se escribe como "en cola" antes de encolarlo de verdad. Si
+        el encargo falla y nadie corrige ese estado, la pantalla se queda
+        diciendo "EN COLA" para siempre sobre un trabajo que nunca existio.
+        Eso paso: un permiso que faltaba, y la app mintiendo tan tranquila.
+
+        Un estado falso es peor que un error: con el error se sabe que hacer, y
+        con el estado falso se espera.
+        """
+        try:
+            if self.settings.tasks_queue and self.settings.tasks_target_url:
+                self._enqueue_cloud_task(universe_id, job_id)
+            else:
+                self._run_inline(universe_id, job_id)
+        except Exception as exc:
+            self.mark_failed(universe_id, job_id, f"No se pudo encargar: {exc}")
+            raise
 
     def build_task(self, universe_id: str, job_id: str, http_method: Any) -> dict[str, Any]:
         """La tarea que se le entrega a Cloud Tasks.

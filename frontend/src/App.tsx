@@ -26,11 +26,13 @@ function TabBar() {
 
   const activo = universeId ?? ultimoUniverso()
   const prefix = activo ? `/u/${activo}` : ''
+  // Sin iconos. Los emoji de teclado son de otra aplicacion: aqui manda la
+  // tipografia, y cuatro palabras en versalitas se leen igual de rapido.
   const tabs = [
-    { to: '/', glyph: '🏠', label: 'Inicio', end: true },
-    { to: activo ? `${prefix}/songs` : '/', glyph: '🎵', label: 'Musica', end: false },
-    { to: activo ? `${prefix}/projects` : '/', glyph: '🎬', label: 'Video', end: false },
-    { to: '/settings', glyph: '⚙️', label: 'Ajustes', end: false },
+    { to: '/', label: 'Inicio', end: true },
+    { to: activo ? `${prefix}/songs` : '/', label: 'Musica', end: false },
+    { to: activo ? `${prefix}/projects` : '/', label: 'Video', end: false },
+    { to: '/settings', label: 'Ajustes', end: false },
   ]
   return (
     <nav className="tabbar">
@@ -41,7 +43,6 @@ function TabBar() {
           end={tab.end}
           className={({ isActive }) => (isActive ? 'active' : '')}
         >
-          <span className="glyph">{tab.glyph}</span>
           <span>{tab.label}</span>
         </NavLink>
       ))}
@@ -72,7 +73,11 @@ export default function App() {
         <Route path="/u/:universeId/exports" element={<ExportsScreen />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      {/* La portada no lleva barra de pestanas: alli el nombre grande y las
+          caras son toda la navegacion que hace falta, y lo que sobraba
+          -Ajustes y Salir- esta en el boton redondo de su esquina. */}
       <Routes>
+        <Route path="/" element={null} />
         <Route path="/u/:universeId/*" element={<TabBar />} />
         <Route path="*" element={<TabBar />} />
       </Routes>

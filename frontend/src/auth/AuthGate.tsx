@@ -84,8 +84,8 @@ function Portada({ children }: { children: ReactNode }) {
   return (
     <div className="login">
       <div className="login-card">
-        <div className="login-mark">🎬</div>
-        <h1>Universe Studio</h1>
+        <div className="login-mark">Good Problem</div>
+        <p className="login-lema">Tu música. Tus universos.</p>
         {children}
       </div>
     </div>

@@ -1,153 +1,123 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { api } from '../api/client'
+import { Link, useNavigate } from 'react-router-dom'
+import { api, mediaUrl } from '../api/client'
 import { useAction, useResource } from '../hooks/useApi'
-import type { Home as HomeData } from '../api/types'
-import {
-  Card,
-  DeleteButton,
-  Empty,
-  ErrorNote,
-  Field,
-  JobBadge,
-  Loading,
-  Sheet,
-  TopBar,
-} from '../components/ui'
+import type { Home as HomeData, RecentProject, UniverseCard } from '../api/types'
+import { ErrorNote, Field, Loading, Sheet } from '../components/ui'
+
+/**
+ * La portada de la aplicación.
+ *
+ * No es un panel de control: es la primera cosa que se ve al abrir el teléfono,
+ * y lo que tiene que contestar es "¿quiénes son mis artistas y qué dejé a
+ * medias?". Por eso mandan las caras y los títulos, y lo demás —cuántos
+ * trabajos hay en marcha, qué espera tu visto bueno— cabe en la línea de
+ * estado de cada tarjeta en vez de abrir secciones nuevas.
+ *
+ * Aquí no hay barra de pestañas. Ocupa sitio y en esta pantalla no lleva a
+ * ningún sitio que no esté ya delante; lo que hace falta —ajustes y salir—
+ * está en el botón redondo de la esquina.
+ */
 
 export function HomeScreen() {
   const { data, loading, error, reload } = useResource<HomeData>('/api/home', 8000)
-  const [creating, setCreating] = useState(false)
-  const [name, setName] = useState('')
-  const action = useAction()
+  const [creando, setCreando] = useState(false)
+  const [menu, setMenu] = useState(false)
+  const [nombre, setNombre] = useState('')
+  const accion = useAction()
 
-  const create = async () => {
-    const created = await action.run(() => api.post('/api/universes', { name: name.trim() }))
-    if (created) {
-      setCreating(false)
-      setName('')
+  const crear = async () => {
+    const creado = await accion.run(() => api.post('/api/universes', { name: nombre.trim() }))
+    if (creado) {
+      setCreando(false)
+      setNombre('')
       await reload()
     }
   }
 
+  const universos = data?.universes ?? []
+  const proyectos = data?.recent_projects ?? []
+
   return (
     <>
-      <TopBar
-        title="Universe Studio"
-        action={
-          <button className="btn small primary" onClick={() => setCreating(true)}>
-            Nuevo
+      <main className="screen inicio">
+        <header className="inicio-cabecera">
+          <div>
+            <h1 className="inicio-titulo">Good Problem</h1>
+            <p className="inicio-lema">Tu música. Tus universos.</p>
+          </div>
+          <button className="menu-redondo" onClick={() => setMenu(true)} aria-label="Menú">
+            <span />
+            <span />
+            <span />
           </button>
-        }
-      />
-      <main className="screen">
+        </header>
+
         {loading && !data && <Loading />}
         <ErrorNote error={error} />
 
         {data && (
           <>
-            {data.pending_approvals.length > 0 && (
-              <>
-                <div className="section-title">Esperando tu decision</div>
-                <div className="list">
-                  {data.pending_approvals.map((item) => (
-                    <Link
-                      key={item.job_id}
-                      to={`/u/${item.universe_id}/jobs`}
-                      className="card tappable"
-                    >
-                      <div className="row between">
-                        <strong>{describeTarget(item.kind, item.target_type)}</strong>
-                        <span className="badge accent">Revisar</span>
-                      </div>
-                      <div className="row between muted">
-                        <span>{item.universe_name}</span>
-                        <span className="mono">{item.model}</span>
-                      </div>
-                      <div className="muted mono">{item.target_id}</div>
-                    </Link>
-                  ))}
-                </div>
-              </>
-            )}
+            <div className="epigrafe">
+              <h2>Mis universos</h2>
+              <button className="btn small primary" onClick={() => setCreando(true)}>
+                + Nuevo universo
+              </button>
+            </div>
 
-            {data.active_jobs.length > 0 && (
-              <>
-                <div className="section-title">Generando ahora</div>
-                <div className="list">
-                  {data.active_jobs.map((job) => (
-                    <Card key={job.id}>
-                      <div className="row between">
-                        <strong>{describeTarget(job.kind, job.target_type)}</strong>
-                        <JobBadge state={job.state} />
-                      </div>
-                      <div className="muted mono">{job.model}</div>
-                      <div className="muted">
-                        Continua en Google Cloud aunque cierres el iPhone.
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              </>
-            )}
-
-            <div className="section-title">Artistas</div>
-            {data.universes.length === 0 ? (
-              <Empty
-                title="Todavia no hay ningun artista"
-                hint="Cada artista vive en su propio Universe: identidad, personaje, canciones y videoclips."
-                action={
-                  <button className="btn primary" onClick={() => setCreating(true)}>
-                    Crear el primero
-                  </button>
-                }
-              />
+            {universos.length === 0 ? (
+              <p className="inicio-vacio">
+                Todavía no hay ninguno. Un universo es un artista: su cara, sus
+                canciones y sus videoclips.
+              </p>
             ) : (
               <div className="list">
-                {data.universes.map((universe) => (
-                  <div key={universe.id} className="card fila-borrable">
-                    <Link to={`/u/${universe.id}`} className="grow">
-                      <strong>{universe.name}</strong>
-                      {universe.tagline && <div className="sub">{universe.tagline}</div>}
-                    </Link>
-                    {/* Borrar un artista se lleva por delante sus canciones,
-                        sus videoclips y todo lo aprobado. La confirmación lo
-                        dice: "¿Seguro?" no basta cuando lo que se va es todo. */}
-                    <DeleteButton
-                      confirmLabel="¿Borrar todo?"
-                      busy={action.busy}
-                      onDelete={async () => {
-                        await action.run(() => api.del(`/api/universes/${universe.id}`))
-                        await reload()
-                      }}
-                    />
-                  </div>
+                {universos.map((universo) => (
+                  <TarjetaUniverso key={universo.id} universo={universo} datos={data} />
                 ))}
               </div>
             )}
+
+            {proyectos.length > 0 && (
+              <>
+                <div className="epigrafe">
+                  <h2>Últimos proyectos</h2>
+                  {universos.length > 0 && (
+                    <Link className="ver-todos" to={`/u/${universos[0].id}/projects`}>
+                      Ver todos
+                    </Link>
+                  )}
+                </div>
+                <div className="list apretada">
+                  {proyectos.map((proyecto) => (
+                    <FilaProyecto key={proyecto.id} proyecto={proyecto} />
+                  ))}
+                </div>
+              </>
+            )}
+
+            <button className="crear-universo" onClick={() => setCreando(true)}>
+              + Crear nuevo universo
+            </button>
           </>
         )}
       </main>
 
-      {creating && (
-        <Sheet title="Nuevo artista" onClose={() => setCreating(false)}>
-          <Field
-            label="Nombre artistico"
-            value={name}
-            onChange={setName}
-            placeholder="Nova"
-          />
-          <ErrorNote error={action.error} onDismiss={action.clearError} />
+      {menu && <MenuEsquina onClose={() => setMenu(false)} />}
+
+      {creando && (
+        <Sheet title="Nuevo universo" onClose={() => setCreando(false)}>
+          <Field label="Nombre del artista" value={nombre} onChange={setNombre} placeholder="Nova" />
+          <ErrorNote error={accion.error} onDismiss={accion.clearError} />
           <button
             className="btn primary block"
-            disabled={!name.trim() || action.busy}
-            onClick={create}
+            disabled={!nombre.trim() || accion.busy}
+            onClick={crear}
           >
-            {action.busy ? 'Creando…' : 'Crear Universe'}
+            {accion.busy ? 'Creando…' : 'Crear universo'}
           </button>
           <p className="muted" style={{ margin: 0 }}>
-            Se crea vacio: identidad, personaje, vestuario y locaciones se construyen despues, cada
-            uno con su aprobacion.
+            Se crea vacío. Lo primero que pedirá es la cara del artista.
           </p>
         </Sheet>
       )}
@@ -155,28 +125,110 @@ export function HomeScreen() {
   )
 }
 
-function describeTarget(kind: string, targetType: string): string {
-  const kinds: Record<string, string> = {
-    text: 'Propuesta del Director',
-    image: 'Imagen',
-    video: 'Clip de video',
-    music: 'Cancion',
-    speech: 'Voz hablada',
-    assembly: 'Ensamblaje',
+/** Una tarjeta de artista: la cara, el nombre y por dónde va. */
+function TarjetaUniverso({ universo, datos }: { universo: UniverseCard; datos: HomeData }) {
+  const foto = mediaUrl(universo.cover_path)
+  const señal = estado(universo, datos)
+  return (
+    <Link to={`/u/${universo.id}`} className="universo">
+      <div className="universo-foto">
+        {foto ? <img src={foto} alt={universo.name} /> : <span>{inicial(universo.name)}</span>}
+      </div>
+      <div className="universo-texto">
+        <div className="universo-nombre">{universo.name || universo.artist_name || 'Sin nombre'}</div>
+        <div className="universo-genero">{universo.tagline || universo.artist_name || '—'}</div>
+        <div className="universo-estado">
+          <i className={`punto ${señal.tono}`} />
+          {señal.texto}
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+/** Una fila de videoclip: la portada de su canción, el título y por dónde va. */
+function FilaProyecto({ proyecto }: { proyecto: RecentProject }) {
+  const foto = mediaUrl(proyecto.cover_path)
+  return (
+    <Link to={`/u/${proyecto.universe_id}/projects/${proyecto.id}`} className="proyecto">
+      <div className="proyecto-foto">{foto && <img src={foto} alt="" />}</div>
+      <div className="proyecto-texto">
+        <div className="proyecto-titulo">{proyecto.title}</div>
+        <div className="proyecto-pie">
+          <span className="proyecto-universo">{proyecto.universe_name}</span>
+          {proyecto.stage && <span> · {proyecto.stage}</span>}
+          {fecha(proyecto.updated_at) && <span> · {fecha(proyecto.updated_at)}</span>}
+        </div>
+      </div>
+      <span className="proyecto-flecha">›</span>
+    </Link>
+  )
+}
+
+/** Lo que no cabe en la portada: los ajustes y la salida. */
+function MenuEsquina({ onClose }: { onClose: () => void }) {
+  const navegar = useNavigate()
+  return (
+    <Sheet title="Menú" onClose={onClose}>
+      <button
+        className="btn block"
+        onClick={() => {
+          onClose()
+          navegar('/settings')
+        }}
+      >
+        Ajustes
+      </button>
+      <button
+        className="btn block"
+        onClick={async () => {
+          await api.post('/api/auth/logout')
+          window.location.reload()
+        }}
+      >
+        Salir de la cuenta
+      </button>
+    </Sheet>
+  )
+}
+
+/** La línea de estado de una tarjeta.
+ *
+ * Es una sola línea, así que dice lo más urgente y se calla el resto: primero
+ * lo que espera una decisión tuya, luego lo que se está generando, y al final
+ * lo que hay a medias. Un "3 proyectos en proceso" tapando un "esperando tu
+ * visto bueno" sería esconder justo lo único que no puede hacer la máquina.
+ */
+function estado(universo: UniverseCard, datos: HomeData) {
+  const revisar = datos.pending_approvals.filter((p) => p.universe_id === universo.id).length
+  if (revisar > 0) {
+    return { tono: 'revisar', texto: plural(revisar, 'cosa espera', 'cosas esperan') + ' tu visto bueno' }
   }
-  const targets: Record<string, string> = {
-    song: 'cancion',
-    scene: 'escena',
-    character: 'personaje',
-    wardrobe: 'vestuario',
-    location: 'locacion',
-    video_project: 'videoclip',
-    content: 'contenido',
-    artist_bible: 'Artist Bible',
+  const generando = datos.active_jobs.filter((j) => j.universe_id === universo.id).length
+  if (generando > 0) {
+    return { tono: 'generando', texto: plural(generando, 'cosa generándose', 'cosas generándose') }
   }
-  const base = kinds[kind] ?? kind
-  const target = targets[targetType]
-  // "Cancion · cancion" reads badly: skip the target when the kind names it.
-  if (!target || base.toLowerCase().includes(target.toLowerCase())) return base
-  return `${base} · ${target}`
+  if (universo.projects_active > 0) {
+    return {
+      tono: 'proceso',
+      texto: plural(universo.projects_active, 'proyecto en proceso', 'proyectos en proceso'),
+    }
+  }
+  if (universo.projects_total > 0) return { tono: 'listo', texto: 'Todo terminado' }
+  return { tono: 'quieto', texto: 'Sin proyectos todavía' }
+}
+
+function plural(n: number, uno: string, varios: string): string {
+  return `${n} ${n === 1 ? uno : varios}`
+}
+
+function inicial(nombre: string): string {
+  return (nombre.trim()[0] ?? '·').toUpperCase()
+}
+
+function fecha(iso: string): string {
+  if (!iso) return ''
+  const dia = new Date(iso)
+  if (Number.isNaN(dia.getTime())) return ''
+  return dia.toLocaleDateString('es', { day: 'numeric', month: 'short' }).replace('.', '')
 }

@@ -750,11 +750,33 @@ def test_en_la_aplicacion_no_se_habla_de_dinero():
         assert rastro not in pintado, f"quedo dinero en la interfaz: {rastro}"
 
 
+def test_la_interfaz_no_lleva_monigotes():
+    """No es una aplicacion de ninos.
+
+    Habia un dibujito de persona presidiendo la pantalla de crear artistas, y
+    emoji de teclado en la barra de abajo. Eso no es un icono: es el emoji del
+    telefono de otra persona, se dibuja distinto en cada sistema y convierte una
+    herramienta de trabajo en un juguete.
+
+    Las marcas geometricas —el visto de una etapa aprobada, el circulo de
+    grabar— si valen: son tipografia, no dibujos. Por eso el corte esta en el
+    bloque de pictogramas, de U+1F300 para arriba.
+    """
+    import pathlib
+
+    fuente = pathlib.Path(__file__).resolve().parents[2] / "frontend" / "src"
+    for fichero in sorted(fuente.rglob("*.tsx")) + sorted(fuente.rglob("*.ts")):
+        for numero, linea in enumerate(fichero.read_text().splitlines(), 1):
+            dibujos = [c for c in linea if ord(c) >= 0x1F300]
+            assert not dibujos, f"{fichero.name}:{numero} lleva {''.join(dibujos)}"
+
+
 def test_todo_lo_que_se_crea_se_puede_borrar(client, universe):
     """Dije que el universo si se podia borrar y era falso: la ruta existia en
     el servidor pero no habia boton en ninguna parte, y una ruta sin boton no
     existe para quien usa la app. Aqui se comprueban las dos mitades."""
     import pathlib
+    import re
 
     creables = {
         "characters": {"name": "Nova", "role": "lead"},
@@ -779,7 +801,13 @@ def test_todo_lo_que_se_crea_se_puede_borrar(client, universe):
     codigo = "\n".join(p.read_text() for p in pantallas.glob("*.tsx"))
     for ruta in ("/characters/", "/wardrobe/", "/locations/", "/songs/", "/video-projects/"):
         assert f"api.del(`/api/universes/${{universeId}}{ruta}" in codigo, f"sin boton: {ruta}"
-    assert "api.del(`/api/universes/${universe.id}`)" in codigo, "sin boton: el artista"
+    # El artista entero. La expresion exacta cambia si el boton se muda de
+    # pantalla —y se mudo, de la portada a la pantalla del propio artista— asi
+    # que lo que se comprueba es la llamada, no donde vive.
+    borra_artista = re.search(
+        r"api\.del\(`/api/universes/\$\{[A-Za-z.]+\}`\)", codigo
+    )
+    assert borra_artista, "sin boton: el artista"
 
 
 def test_la_cola_puede_entrar_con_su_token(client, studio, monkeypatch):
@@ -814,3 +842,33 @@ def test_la_cola_puede_entrar_con_su_token(client, studio, monkeypatch):
     )
     assert respuesta.status_code == 404, respuesta.text
     assert respuesta.json()["error"]["code"] == "not_found"
+
+
+def test_un_trabajo_que_no_se_pudo_encargar_no_dice_en_cola(studio, universe, monkeypatch):
+    """La pantalla decia "EN COLA" sobre un trabajo que nunca llego a existir.
+
+    El documento se escribe como en cola antes de encargarlo de verdad; si el
+    encargo falla -un permiso que falta- y nadie corrige ese estado, ahi se
+    queda para siempre. Un estado falso es peor que un error: con el error se
+    sabe que hacer, con el estado falso se espera.
+    """
+    from app.domain.enums import JobState
+
+    trabajo = studio.jobs.create(
+        universe, kind="text", model="gemini-3.1-pro-preview", variant="default",
+        target_type="song", target_id="x", request={}, estimated_cost_usd=0.0,
+    )
+    assert trabajo["state"] == JobState.QUEUED.value
+
+    def no_se_puede(*_a, **_k):
+        raise RuntimeError("lacks IAM permission iam.serviceAccounts.actAs")
+
+    monkeypatch.setattr(studio.jobs, "_run_inline", no_se_puede)
+    monkeypatch.setattr(studio.jobs, "_enqueue_cloud_task", no_se_puede)
+
+    with pytest.raises(RuntimeError):
+        studio.jobs.enqueue(universe, trabajo["id"])
+
+    despues = studio.jobs.get(universe, trabajo["id"])
+    assert despues["state"] == JobState.FAILED.value
+    assert "No se pudo encargar" in despues["error"]

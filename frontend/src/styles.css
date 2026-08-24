@@ -6,28 +6,34 @@
  */
 
 :root {
-  /* Native controls — audio and video players, form fields, scrollbars — follow
-     this. Without it the built-in media player renders white on a dark page. */
-  color-scheme: dark;
+  /* Claro, editorial, sin adornos. Los controles nativos —el reproductor de
+     audio, los campos, la barra de scroll— siguen esto; sin decirlo, el
+     reproductor sale oscuro sobre una página clara. */
+  color-scheme: light;
 
-  --bg: #0b0b10;
-  --bg-raised: #14141d;
-  --bg-sunken: #08080c;
-  --line: #262636;
-  --text: #f2f2f7;
-  --muted: #9a9aae;
-  --accent: #b566ff;
-  --accent-soft: rgba(181, 102, 255, 0.16);
-  --cyan: #5ae6dc;
-  --ok: #4ade80;
-  --warn: #fbbf24;
-  --danger: #fb7185;
-  --radius: 16px;
-  --radius-sm: 10px;
+  --bg: #f2f1ef;
+  --bg-raised: #ffffff;
+  --bg-sunken: #e9e8e5;
+  --line: #e2e0dc;
+  --line-fuerte: #111111;
+  --text: #111111;
+  --muted: #8a8782;
+  --accent: #111111;
+  --accent-soft: #e9e8e5;
+  --cyan: #3c6e71;
+  --ok: #2f7d5b;
+  --warn: #b07d2b;
+  --danger: #b33a3a;
+  --rosa: #d98ca6;
+  --radius: 14px;
+  --radius-sm: 8px;
   --tap: 48px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+  /* Los títulos y los nombres van en versalitas muy espaciadas: es lo que hace
+     que una lista de artistas parezca una portada y no una tabla. */
+  --tracking: 0.14em;
 }
 
 * {
@@ -76,7 +82,7 @@ select {
   align-items: center;
   gap: 12px;
   padding: calc(var(--safe-top) + 10px) 16px 10px;
-  background: rgba(11, 11, 16, 0.86);
+  background: rgba(242, 241, 239, 0.9);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--line);
 }
@@ -122,7 +128,7 @@ select {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   padding: 8px 8px calc(var(--safe-bottom) + 8px);
-  background: rgba(11, 11, 16, 0.92);
+  background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(14px);
   border-top: 1px solid var(--line);
 }
@@ -146,9 +152,10 @@ select {
   background: var(--accent-soft);
 }
 
-.tabbar .glyph {
-  font-size: 19px;
-  line-height: 1;
+.tabbar a {
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  justify-content: center;
 }
 
 /* --- Cards -------------------------------------------------------------- */
@@ -250,6 +257,11 @@ pre.block {
 /* --- Buttons ------------------------------------------------------------ */
 
 .btn {
+  /* Un <a class="btn"> sin esto sale azul y subrayado: el navegador pinta los
+     enlaces antes de que nadie diga lo contrario, y en la pantalla del artista
+     los tres botones de abajo parecian un indice de Wikipedia. */
+  text-decoration: none;
+  color: var(--text);
   min-height: var(--tap);
   padding: 0 18px;
   border: 1px solid var(--line);
@@ -272,20 +284,21 @@ pre.block {
 }
 
 .btn.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #16041f;
+  background: var(--line-fuerte);
+  border-color: var(--line-fuerte);
+  color: #ffffff;
+  border-radius: 999px;
 }
 
 .btn.ok {
-  background: rgba(74, 222, 128, 0.14);
-  border-color: rgba(74, 222, 128, 0.45);
+  background: rgba(47, 125, 91, 0.1);
+  border-color: rgba(47, 125, 91, 0.35);
   color: var(--ok);
 }
 
 .btn.danger {
-  background: rgba(251, 113, 133, 0.12);
-  border-color: rgba(251, 113, 133, 0.4);
+  background: rgba(179, 58, 58, 0.08);
+  border-color: rgba(179, 58, 58, 0.3);
   color: var(--danger);
 }
 
@@ -367,7 +380,7 @@ pre.block {
 
 .badge.approved {
   color: var(--ok);
-  border-color: rgba(74, 222, 128, 0.4);
+  border-color: rgba(47, 125, 91, 0.32);
 }
 
 .badge.draft {
@@ -377,7 +390,7 @@ pre.block {
 
 .badge.rejected {
   color: var(--danger);
-  border-color: rgba(251, 113, 133, 0.4);
+  border-color: rgba(179, 58, 58, 0.3);
 }
 
 .badge.busy {
@@ -388,41 +401,6 @@ pre.block {
 .badge.accent {
   color: var(--accent);
   border-color: rgba(181, 102, 255, 0.45);
-}
-
-/* --- Credit meter ------------------------------------------------------- */
-
-.credit {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px;
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
-  background: linear-gradient(160deg, rgba(181, 102, 255, 0.16), transparent 70%), var(--bg-raised);
-}
-
-.credit .amount {
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.meter {
-  height: 7px;
-  border-radius: 999px;
-  background: var(--bg-sunken);
-  overflow: hidden;
-}
-
-.meter span {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--cyan));
-}
-
-.meter.low span {
-  background: linear-gradient(90deg, var(--warn), var(--danger));
 }
 
 /* --- Production rail (PRD 38) ------------------------------------------- */
@@ -627,8 +605,8 @@ video {
 .error {
   padding: 12px 14px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(251, 113, 133, 0.45);
-  background: rgba(251, 113, 133, 0.1);
+  border: 1px solid rgba(179, 58, 58, 0.35);
+  background: rgba(179, 58, 58, 0.07);
   color: #ffd9df;
   font-size: 14px;
 }
@@ -749,8 +727,20 @@ video {
 }
 
 .login-mark {
-  font-size: 44px;
-  line-height: 1;
+  font-size: 27px;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+  text-transform: uppercase;
+}
+
+.login-lema {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 .login-card h1 {
@@ -815,7 +805,7 @@ video {
 .btn.peligro {
   border-color: var(--danger);
   color: var(--danger);
-  background: rgba(251, 113, 133, 0.12);
+  background: rgba(179, 58, 58, 0.08);
 }
 
 /* Una fila que se puede abrir y borrar. El enlace ocupa todo menos el botón,
@@ -877,7 +867,10 @@ video {
   height: 108px;
   display: grid;
   place-items: center;
-  font-size: 40px;
+  font-size: 34px;
+  font-weight: 300;
+  letter-spacing: 0.06em;
+  color: var(--muted);
   border-radius: var(--radius);
   border: 1px dashed var(--line);
   background: var(--bg-sunken);
@@ -896,4 +889,306 @@ video {
   justify-content: center;
   flex-wrap: wrap;
   padding-top: 4px;
+}
+
+/* --- Inicio -------------------------------------------------------------
+ *
+ * La portada. Nada de tarjetas iguales ni de tablas: el nombre grande y muy
+ * espaciado, la cara a la izquierda, y una sola línea de estado por artista.
+ * Es lo que hace que una lista de tres artistas parezca una portada de revista
+ * y no la bandeja de entrada.
+ */
+
+.inicio {
+  padding: calc(var(--safe-top) + 26px) 20px calc(var(--safe-bottom) + 40px);
+  gap: 0;
+}
+
+.inicio-cabecera {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.inicio-titulo {
+  margin: 0;
+  font-size: 33px;
+  line-height: 1.02;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  text-transform: uppercase;
+}
+
+.inicio-lema {
+  margin: 10px 0 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* El botón redondo de la esquina. Con la barra de pestañas fuera de la
+   portada, esta es la única puerta a Ajustes y a Salir, así que tiene el
+   tamaño de dedo entero. */
+.menu-redondo {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  width: 44px;
+  height: 44px;
+  margin-top: 2px;
+  padding: 0;
+  border: 1px solid var(--line-fuerte);
+  border-radius: 50%;
+  background: transparent;
+}
+
+.menu-redondo span {
+  display: block;
+  width: 15px;
+  height: 1.5px;
+  background: var(--text);
+}
+
+.menu-redondo:active {
+  background: var(--accent-soft);
+}
+
+.epigrafe {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 34px 0 14px;
+}
+
+.epigrafe h2 {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: var(--tracking);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* El boton negro del epigrafe. `.btn.small` le pone esquinas de 11px porque
+   va despues de `.btn.primary` en la hoja; aqui vuelve a ser pastilla, que es
+   lo que hace que la cabecera de la seccion se lea como un titular con un
+   boton y no como una fila de formulario. */
+.epigrafe .btn.small.primary {
+  min-height: 36px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.ver-todos {
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 1px;
+}
+
+.inicio-vacio {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* --- Tarjeta de artista -------------------------------------------------- */
+
+.universo {
+  display: grid;
+  grid-template-columns: 108px 1fr;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  color: inherit;
+  text-decoration: none;
+}
+
+.universo:active {
+  transform: scale(0.995);
+}
+
+.universo-foto {
+  display: grid;
+  place-items: center;
+  min-height: 132px;
+  background: var(--bg-sunken);
+  overflow: hidden;
+}
+
+.universo-foto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Sin retrato todavía, la inicial del nombre. Un dibujo de persona genérico
+   aquí convierte una portada en una plantilla de ejemplo. */
+.universo-foto span {
+  font-size: 30px;
+  font-weight: 300;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.universo-texto {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 16px 16px 16px 18px;
+  min-width: 0;
+}
+
+.universo-nombre {
+  font-size: 21px;
+  font-weight: 300;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.universo-genero {
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.universo-estado {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.punto {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.punto.revisar {
+  background: var(--rosa);
+}
+
+.punto.generando {
+  background: var(--warn);
+}
+
+.punto.proceso {
+  background: var(--cyan);
+}
+
+.punto.listo {
+  background: var(--ok);
+}
+
+/* --- Fila de videoclip --------------------------------------------------- */
+
+.list.apretada {
+  gap: 8px;
+}
+
+.proyecto {
+  display: grid;
+  grid-template-columns: 54px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  color: inherit;
+  text-decoration: none;
+}
+
+.proyecto:active {
+  transform: scale(0.995);
+}
+
+.proyecto-foto {
+  width: 54px;
+  height: 54px;
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--bg-sunken);
+}
+
+.proyecto-foto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.proyecto-texto {
+  min-width: 0;
+}
+
+.proyecto-titulo {
+  font-size: 15px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proyecto-pie {
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proyecto-universo {
+  color: var(--rosa);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+.proyecto-flecha {
+  color: var(--muted);
+  font-size: 20px;
+}
+
+.crear-universo {
+  margin-top: 26px;
+  width: 100%;
+  min-height: var(--tap);
+  border: 1px dashed var(--line-fuerte);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+}
+
+.crear-universo:active {
+  background: var(--accent-soft);
 }
