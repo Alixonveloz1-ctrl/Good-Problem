@@ -12,8 +12,12 @@ substitutions:
   _TASKS_SA: aaus-tasks@${PROJECT_ID}.iam.gserviceaccount.com
   _BUCKET: ${PROJECT_ID}-aaus
   _QUEUE: aaus-generation
-  _OWNER_EMAIL: ''
-  _IAP_AUDIENCE: ''
+
+# Lo que identifica la instalacion —quien es el dueno, con que se firman las
+# sesiones, cual es el cliente de OAuth— no se toca desde aqui. Lo pone setup.sh
+# una vez y sobrevive a todos los despliegues: el instalador manda en la
+# identidad, la compilacion manda en el codigo. Por eso todos los pasos de abajo
+# usan --update-env-vars y no --set-env-vars, que borraria el resto.
 
 options:
   logging: CLOUD_LOGGING_ONLY
@@ -71,18 +75,21 @@ steps:
     args:
       - -c
       - |
+        # Publico en la red a proposito: la puerta la pone la propia app, que
+        # para dibujar la pantalla de entrada tiene que poder cargarse antes de
+        # saber quien eres.
         gcloud run deploy ${_SERVICE} \
           --image ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${SHORT_SHA} \
           --region ${_REGION} \
           --service-account ${_RUNTIME_SA} \
-          --no-allow-unauthenticated \
+          --allow-unauthenticated \
           --ingress all \
           --memory 2Gi \
           --cpu 2 \
           --timeout 3600 \
           --concurrency 20 \
           --max-instances 4 \
-          --set-env-vars "AAUS_PROJECT_ID=${PROJECT_ID},AAUS_LOCATION=${_REGION},AAUS_BUCKET=${_BUCKET},AAUS_OWNER_EMAIL=${_OWNER_EMAIL},AAUS_DRY_RUN=false"
+          --update-env-vars "AAUS_PROJECT_ID=${PROJECT_ID},AAUS_LOCATION=${_REGION},AAUS_BUCKET=${_BUCKET},AAUS_DRY_RUN=false"
 
   # La cola necesita la URL del servicio, que no existe hasta que esta
   # desplegado. Sin este paso los trabajos correrian en un hilo del propio
@@ -97,7 +104,25 @@ steps:
           --format='value(status.url)')
         echo "Servicio en $$URL"
         gcloud run services update ${_SERVICE} --region ${_REGION} \
-          --update-env-vars "AAUS_TASKS_QUEUE=${_QUEUE},AAUS_TASKS_TARGET_URL=$$URL,AAUS_TASKS_SERVICE_ACCOUNT=${_TASKS_SA},AAUS_IAP_AUDIENCE=${_IAP_AUDIENCE}"
+          --update-env-vars "AAUS_TASKS_QUEUE=${_QUEUE},AAUS_TASKS_TARGET_URL=$$URL,AAUS_TASKS_SERVICE_ACCOUNT=${_TASKS_SA}"
+
+  # Un servicio publico sin correo de dueno no tiene puerta: cualquiera que
+  # acierte la direccion entra. Es el unico fallo de esta lista que no se ve
+  # mirando la app, asi que se comprueba aqui y tumba la compilacion.
+  - id: comprobar-la-puerta
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        FALTA=$(gcloud run services describe ${_SERVICE} --region ${_REGION} \
+          --format="value(spec.template.spec.containers[0].env.filter(\"name:AAUS_OWNER_EMAIL\").extract(value))")
+        if [ -z "$$FALTA" ] || [ "$$FALTA" = "[]" ]; then
+          echo "AAUS_OWNER_EMAIL esta vacio: el estudio quedaria abierto."
+          echo "Ejecuta ./setup.sh una vez en Cloud Shell."
+          exit 1
+        fi
+        echo "Puerta configurada para $$FALTA"
 
   - id: deploy-assembly-job
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
@@ -113,6 +138,6 @@ steps:
           --cpu 4 \
           --task-timeout 3600 \
           --max-retries 1 \
-          --set-env-vars "AAUS_PROJECT_ID=${PROJECT_ID},AAUS_LOCATION=${_REGION},AAUS_BUCKET=${_BUCKET},AAUS_DRY_RUN=false"
+          --update-env-vars "AAUS_PROJECT_ID=${PROJECT_ID},AAUS_LOCATION=${_REGION},AAUS_BUCKET=${_BUCKET},AAUS_DRY_RUN=false"
 
 timeout: 2400s

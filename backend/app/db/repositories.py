@@ -13,6 +13,7 @@ from ..errors import NotFound
 from .client import Database, Document
 
 CONFIG_MODELS = "config/models"
+CONFIG_AUTH = "config/auth"
 UNIVERSES = "universes"
 
 # Sub collections of a universe (PRD 47).

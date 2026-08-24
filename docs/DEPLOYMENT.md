@@ -21,7 +21,7 @@ se elimina desde IAM.
 | Cloud Build → GitHub | Conexión gestionada por Google con su app de GitHub |
 | Cloud Build → Cloud Run | Su propia cuenta de servicio |
 | Cloud Tasks → el worker | Token OIDC emitido en el momento |
-| Safari → Cloud Run | La sesión de Google del propietario, a través de IAP |
+| Safari → Cloud Run | Entrada con Google (`accounts.google.com/gsi`) y luego una cookie de sesión firmada |
 
 Tampoco se guarda la credencial en una variable de entorno del servicio: eso
 dejaría una credencial en la configuración cuando el runtime ya tiene identidad
@@ -48,9 +48,14 @@ servicio con sus roles y el acceso del propietario, publica el servicio con
 `gcloud run deploy --source .` y le conecta la cola con la URL que acaba de
 obtener.
 
-Se ejecuta **dos veces**: la primera deja todo montado y pide activar IAP; la
-segunda lee el Client ID que IAP creó y lo conecta con la cola. Sin esa segunda
-pasada la aplicación abre pero ninguna generación arranca.
+También genera `AAUS_SESSION_SECRET` y un código de instalación de ocho
+caracteres, y los conserva entre ejecuciones: regenerarlos cerraría la sesión
+abierta en el iPhone sin motivo. Se puede ejecutar las veces que haga falta.
+
+Deja pendiente **un solo paso manual**, y no por comodidad: Google no publica
+ninguna API para crear un cliente OAuth de tipo web ni para añadirle orígenes de
+JavaScript, así que ese cliente hay que crearlo a mano en la consola. El script
+imprime los tres enlaces exactos y el código.
 
 Roles de la cuenta de servicio del runtime, y ninguno más:
 
@@ -81,58 +86,98 @@ Para un despliegue puntual, desde Cloud Shell:
 ```bash
 gcloud run deploy aaus --source . --region us-central1 \
   --service-account aaus-run@MI-PROYECTO.iam.gserviceaccount.com \
-  --no-allow-unauthenticated
+  --allow-unauthenticated
 ```
 
-## 3. Acceso: IAM más IAP
+## 3. Acceso: entrar con la cuenta de Google
 
-El PRD dice que el acceso se controla con IAM sobre el servicio de Cloud Run
-contra la cuenta de Google del propietario. Es correcto, con un matiz que
-conviene tener claro antes de empezar:
+El PRD daba por hecho IAM más **Identity Aware Proxy**: un servicio con
+`--no-allow-unauthenticated` y el proxy delante convirtiendo la sesión de Google
+del navegador en una petición autorizada, sin pantalla de login ni pantalla de
+consentimiento que configurar.
 
-Un servicio con `--no-allow-unauthenticated` espera una cabecera
-`Authorization: Bearer <token>` que **Safari no envía por sí solo**. Lo que
-convierte la sesión de Google del navegador en una petición autorizada es
-**Identity Aware Proxy**.
+No se sostiene, por dos motivos que solo se ven al intentarlo:
 
-Activarlo, una vez, desde la consola:
+1. En una cuenta personal de Gmail, IAP exige crear a mano una marca y un
+   cliente de OAuth en la consola —la misma pantalla de consentimiento que se
+   quería evitar—. Hasta que eso está hecho, el servicio responde
+   `Empty Google Account OAuth client ID(s)/secret(s)` y nada más.
+2. Las APIs de administración de OAuth de IAP las apagó Google el 19 de marzo de
+   2026, así que `gcloud iap oauth-clients` ya no sirve para automatizar ese
+   paso.
 
-1. Security → Identity-Aware Proxy.
-2. Activar IAP sobre el servicio de Cloud Run `aaus`.
-3. Conceder `roles/iap.httpsResourceAccessor` únicamente a la cuenta del
-   propietario (`setup.sh` ya lo hace).
+Así que la puerta la pone la aplicación:
 
-Con IAP delante, el navegador entra con la sesión de Google que ya tiene. No hay
-login dentro de la app y **no hay pantalla de consentimiento OAuth que
-configurar**, que era justamente el paso que habría obligado a usar una
-computadora.
+- El servicio es **público en la red** (`--allow-unauthenticated`), y tiene que
+  serlo: para dibujar la pantalla de entrada hay que poder cargarla antes de
+  saber quién eres.
+- El navegador entra con **Google Identity Services**. Google devuelve un token
+  firmado; el servidor lo verifica con la librería oficial (firma, caducidad,
+  emisor, y que fuera emitido para *este* cliente) y comprueba que el correo sea
+  `AAUS_OWNER_EMAIL`. Las dos cosas: la primera sola dejaría entrar a cualquiera
+  con una cuenta de Google.
+- A cambio se entrega una cookie de sesión firmada con HMAC (`aaus_session`,
+  30 días, `HttpOnly`, `Secure`, `SameSite=Lax`).
 
-La aplicación comprueba además la cabecera `X-Goog-Authenticated-User-Email`
-contra `AAUS_OWNER_EMAIL` (`app/auth.py`). Es la segunda cerradura: si la
-petición llegó al contenedor, IAP ya respondió por ella.
+### La puerta es un middleware, no un decorador por ruta
 
-### La cola de trabajos también tiene que atravesar IAP
+`app/auth.py:gate()` se aplica a **todas** las peticiones desde `main.py`, y no
+ruta por ruta. Una ruta nueva se puede escribir sin acordarse de pedir
+identidad; de hecho pasó, y `/media/` servía cualquier archivo generado a quien
+acertara la ruta. Un middleware no se olvida.
+
+| Qué | Quién puede |
+|---|---|
+| `/`, `/assets/*` | Cualquiera. Es lo que dibuja la pantalla de entrada |
+| `/api/health`, `/api/auth/*` | Cualquiera. Nadie puede identificarse si para identificarse hay que estar ya dentro |
+| `/api/internal/*` | Solo Cloud Tasks, con su token OIDC. La cookie del navegador **no** vale |
+| Todo lo demás bajo `/api/` y `/media/` | Solo la sesión del propietario |
+
+### El paso que Google no deja automatizar
+
+Hay que crear un cliente OAuth de tipo **Aplicación web** en la consola y poner
+la URL del servicio en *Orígenes autorizados de JavaScript*. No existe API para
+esto. Y hay que **publicar** la aplicación en la pantalla de consentimiento: en
+modo Prueba, Google bloquea al propio dueño.
+
+Lo que sale de ahí son unos setenta caracteres, y Cloud Shell en un móvil no
+deja pegar. Por eso el Client ID entra por `POST /api/auth/setup` desde el propio
+navegador, autorizado con el código de ocho caracteres que el instalador imprime
+(`AAUS_SETUP_CODE`). Se guarda en Firestore (`config/auth`), así que sobrevive a
+los redespliegues; `AAUS_OAUTH_CLIENT_ID`, si está puesta, manda sobre él.
+
+Ese código **sigue valiendo después de instalar**, y es a propósito: un Client ID
+mal copiado deja la pantalla de entrada sin botón, y entonces «entra primero
+para corregirlo» es imposible. La pantalla de entrada ofrece *Cambiar el Client
+ID* para exactamente eso. Cinco intentos fallidos cierran la ruta un cuarto de
+hora.
+
+### La cola de trabajos
 
 Los trabajos largos no se ejecutan dentro de la petición: Cloud Tasks los empuja
 de vuelta a `POST /api/internal/jobs/run` del mismo servicio, y por eso una
 generación sobrevive a que se cierre Safari (PRD 37).
 
-Con IAP delante, esa petición de vuelta pasa por el mismo control. Un token OIDC
-dirigido a la URL del servicio **no entra**: IAP exige que el destinatario del
-token sea su propio Client ID de OAuth. Sin eso, cada trabajo encolado recibe un
-401 y la generación no arranca nunca, sin ningún error visible en la app.
-
-Por eso el despliegue necesita dos cosas que solo existen después de activar
-IAP:
-
-1. `AAUS_IAP_AUDIENCE` con el Client ID que IAP crea, pasado al activador de
-   Cloud Build como `_IAP_AUDIENCE`;
-2. el rol `roles/iap.httpsResourceAccessor` sobre la cuenta `aaus-tasks`, que
-   `setup.sh` ya concede.
+Esa petición trae un token OIDC firmado por la cuenta `aaus-tasks`. El worker
+comprueba firma, caducidad, destinatario y que el correo sea el de esa cuenta.
+La audiencia se pone **a mano** en `auth.py:service_audience()`, que es también
+lo que usa `services/jobs.py` al encolar: si se dejara al valor por defecto,
+Cloud Tasks firmaría para la URL completa con su ruta y el worker comprobaría
+contra la URL base, y cada trabajo moriría en un 401 sin ningún error visible en
+la app.
 
 Y `AAUS_TASKS_TARGET_URL` es la URL del propio servicio, que no existe hasta
 haberlo desplegado: el paso `conectar-cola` de `cloudbuild.yaml` la lee después
 del despliegue y actualiza el servicio con ella.
+
+### Lo que la compilación no toca
+
+`cloudbuild.yaml` usa `--update-env-vars`, nunca `--set-env-vars`. El correo del
+dueño, la clave de sesión, el código y el Client ID los pone `setup.sh` una vez;
+un `--set-env-vars` en el despliegue los borraría todos y dejaría el estudio
+público y sin puerta. El paso `comprobar-la-puerta` tumba la compilación si
+`AAUS_OWNER_EMAIL` acaba vacío, porque es el único de estos fallos que no se ve
+mirando la aplicación.
 
 ## 4. Instalar la PWA en el iPhone
 

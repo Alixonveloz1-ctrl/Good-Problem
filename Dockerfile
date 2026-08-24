@@ -27,4 +27,11 @@ ENV AAUS_STATIC_DIR=/app/frontend/dist \
     PORT=8080
 
 EXPOSE 8080
-CMD exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers 1 --timeout-keep-alive 75
+# --forwarded-allow-ips: sin esto uvicorn solo se fia de las cabeceras
+# X-Forwarded-* que vengan de 127.0.0.1, y en Cloud Run vienen del frontal
+# de Google desde una IP interna cualquiera. El resultado es que la app se
+# cree en http estando en https, y la cookie de sesion pierde su marca
+# Secure sin que nada falle a la vista. Al contenedor no se llega mas que
+# por ese frontal, que reescribe esas cabeceras.
+CMD exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers 1 \
+    --timeout-keep-alive 75 --proxy-headers --forwarded-allow-ips='*'

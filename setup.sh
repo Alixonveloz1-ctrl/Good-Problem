@@ -14,8 +14,7 @@
 #       ./setup.sh
 #
 #  SE PUEDE EJECUTAR LAS VECES QUE HAGA FALTA
-#    No duplica nada. De hecho hay que ejecutarlo DOS veces: la segunda
-#    recoge el dato que solo existe después de activar el candado.
+#    No duplica nada y no pierde nada de lo ya instalado.
 #
 # ═══════════════════════════════════════════════════════════════════════
 
@@ -98,7 +97,7 @@ gcloud services enable \
   run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com \
   aiplatform.googleapis.com texttospeech.googleapis.com firestore.googleapis.com \
   storage.googleapis.com cloudtasks.googleapis.com secretmanager.googleapis.com \
-  iap.googleapis.com logging.googleapis.com monitoring.googleapis.com \
+  iamcredentials.googleapis.com logging.googleapis.com monitoring.googleapis.com \
   --project="$PROJECT_ID" >/dev/null
 ok "Servicios encendidos"
 
@@ -164,7 +163,6 @@ paso "La identidad de la cola de trabajos"
 detalle "Es lo que hace que un vídeo siga generándose aunque cierres Safari."
 crear_cuenta "aaus-tasks" "Cola de generación"
 dar_rol "serviceAccount:${SA_COLA}" "roles/run.invoker"
-dar_rol "serviceAccount:${SA_COLA}" "roles/iap.httpsResourceAccessor"
 ok "Permisos de la cola"
 
 paso "Permisos para publicar actualizaciones"
@@ -175,8 +173,9 @@ done
 ok "Listo"
 
 paso "Tu acceso"
-dar_rol "user:${CORREO}" "roles/run.invoker"
-dar_rol "user:${CORREO}" "roles/iap.httpsResourceAccessor"
+detalle "Quién entra en la app lo decide la propia app, no la red: tiene que"
+detalle "poder dibujar la pantalla de entrada antes de saber quién eres."
+dar_rol "user:${CORREO}" "roles/run.admin"
 ok "${CORREO}"
 
 # ══════════════════════════════════════════════════════════════════════
@@ -202,14 +201,35 @@ titulo "Publicando la aplicación"
 paso "Esto tarda entre 5 y 10 minutos. No cierres Cloud Shell."
 detalle "Construye la app y la sube. La primera vez es la más lenta."
 
+# La llave con la que se firman las sesiones y el código de un solo uso para
+# terminar la instalación desde el teléfono. Se generan aquí y no se escriben
+# a mano en ninguna parte. Si ya existen de una instalación anterior se
+# conservan: cambiarlos cerraría la sesión abierta en el iPhone sin motivo.
+LEER_VAR() {
+  gcloud run services describe "$SERVICIO" --region "$REGION" --project "$PROJECT_ID" \
+    --format="value(spec.template.spec.containers[0].env.filter(\"name:$1\").extract(value))" \
+    2>/dev/null | tr -d '[]' || true
+}
+
+SECRETO="$(LEER_VAR AAUS_SESSION_SECRET)"
+[[ -n "$SECRETO" ]] || SECRETO="$(openssl rand -hex 32)"
+
+CLIENT_ID="$(LEER_VAR AAUS_OAUTH_CLIENT_ID)"
+CODIGO="$(LEER_VAR AAUS_SETUP_CODE)"
+# Alfabeto sin 0/O/1/I/L: hay que leerlo de la pantalla y escribirlo en el móvil.
+[[ -n "$CODIGO" ]] || CODIGO="$(LC_ALL=C tr -dc 'ABCDEFGHJKMNPQRSTUVWXYZ23456789' </dev/urandom | head -c 8)"
+
+# La app es pública en Cloud Run y tiene que serlo: para pintar la pantalla de
+# entrada hay que poder cargarla antes de saber quién eres. La puerta la pone la
+# propia app, con tu cuenta de Google, y también cubre /media/ y la cola.
 gcloud run deploy "$SERVICIO" \
   --source . \
   --region "$REGION" \
   --project "$PROJECT_ID" \
   --service-account "$SA_APP" \
-  --no-allow-unauthenticated \
+  --allow-unauthenticated \
   --memory 2Gi --cpu 2 --timeout 3600 --concurrency 20 --max-instances 4 \
-  --set-env-vars "AAUS_PROJECT_ID=${PROJECT_ID},AAUS_LOCATION=${REGION},AAUS_BUCKET=${BUCKET},AAUS_OWNER_EMAIL=${CORREO},AAUS_DRY_RUN=false" \
+  --set-env-vars "AAUS_PROJECT_ID=${PROJECT_ID},AAUS_LOCATION=${REGION},AAUS_BUCKET=${BUCKET},AAUS_OWNER_EMAIL=${CORREO},AAUS_DRY_RUN=false,AAUS_SESSION_SECRET=${SECRETO},AAUS_SETUP_CODE=${CODIGO}${CLIENT_ID:+,AAUS_OAUTH_CLIENT_ID=${CLIENT_ID}}" \
   --quiet >/dev/null
 
 URL="$(gcloud run services describe "$SERVICIO" --region "$REGION" \
@@ -225,35 +245,41 @@ gcloud run services update "$SERVICIO" --region "$REGION" --project "$PROJECT_ID
 ok "Conectada"
 
 # ══════════════════════════════════════════════════════════════════════
-#  7 · El candado (IAP)
+#  7 · Si el candado viejo quedó puesto, quitarlo
 # ══════════════════════════════════════════════════════════════════════
-titulo "El candado"
-
-# Al activar IAP, Google crea una credencial. La cola de trabajos necesita
-# ese dato para poder atravesar el candado; sin él, cada generación recibe
-# un 401 y se queda pensando para siempre, sin ningún error visible.
-CLIENT_ID=""
-MARCA="$(gcloud iap oauth-brands list --project="$PROJECT_ID" \
-         --format='value(name)' 2>/dev/null | head -1 || true)"
-if [[ -n "$MARCA" ]]; then
-  CLIENT_ID="$(gcloud iap oauth-clients list "$MARCA" --project="$PROJECT_ID" \
-               --format='value(name)' 2>/dev/null | head -1 | sed 's|.*/||' || true)"
-fi
-
-if [[ -n "$CLIENT_ID" ]]; then
-  gcloud run services update "$SERVICIO" --region "$REGION" --project "$PROJECT_ID" \
-    --update-env-vars "AAUS_IAP_AUDIENCE=${CLIENT_ID}" --quiet >/dev/null
-  ok "Candado configurado y conectado con la cola"
-  IAP_LISTO="si"
-else
-  aviso "El candado todavía no está activado"
-  IAP_LISTO="no"
+# IAP se abandonó por dos motivos: en una cuenta personal de Gmail exige crear
+# a mano una marca y un cliente de OAuth en la consola —y hasta entonces el
+# servicio contesta "Empty Google Account OAuth client ID(s)/secret(s)" y nada
+# más—, y sus APIs de administración las apagó Google en marzo de 2026. Si
+# quedó encendido de un intento anterior, se apaga: con él delante, la pantalla
+# de entrada no llega ni a cargar.
+if gcloud beta run services describe "$SERVICIO" --region "$REGION" \
+     --project "$PROJECT_ID" --format='value(metadata.annotations)' 2>/dev/null \
+   | grep -q 'iap-enabled.*[Tt]rue'; then
+  paso "Quitando el candado viejo"
+  gcloud beta run services update "$SERVICIO" --region "$REGION" \
+    --project "$PROJECT_ID" --no-iap --quiet >/dev/null 2>&1 || true
+  ok "Quitado"
 fi
 
 # ══════════════════════════════════════════════════════════════════════
 #  8 · Resumen
 # ══════════════════════════════════════════════════════════════════════
 titulo "Listo"
+
+# La propia app dice si le falta el Client ID. Es la única fuente fiable: el
+# dato puede haber entrado por la pantalla del teléfono y no por aquí.
+paso "Comprobando la aplicación"
+ESTADO="$(curl -s --max-time 90 "${URL}/api/auth/config" 2>/dev/null || true)"
+if [[ -z "$ESTADO" ]]; then
+  aviso "La app aún está arrancando. Espera un minuto y abre ${URL}"
+  FALTA_CLIENTE="si"
+elif echo "$ESTADO" | grep -q '"needs_setup":true'; then
+  FALTA_CLIENTE="si"
+else
+  FALTA_CLIENTE="no"
+  ok "Responde y ya está instalada"
+fi
 
 cat <<RESUMEN
 
@@ -263,21 +289,36 @@ cat <<RESUMEN
 
 RESUMEN
 
-if [[ "$IAP_LISTO" == "no" ]]; then
+if [[ "$FALTA_CLIENTE" == "si" ]]; then
   cat <<PENDIENTE
-  ${YELLOW}${BOLD}TE QUEDAN DOS COSAS:${RESET}
+  ${YELLOW}${BOLD}FALTA UN PASO.${RESET} Google no deja automatizarlo: hay que crear a mano
+  el permiso para que puedas entrar con tu cuenta.
 
-  ${BOLD}1. Activar el candado${RESET}   ${DIM}(obligatorio: sin esto no puedes entrar)${RESET}
-     Abre:  https://console.cloud.google.com/security/iap?project=${PROJECT_ID}&${CUENTA}
-     Toca:  el interruptor de "${SERVICIO}"
-     Si te pide configurar la pantalla de consentimiento, elige ${BOLD}Externo${RESET},
-     pon tu correo donde te lo pida y guarda. No hace falta nada más.
+  ${BOLD}Tu código:${RESET}   ${BOLD}${GREEN}${CODIGO}${RESET}   ${DIM}(lo pide el punto 5)${RESET}
 
-  ${BOLD}2. Volver a ejecutar este script${RESET}   ${DIM}(30 segundos)${RESET}
-     ./setup.sh
-     La segunda vez recoge el dato que el candado acaba de crear.
-     ${YELLOW}Sin este paso la app abre, pero cada generación se queda pensando
-     para siempre sin dar ningún error.${RESET}
+  ${BOLD}1.${RESET} Abre:  https://console.cloud.google.com/auth/branding?project=${PROJECT_ID}&${CUENTA}
+     Nombre de la app:  Universe Studio
+     Correo de asistencia y de contacto:  ${CORREO}
+     Público:  ${BOLD}Externo${RESET}   →   Crear
+
+  ${BOLD}2.${RESET} Abre:  https://console.cloud.google.com/auth/audience?project=${PROJECT_ID}&${CUENTA}
+     Toca:  ${BOLD}Publicar aplicación${RESET}   →   Confirmar
+     ${DIM}Sin esto, Google te bloquea a ti mismo al intentar entrar.${RESET}
+
+  ${BOLD}3.${RESET} Abre:  https://console.cloud.google.com/auth/clients?project=${PROJECT_ID}&${CUENTA}
+     Toca:  ${BOLD}Crear cliente${RESET}
+     Tipo:  ${BOLD}Aplicación web${RESET}
+     En ${BOLD}Orígenes autorizados de JavaScript${RESET} → Añadir URI:
+        ${BOLD}${URL}${RESET}
+     Toca:  Crear
+
+  ${BOLD}4.${RESET} Copia el ${BOLD}ID de cliente${RESET} que aparece.
+     ${DIM}Termina en .apps.googleusercontent.com${RESET}
+
+  ${BOLD}5.${RESET} Abre tu app en ${BOLD}Safari${RESET}:  ${URL}
+     Pega el ID, escribe el código ${BOLD}${CODIGO}${RESET}, y toca Terminar instalación.
+     ${DIM}Ahí sí se puede pegar. La dirección del punto 3 también sale
+     en esa pantalla, con un botón para copiarla.${RESET}
 
 PENDIENTE
 else
@@ -290,7 +331,7 @@ else
 
   ${BOLD}Instálala en el iPhone:${RESET}
      1. Abre ${URL} en ${BOLD}Safari${RESET}
-     2. Inicia sesión con ${CORREO}
+     2. Entra con ${CORREO}
      3. Compartir → Añadir a pantalla de inicio
 
 TERMINADO

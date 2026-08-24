@@ -1,9 +1,10 @@
 /* Service worker for the app shell only.
  *
- * API responses and generated media are never cached: a stale job state or a
- * stale credit counter would be worse than a spinner, and the media lives
- * behind signed URLs that expire. Generations keep running in Google Cloud
- * whether or not this page is open, so there is nothing to keep alive here.
+ * API responses and generated media are never cached: a stale job state would
+ * be worse than a spinner, the media lives behind signed URLs that expire, and
+ * a cached answer from the door would show the studio to someone who no longer
+ * has a session. Generations keep running in Google Cloud whether or not this
+ * page is open, so there is nothing to keep alive here.
  */
 const SHELL = 'aaus-shell-v1'
 const PRECACHE = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.png']

@@ -251,34 +251,266 @@ def test_la_ruta_de_voz_no_la_tapa_la_de_contenido(client, universe):
     assert "consent" in cuerpo["consent_script"].lower()
 
 
-def test_la_cola_de_trabajos_atraviesa_iap(settings, studio):
+def test_la_cola_de_trabajos_lleva_su_propia_identidad(settings, studio):
     """PRD 37: los trabajos siguen en Google Cloud aunque se cierre el iPhone.
 
-    Eso solo se cumple si van por Cloud Tasks, y con IAP delante el token tiene
-    que ir dirigido a su client ID. Con la URL del servicio, IAP responde 401 y
-    la generacion nunca arranca.
+    Eso solo se cumple si van por Cloud Tasks. La audiencia del token se pone a
+    mano: si se deja al valor por defecto, Cloud Tasks firma para la URL con su
+    ruta, el worker comprueba contra la URL base, y cada trabajo muere en un 401.
     """
     from app.services.jobs import JobService
 
     settings.tasks_queue = "aaus-generation"
     settings.tasks_target_url = "https://aaus-abc.a.run.app"
     settings.tasks_service_account = "aaus-tasks@proyecto.iam.gserviceaccount.com"
-    settings.iap_audience = "1234-abc.apps.googleusercontent.com"
 
     tarea = JobService(studio.db, settings).build_task("uni_1", "job_1", "POST")
     peticion = tarea["http_request"]
 
     assert peticion["url"] == "https://aaus-abc.a.run.app/api/internal/jobs/run"
-    assert peticion["oidc_token"]["audience"] == "1234-abc.apps.googleusercontent.com"
+    assert peticion["oidc_token"]["audience"] == "https://aaus-abc.a.run.app"
     assert peticion["oidc_token"]["service_account_email"].startswith("aaus-tasks@")
 
 
-def test_sin_iap_el_token_va_dirigido_a_la_url(settings, studio):
+def test_la_audiencia_del_token_es_la_que_el_worker_comprueba(settings, studio):
+    """El que firma y el que comprueba tienen que mirar el mismo sitio.
+
+    Estas dos lineas viven en archivos distintos y nadie las lee juntas. Esta
+    prueba es el unico sitio donde se encuentran.
+    """
     from app.services.jobs import JobService
 
-    settings.tasks_target_url = "https://aaus-abc.a.run.app"
+    settings.tasks_target_url = "https://aaus-abc.a.run.app/"
     settings.tasks_service_account = "aaus-tasks@proyecto.iam.gserviceaccount.com"
-    settings.iap_audience = ""
 
     tarea = JobService(studio.db, settings).build_task("uni_1", "job_1", "POST")
-    assert "audience" not in tarea["http_request"]["oidc_token"]
+    firmada = tarea["http_request"]["oidc_token"]["audience"]
+
+    # Lo mismo que comprueba verify_service_token al recibir la peticion.
+    from app.auth import service_audience
+
+    assert firmada == service_audience(settings) == "https://aaus-abc.a.run.app"
+
+
+# --- La puerta (PRD 41) -----------------------------------------------------
+
+
+def test_la_cookie_de_sesion_no_se_puede_falsificar():
+    """Sin esto, cualquiera que sepa el correo del dueno entra escribiendo una
+    cookie a mano."""
+    from app.auth import create_session, read_session
+
+    cookie = create_session("yo@gmail.com", "un-secreto-de-treinta-y-dos-caracteres")
+
+    assert read_session(cookie, "un-secreto-de-treinta-y-dos-caracteres") == "yo@gmail.com"
+    assert read_session(cookie, "otro-secreto-cualquiera-de-32-chars") is None
+    assert read_session(cookie[:-1] + "0", "un-secreto-de-treinta-y-dos-caracteres") is None
+    assert read_session("basura", "un-secreto-de-treinta-y-dos-caracteres") is None
+
+
+def test_la_sesion_caduca():
+    from app.auth import create_session, read_session
+
+    secreto = "un-secreto-de-treinta-y-dos-caracteres"
+    caducada = create_session("yo@gmail.com", secreto, days=-1)
+    assert read_session(caducada, secreto) is None
+
+
+def test_sin_sesion_no_se_ven_los_datos(client, studio):
+    """La puerta se aplica en un middleware y no ruta por ruta a proposito: una
+    ruta nueva se puede escribir sin acordarse de pedir identidad."""
+    studio.settings.owner_email = "dueno@gmail.com"
+    studio.settings.oauth_client_id = "123.apps.googleusercontent.com"
+    studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
+
+    assert client.get("/api/home").status_code == 403
+    assert client.get("/api/universes").status_code == 403
+    # /media/ tampoco: los archivos generados no son publicos por acertar la ruta.
+    assert client.get("/media/loquesea.png").status_code == 403
+
+
+def test_la_pantalla_de_entrada_si_carga_sin_sesion(client, studio):
+    """Si la puerta tapara tambien el HTML, no habria forma de pintar el boton
+    de entrar: la aplicacion seria inaccesible para su propio dueno."""
+    studio.settings.owner_email = "dueno@gmail.com"
+    studio.settings.oauth_client_id = "123.apps.googleusercontent.com"
+    studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
+
+    assert client.get("/api/health").status_code == 200
+
+    config = client.get("/api/auth/config")
+    assert config.status_code == 200
+    assert config.json()["login_required"] is True
+    assert config.json()["client_id"] == "123.apps.googleusercontent.com"
+    assert config.json()["signed_in"] is False
+
+
+def test_con_la_cookie_correcta_se_entra(client, studio):
+    from app.auth import COOKIE, create_session
+
+    studio.settings.owner_email = "Dueno@Gmail.com"
+    studio.settings.oauth_client_id = "123.apps.googleusercontent.com"
+    studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
+
+    client.cookies.set(COOKIE, create_session("dueno@gmail.com", studio.settings.session_secret))
+    assert client.get("/api/home").status_code == 200
+
+    # Otra cuenta de Google, con una sesion firmada de verdad, sigue fuera.
+    client.cookies.set(COOKIE, create_session("otro@gmail.com", studio.settings.session_secret))
+    assert client.get("/api/home").status_code == 403
+    client.cookies.clear()
+
+
+def test_la_ruta_interna_no_acepta_la_cookie_del_navegador(client, studio):
+    """Es la puerta de la cola de trabajos y solo de ella. Con la cookie valdria
+    para lanzar trabajos a mano desde el movil sin pasar por el orquestador."""
+    from app.auth import COOKIE, create_session
+
+    studio.settings.owner_email = "dueno@gmail.com"
+    studio.settings.oauth_client_id = "123.apps.googleusercontent.com"
+    studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
+    client.cookies.set(COOKIE, create_session("dueno@gmail.com", studio.settings.session_secret))
+
+    respuesta = client.post("/api/internal/jobs/run", json={"universe_id": "u", "job_id": "j"})
+    assert respuesta.status_code == 403
+    client.cookies.clear()
+
+
+def test_un_despliegue_a_medias_no_arranca():
+    """Correo de dueno puesto y nada con que comprobarlo: eso es una puerta
+    pintada. Tiene que romperse en el despliegue, no despues."""
+    from app.settings import Settings
+
+    a_medias = Settings(owner_email="dueno@gmail.com", oauth_client_id="", session_secret="")
+    problemas = a_medias.check()
+    assert len(problemas) == 2
+
+    corto = Settings(
+        owner_email="dueno@gmail.com", oauth_client_id="123.apps.googleusercontent.com",
+        session_secret="corto",
+    )
+    assert len(corto.check()) == 1
+
+    completo = Settings(
+        owner_email="dueno@gmail.com",
+        oauth_client_id="123.apps.googleusercontent.com",
+        session_secret="un-secreto-de-treinta-y-dos-caracteres",
+    )
+    assert completo.check() == []
+
+    # En un portatil, sin correo de dueno, no hay nada que exigir.
+    assert Settings(owner_email="").check() == []
+
+
+def test_el_client_id_no_lo_puede_poner_cualquiera(client, studio):
+    """Una direccion de Cloud Run es adivinable. Sin codigo, el primero que
+    pasara por ella podria dejar al dueno fuera de su propio estudio."""
+    studio.settings.owner_email = "dueno@gmail.com"
+    studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
+    studio.settings.setup_code = "K7M2QX9P"
+    bueno = "123456789012-abcdef.apps.googleusercontent.com"
+
+    sin_codigo = client.post(
+        "/api/auth/setup", json={"client_id": bueno, "code": "loquesea"}
+    )
+    assert sin_codigo.status_code == 403
+    assert studio.oauth_client_id == ""
+
+    # Y no se cuela cualquier cadena: un Client ID mal copiado dejaria la
+    # pantalla de entrada rota sin decir por que.
+    basura = client.post(
+        "/api/auth/setup",
+        json={"client_id": "https://console.cloud.google.com", "code": "K7M2QX9P"},
+    )
+    assert basura.status_code == 422
+
+    con_codigo = client.post("/api/auth/setup", json={"client_id": bueno, "code": "k7m2qx9p"})
+    assert con_codigo.status_code == 200
+    assert studio.oauth_client_id == bueno
+
+
+def test_un_client_id_mal_copiado_se_puede_corregir(client, studio):
+    """Sin esto no habria salida.
+
+    Un Client ID con una letra de mas deja la pantalla de entrada sin boton, y
+    entonces "entra primero para corregirlo" es imposible. La unica salida seria
+    volver a Cloud Shell, que es justo lo que el codigo evita.
+    """
+    from app.routers import auth as router_auth
+
+    router_auth._fallos.clear()
+    studio.settings.owner_email = "dueno@gmail.com"
+    studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
+    studio.settings.setup_code = "K7M2QX9P"
+    studio.save_oauth_client_id("123456789012-malo.apps.googleusercontent.com")
+
+    correcto = client.post(
+        "/api/auth/setup",
+        json={"client_id": "999999999999-bueno.apps.googleusercontent.com", "code": "K7M2QX9P"},
+    )
+    assert correcto.status_code == 200
+    assert studio.oauth_client_id == "999999999999-bueno.apps.googleusercontent.com"
+
+
+def test_el_codigo_no_se_puede_probar_a_lo_bruto(client, studio):
+    from app.routers import auth as router_auth
+
+    router_auth._fallos.clear()
+    studio.settings.owner_email = "dueno@gmail.com"
+    studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
+    studio.settings.setup_code = "K7M2QX9P"
+    bueno = "123456789012-abcdef.apps.googleusercontent.com"
+
+    for _ in range(5):
+        assert client.post(
+            "/api/auth/setup", json={"client_id": bueno, "code": "AAAAAAAA"}
+        ).status_code == 403
+
+    # A partir del sexto no se mira ni el codigo: ni el bueno pasa.
+    cerrado = client.post("/api/auth/setup", json={"client_id": bueno, "code": "K7M2QX9P"})
+    assert cerrado.status_code == 403
+    assert "intentos" in cerrado.json()["error"]["message"]
+    assert studio.oauth_client_id == ""
+    router_auth._fallos.clear()
+
+
+def test_la_variable_de_entorno_manda_sobre_lo_guardado(studio):
+    """Un despliegue con el dato ya puesto no lo tiene que ir a buscar, y no lo
+    puede pisar nada que quedara guardado de una instalacion anterior."""
+    studio.save_oauth_client_id("viejo-000.apps.googleusercontent.com")
+    studio.settings.oauth_client_id = "123456789012-nuevo.apps.googleusercontent.com"
+    assert studio.oauth_client_id == "123456789012-nuevo.apps.googleusercontent.com"
+
+
+def test_sin_client_id_la_app_pide_instalarse(client, studio):
+    studio.settings.owner_email = "dueno@gmail.com"
+    studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
+    studio.settings.setup_code = "K7M2QX9P"
+
+    config = client.get("/api/auth/config").json()
+    assert config["needs_setup"] is True
+    assert config["client_id"] == ""
+
+    # Y no se puede intentar entrar con Google mientras falte: el token no se
+    # podria comprobar contra nada.
+    intento = client.post("/api/auth/session", json={"credential": "loquesea"})
+    assert intento.status_code == 403
+
+
+def test_la_cookie_de_sesion_sale_marcada(client, studio, monkeypatch):
+    """HttpOnly para que ningun script la lea, Secure para que no viaje en
+    claro. Mirar solo el esquema fallaria: detras del proxy de Cloud Run la app
+    se cree en http, y la marca se perderia sin que nada falle a la vista."""
+    from app.routers import auth as router_auth
+
+    studio.settings.owner_email = "dueno@gmail.com"
+    studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
+    studio.save_oauth_client_id("123456789012-abcdef.apps.googleusercontent.com")
+    monkeypatch.setattr(router_auth, "verify_google_token", lambda *_: "dueno@gmail.com")
+
+    respuesta = client.post("/api/auth/session", json={"credential": "loquesea"})
+    assert respuesta.status_code == 200
+    galleta = respuesta.headers["set-cookie"]
+    assert "HttpOnly" in galleta
+    assert "Secure" in galleta   # aunque el test hable http
+    assert "SameSite=lax" in galleta

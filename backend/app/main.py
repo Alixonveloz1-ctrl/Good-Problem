@@ -1,9 +1,9 @@
 """AI Artist Universe Studio.
 
 One Cloud Run service: the API, the job worker and the PWA that the phone
-loads. Access is IAM plus IAP against a single Google account, so there is no
-login screen and no OAuth consent screen to click through from a phone
-(PRD 41).
+loads. Entra una sola persona, con su cuenta de Google: el servicio es público
+en Cloud Run —tiene que serlo para poder pintar la pantalla de entrada— y la
+puerta la pone el middleware de aquí abajo, no la red (PRD 41).
 """
 
 from __future__ import annotations
@@ -17,9 +17,20 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from .auth import gate
 from .container import get_studio
 from .errors import DomainError, NotFound
-from .routers import characters, content, exports, jobs, music, system, universes, video
+from .routers import (
+    auth,
+    characters,
+    content,
+    exports,
+    jobs,
+    music,
+    system,
+    universes,
+    video,
+)
 from .settings import get_settings
 
 logging.basicConfig(
@@ -42,13 +53,33 @@ app = FastAPI(
 def startup() -> None:
     studio = get_studio()
     app.state.studio = studio
+
+    # Un despliegue mal configurado tiene que romperse aquí, en el despliegue, y
+    # no media hora después cuando alguien pase por delante de una puerta que no
+    # cierra.
+    problemas = studio.settings.check()
+    if problemas:
+        raise RuntimeError("Configuración incompleta: " + " | ".join(problemas))
+
     studio.ensure_registry_seeded()
     logger.info(
-        "studio_ready dry_run=%s project=%s storage=%s",
+        "studio_ready dry_run=%s project=%s storage=%s puerta=%s",
         studio.settings.dry_run,
         studio.settings.project_id or "(local)",
         "gcs" if studio.settings.use_gcs else "local",
+        studio.settings.owner_email or "abierta",
     )
+
+
+@app.middleware("http")
+async def puerta(request: Request, call_next):
+    """Identidad antes que nada, para todo lo que sirva datos."""
+    settings = getattr(app.state, "studio", None)
+    settings = settings.settings if settings else get_settings()
+    error = gate(request, settings)
+    if error is not None:
+        return JSONResponse(status_code=error.status_code, content=error.to_payload())
+    return await call_next(request)
 
 
 @app.exception_handler(DomainError)
@@ -56,6 +87,7 @@ def domain_error_handler(request: Request, exc: DomainError) -> JSONResponse:
     return JSONResponse(status_code=exc.status_code, content=exc.to_payload())
 
 
+app.include_router(auth.router)
 app.include_router(system.router)
 app.include_router(system.media_router)
 app.include_router(universes.router)

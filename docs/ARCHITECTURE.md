@@ -236,19 +236,36 @@ Job que ve el teléfono.
 ## 11. Autenticación
 
 Una sola persona usa esto, así que no hay registro, ni roles, ni recuperación de
-contraseña, ni pantalla de consentimiento OAuth: nada que obligue a sacar una
-computadora.
+contraseña. Solo un botón de «Entrar con Google» y una lista de correos
+permitidos que tiene exactamente un nombre.
 
-El acceso se controla fuera de la aplicación: el servicio de Cloud Run exige
-autenticación e Identity Aware Proxy delante solo deja pasar a la cuenta del
-propietario. `app/auth.py` lee la cabecera que IAP inyecta y la contrasta con
-`AAUS_OWNER_EMAIL`; es la segunda cerradura, no la primera.
+El PRD daba por hecho IAM más **Identity Aware Proxy**, sin login ni pantalla de
+consentimiento. La premisa no se sostiene: en una cuenta personal de Gmail, IAP
+exige crear a mano esa misma pantalla de consentimiento y un cliente de OAuth, y
+hasta entonces el servicio responde `Empty Google Account OAuth client
+ID(s)/secret(s)` sin más explicación. Además, Google apagó las APIs de
+administración de OAuth de IAP en marzo de 2026, así que ese paso tampoco se
+puede automatizar. Lo que sí se conserva del PRD: nadie se registra, no hay
+contraseñas, y la identidad la pone Google.
 
-**IAP hace falta.** Un servicio de Cloud Run con `--no-allow-unauthenticated`
-espera un token Bearer que Safari no envía por sí solo. IAP es lo que convierte
-la sesión de Google del navegador en una petición autorizada. Es el único punto
-donde el PRD necesita un matiz: la idea de «solo IAM» es correcta, pero en la
-práctica se implementa con IAM *más* IAP.
+Así que la puerta vive en el código, que es donde se puede probar:
+
+- El servicio es público en la red, y tiene que serlo: para dibujar la pantalla
+  de entrada hay que poder cargarla antes de saber quién eres.
+- Google Identity Services devuelve un token firmado. `auth.py` lo verifica con
+  la librería oficial —firma, caducidad, emisor, y que fuera emitido para *este*
+  cliente— y comprueba que el correo sea `AAUS_OWNER_EMAIL`. Las dos cosas: la
+  primera sola dejaría entrar a cualquiera con una cuenta de Google.
+- A cambio, una cookie firmada con HMAC. Manipularla rompe la firma.
+
+**La puerta es un middleware, no un decorador por ruta.** `auth.py:gate()` se
+aplica desde `main.py` a todas las peticiones. Una ruta nueva se puede escribir
+sin acordarse de pedir identidad —de hecho pasó: `/media/` servía cualquier
+archivo generado a quien acertara la ruta—. Un middleware no se olvida.
+
+`/api/internal/*` es la excepción: ahí no vale la cookie, solo el token OIDC de
+Cloud Tasks. Con la cookie, cualquiera dentro podría lanzar trabajos a mano
+saltándose el orquestador.
 
 ## 12. Almacenamiento
 

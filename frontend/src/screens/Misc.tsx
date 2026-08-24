@@ -220,7 +220,40 @@ export function SettingsScreen() {
             </div>
           </Card>
         )}
+
+        <Cuenta />
       </main>
     </>
+  )
+}
+
+/** Quien esta dentro, y como salir.
+ *
+ * Salir importa mas de lo que parece en un telefono: es lo que se hace cuando
+ * se presta el movil, y sin un boton la unica forma seria esperar treinta dias
+ * a que caduque la sesion.
+ */
+function Cuenta() {
+  const yo = useResource<{ login_required: boolean; signed_in: boolean; email: string | null }>(
+    '/api/auth/config',
+  )
+  if (!yo.data?.login_required) return null
+  return (
+    <Card>
+      <h3>Cuenta</h3>
+      <div className="row between">
+        <span className="muted">Entraste como</span>
+        <span className="mono">{yo.data.email ?? '—'}</span>
+      </div>
+      <button
+        className="btn small block"
+        onClick={async () => {
+          await api.post('/api/auth/logout')
+          window.location.reload()
+        }}
+      >
+        Salir
+      </button>
+    </Card>
   )
 }

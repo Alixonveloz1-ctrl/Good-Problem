@@ -140,9 +140,14 @@ descarga el proyecto solo. Después, dentro de Cloud Shell:
 ```
 
 El script no pide argumentos: toma el proyecto y la cuenta de Cloud Shell, monta
-todo, publica la aplicación y al final dice los dos toques que quedan en el
-navegador. Volver a ejecutarlo es seguro; de hecho hay que hacerlo dos veces,
-porque la segunda recoge la credencial que el candado crea al activarse.
+todo, publica la aplicación y al final imprime el único paso que queda, con los
+enlaces exactos. Volver a ejecutarlo es seguro y no pierde nada de lo instalado.
+
+Ese paso es crear un cliente OAuth en la consola. No es pereza del script:
+Google no publica ninguna API para crear un cliente de tipo web ni para añadirle
+orígenes de JavaScript. Lo que sale de ahí se pega en la propia aplicación —en
+Cloud Shell desde un móvil no se puede pegar— autorizado con un código de ocho
+caracteres que el instalador enseña.
 
 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) explica el detalle técnico: roles,
 identidades y por qué cada cosa está donde está.

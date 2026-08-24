@@ -178,15 +178,16 @@ class JobService:
             }
         }
         if self.settings.tasks_service_account:
-            oidc: dict[str, Any] = {
-                "service_account_email": self.settings.tasks_service_account
+            # La audiencia se pone a mano. Cloud Tasks, si no se le dice nada,
+            # firma el token para la URL completa con su ruta; el worker lo
+            # comprueba contra la URL base. Dejarlo al azar es un 401 en cada
+            # trabajo y ningun video terminado.
+            from ..auth import service_audience
+
+            task["http_request"]["oidc_token"] = {
+                "service_account_email": self.settings.tasks_service_account,
+                "audience": service_audience(self.settings),
             }
-            if self.settings.iap_audience:
-                # Con IAP delante, el destinatario del token es su client ID y no
-                # la URL del servicio. Sin esto la cola recibe un 401 y el job
-                # nunca llega a ejecutarse.
-                oidc["audience"] = self.settings.iap_audience
-            task["http_request"]["oidc_token"] = oidc
         return task
 
     def _enqueue_cloud_task(self, universe_id: str, job_id: str) -> None:

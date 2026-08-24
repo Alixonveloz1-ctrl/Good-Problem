@@ -719,3 +719,93 @@ video {
   background: var(--accent-soft);
   color: var(--accent);
 }
+
+/* La puerta (PRD 41).
+ *
+ * Centrada y sin barra de pestanas: hasta que no se sabe quien entra no hay
+ * navegacion que ofrecer. El padding de abajo respeta el indicador de inicio
+ * del iPhone, que si no se come el boton. */
+
+.login {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: calc(24px + var(--safe-top)) 20px calc(24px + var(--safe-bottom));
+  background: radial-gradient(120% 80% at 50% 0%, #191926 0%, var(--bg) 60%);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+  padding: 32px 24px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+}
+
+.login-mark {
+  font-size: 44px;
+  line-height: 1;
+}
+
+.login-card h1 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+
+.login-card p {
+  margin: 0;
+}
+
+/* El boton lo dibuja Google dentro de este hueco y su ancho no se puede
+   controlar desde aqui: se centra y se le deja el sitio. */
+.login-boton {
+  min-height: 44px;
+  display: flex;
+  justify-content: center;
+}
+
+.login-error {
+  color: var(--danger);
+  font-size: 14px;
+}
+
+.login-input {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-sunken);
+  color: var(--text);
+  /* 16px o menos hace que Safari haga zoom al tocar el campo y la pantalla se
+     descoloque. */
+  font-size: 16px;
+  font-family: var(--font);
+}
+
+.login-origen {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-sunken);
+}
+
+.login-origen code {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  text-align: left;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}

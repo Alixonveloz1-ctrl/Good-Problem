@@ -10,7 +10,7 @@ import logging
 from typing import Any
 
 from .db.client import Database, build_database
-from .db.repositories import CONFIG_MODELS
+from .db.repositories import CONFIG_AUTH, CONFIG_MODELS
 from .domain.registry import ModelRegistry, load_seed
 from .providers.chirp import ChirpClient, build_chirp_client
 from .providers.secrets import SecretStore, build_secret_store
@@ -79,6 +79,23 @@ class Studio:
         document = {**document, "id": "models"}
         self.db.set(CONFIG_MODELS, document)
         return self.reload_registry()
+
+    # -- entrada con Google ------------------------------------------------
+    @property
+    def oauth_client_id(self) -> str:
+        """El Client ID, venga de donde venga.
+
+        La variable de entorno manda: es lo que pone el instalador cuando ya se
+        conoce el dato. Si no esta, se busca el que se pego desde el telefono la
+        primera vez. Asi un redespliegue no borra la instalacion.
+        """
+        if self.settings.oauth_client_id:
+            return self.settings.oauth_client_id
+        doc = self.db.get(CONFIG_AUTH) or {}
+        return str(doc.get("client_id", ""))
+
+    def save_oauth_client_id(self, client_id: str) -> None:
+        self.db.set(CONFIG_AUTH, {"id": "auth", "client_id": client_id})
 
 
 _studio: Studio | None = None
