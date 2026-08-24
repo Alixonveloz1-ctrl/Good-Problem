@@ -44,6 +44,43 @@ SERVICIO="aaus"
 REGION="us-central1"
 COLA="aaus-generation"
 
+# ══════════════════════════════════════════════════════════════════════
+#  0 · Traerse la última versión, sin que nadie escriba "git pull"
+# ══════════════════════════════════════════════════════════════════════
+#
+# Escribir a mano en un teléfono es el cuello de botella de todo esto, así que
+# el script se actualiza solo. Se hace ANTES de nada y se vuelve a arrancar
+# entero: bash lee el archivo a medida que lo ejecuta, y cambiarlo por debajo
+# mientras corre lo parte por la mitad de una forma imposible de diagnosticar.
+#
+# AAUS_YA_ACTUALIZADO corta el bucle: la segunda vuelta ya no vuelve a mirar.
+if [[ -z "${AAUS_YA_ACTUALIZADO:-}" ]] && git rev-parse --git-dir >/dev/null 2>&1; then
+  echo "${BOLD}${BLUE}══ Buscando cambios ${RESET}"
+  RAMA="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
+  if git fetch --quiet origin "$RAMA" 2>/dev/null; then
+    ANTES="$(git rev-parse HEAD)"
+    DESPUES="$(git rev-parse "origin/${RAMA}" 2>/dev/null || echo "$ANTES")"
+    if [[ "$ANTES" != "$DESPUES" ]]; then
+      # No se fuerza nada: un avance directo no puede perder trabajo de nadie,
+      # y cualquier otra cosa (cambios a medias, historias que divergen) es
+      # decisión de una persona y no de un instalador.
+      if MOTIVO="$(git merge --ff-only "origin/${RAMA}" 2>&1)"; then
+        echo "  ${GREEN}✓ Actualizado. Arrancando la versión nueva…${RESET}"
+        echo
+        export AAUS_YA_ACTUALIZADO=1
+        exec bash "${BASH_SOURCE[0]}" "$@"
+      else
+        echo "  ${YELLOW}! No pude actualizar; sigo con lo que hay. Git dijo:${RESET}"
+        printf '%s\n' "$MOTIVO" | head -3 | sed 's/^/    /'
+      fi
+    else
+      echo "  ${GREEN}✓ Ya tienes lo último${RESET}"
+    fi
+  else
+    echo "  ${YELLOW}! No pude comprobarlo; sigo con lo que hay.${RESET}"
+  fi
+fi
+
 # Los ayudantes de Python viven en archivos y no incrustados aquí: mezclar
 # Python dentro de bash es donde se cuelan los errores de comillas, y en un
 # archivo además se pueden probar por separado.
@@ -54,7 +91,7 @@ AYUDA="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/infra/setup"
 for AYUDANTE in primer_app_id limpiar_config elegir_clave nombre_clave_nueva \
                 armar_config dominios; do
   [[ -f "${AYUDA}/${AYUDANTE}.py" ]] || {
-    echo "Falta ${AYUDA}/${AYUDANTE}.py. Haz 'git pull' y vuelve a intentarlo." >&2
+    echo "Falta ${AYUDA}/${AYUDANTE}.py. Vuelve a ejecutar ./setup.sh" >&2
     exit 1
   }
 done
