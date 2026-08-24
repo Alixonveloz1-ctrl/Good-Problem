@@ -234,7 +234,7 @@ export function SettingsScreen() {
  * a que caduque la sesion.
  */
 function Cuenta() {
-  const yo = useResource<{ login_required: boolean; signed_in: boolean; email: string | null }>(
+  const yo = useResource<{ login_required: boolean; email: string | null }>(
     '/api/auth/config',
   )
   if (!yo.data?.login_required) return null

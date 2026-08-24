@@ -21,7 +21,7 @@ se elimina desde IAM.
 | Cloud Build → GitHub | Conexión gestionada por Google con su app de GitHub |
 | Cloud Build → Cloud Run | Su propia cuenta de servicio |
 | Cloud Tasks → el worker | Token OIDC emitido en el momento |
-| Safari → Cloud Run | Entrada con Google (`accounts.google.com/gsi`) y luego una cookie de sesión firmada |
+| Safari → Cloud Run | Firebase Authentication (entrar con Google) y luego una cookie de sesión firmada |
 
 Tampoco se guarda la credencial en una variable de entorno del servicio: eso
 dejaría una credencial en la configuración cuando el runtime ya tiene identidad
@@ -52,10 +52,10 @@ También genera `AAUS_SESSION_SECRET` y un código de instalación de ocho
 caracteres, y los conserva entre ejecuciones: regenerarlos cerraría la sesión
 abierta en el iPhone sin motivo. Se puede ejecutar las veces que haga falta.
 
-Deja pendiente **un solo paso manual**, y no por comodidad: Google no publica
-ninguna API para crear un cliente OAuth de tipo web ni para añadirle orígenes de
-JavaScript, así que ese cliente hay que crearlo a mano en la consola. El script
-imprime los tres enlaces exactos y el código.
+Monta también el login entero por API: activa Firebase, crea la aplicación web,
+lee su configuración y autoriza los dominios. Como mucho queda **un
+interruptor** que tocar en la consola de Firebase, y el resumen final dice
+exactamente dónde. Nada que copiar, nada que escribir.
 
 Roles de la cuenta de servicio del runtime, y ninguno más:
 
@@ -91,66 +91,75 @@ gcloud run deploy aaus --source . --region us-central1 \
 
 ## 3. Acceso: entrar con la cuenta de Google
 
-El PRD daba por hecho IAM más **Identity Aware Proxy**: un servicio con
-`--no-allow-unauthenticated` y el proxy delante convirtiendo la sesión de Google
-del navegador en una petición autorizada, sin pantalla de login ni pantalla de
-consentimiento que configurar.
+El PRD daba por hecho IAM más **Identity Aware Proxy**, "sin pantalla de
+consentimiento OAuth". La premisa no se sostiene: en una cuenta personal de
+Gmail, IAP exige crear a mano esa misma pantalla y un cliente de OAuth, y hasta
+entonces el servicio responde `Empty Google Account OAuth client ID(s)/
+secret(s)` y nada más. Las APIs de administración de OAuth de IAP, además, las
+apagó Google el 19 de marzo de 2026.
 
-No se sostiene, por dos motivos que solo se ven al intentarlo:
+Quien identifica es **Firebase Authentication**, montado sobre el mismo
+proyecto. Lo importante no es la marca sino esto: **el instalador lo consigue
+todo por API**. Activa Firebase (`:addFirebase`), crea la aplicación web, lee su
+configuración y autoriza los dominios del servicio. Por el otro camino —Google
+Identity Services a pelo— había que crear un cliente OAuth a mano en la consola
+y copiar setenta caracteres, porque **no existe ninguna API para crear un
+cliente de tipo web ni para añadirle orígenes de JavaScript**; se pide desde
+2021 y sigue sin existir.
 
-1. En una cuenta personal de Gmail, IAP exige crear a mano una marca y un
-   cliente de OAuth en la consola —la misma pantalla de consentimiento que se
-   quería evitar—. Hasta que eso está hecho, el servicio responde
-   `Empty Google Account OAuth client ID(s)/secret(s)` y nada más.
-2. Las APIs de administración de OAuth de IAP las apagó Google el 19 de marzo de
-   2026, así que `gcloud iap oauth-clients` ya no sirve para automatizar ese
-   paso.
-
-Así que la puerta la pone la aplicación:
+Cómo entra alguien:
 
 - El servicio es **público en la red** (`--allow-unauthenticated`), y tiene que
   serlo: para dibujar la pantalla de entrada hay que poder cargarla antes de
   saber quién eres.
-- El navegador entra con **Google Identity Services**. Google devuelve un token
-  firmado; el servidor lo verifica con la librería oficial (firma, caducidad,
-  emisor, y que fuera emitido para *este* cliente) y comprueba que el correo sea
-  `AAUS_OWNER_EMAIL`. Las dos cosas: la primera sola dejaría entrar a cualquiera
-  con una cuenta de Google.
-- A cambio se entrega una cookie de sesión firmada con HMAC (`aaus_session`,
-  30 días, `HttpOnly`, `Secure`, `SameSite=Lax`).
+- El navegador entra con Google por ventana emergente. Firebase devuelve un
+  `idToken`; el servidor lo verifica con `verify_firebase_token` —firma,
+  caducidad, emisor, y que vaya dirigido a **este** proyecto— y comprueba que el
+  correo sea `AAUS_OWNER_EMAIL`. Las dos cosas: la primera sola dejaría entrar a
+  cualquiera con una cuenta de Google.
+- A cambio, una cookie de sesión firmada con HMAC (`aaus_session`, 30 días,
+  `HttpOnly`, `Secure`, `SameSite=Lax`). No se usa `createSessionCookie` del
+  Admin SDK: la cookie propia ya estaba escrita y probada, y evita una
+  dependencia más.
+
+### La configuración se sirve en caliente
+
+`AAUS_FIREBASE_CONFIG` la pone el instalador y `/api/auth/config` la entrega al
+navegador al abrir la app. No se incrusta al construir la imagen: cuando se
+construye, el proyecto de Google puede no existir todavía, y llegarían valores
+vacíos al navegador sin ningún error útil en los registros.
+
+Esa configuración no es secreta —`apiKey`, `authDomain`, `projectId` están
+pensados para ir escritos en la página, igual que en cualquier sitio con "Entrar
+con Google"—. Lo que protege el estudio es el correo del dueño y la firma de la
+cookie.
+
+`appId` es opcional a propósito. Firebase Authentication sólo necesita las tres
+de arriba; el `appId` lo piden Analytics e Installations, que esta app no lleva.
+Y la aplicación web de Firebase se queda colgada a menudo del lado de Google, así
+que el instalador tiene un segundo camino que no depende de ella: crea una clave
+de API del proyecto y arma la configuración con `<proyecto>.firebaseapp.com`.
 
 ### La puerta es un middleware, no un decorador por ruta
 
-`app/auth.py:gate()` se aplica a **todas** las peticiones desde `main.py`, y no
-ruta por ruta. Una ruta nueva se puede escribir sin acordarse de pedir
-identidad; de hecho pasó, y `/media/` servía cualquier archivo generado a quien
-acertara la ruta. Un middleware no se olvida.
+`app/auth.py:gate()` se aplica a **todas** las peticiones desde `main.py`. Una
+ruta nueva se puede escribir sin acordarse de pedir identidad; de hecho pasó, y
+`/media/` servía cualquier archivo generado a quien acertara la ruta. Un
+middleware no se olvida.
 
 | Qué | Quién puede |
 |---|---|
 | `/`, `/assets/*` | Cualquiera. Es lo que dibuja la pantalla de entrada |
 | `/api/health`, `/api/auth/*` | Cualquiera. Nadie puede identificarse si para identificarse hay que estar ya dentro |
-| `/api/internal/*` | Solo Cloud Tasks, con su token OIDC. La cookie del navegador **no** vale |
-| Todo lo demás bajo `/api/` y `/media/` | Solo la sesión del propietario |
+| `/api/internal/*` | Sólo Cloud Tasks, con su token OIDC. La cookie del navegador **no** vale |
+| Todo lo demás bajo `/api/` y `/media/` | Sólo la sesión del propietario |
 
-### El paso que Google no deja automatizar
+### El único interruptor que no se puede automatizar
 
-Hay que crear un cliente OAuth de tipo **Aplicación web** en la consola y poner
-la URL del servicio en *Orígenes autorizados de JavaScript*. No existe API para
-esto. Y hay que **publicar** la aplicación en la pantalla de consentimiento: en
-modo Prueba, Google bloquea al propio dueño.
-
-Lo que sale de ahí son unos setenta caracteres, y Cloud Shell en un móvil no
-deja pegar. Por eso el Client ID entra por `POST /api/auth/setup` desde el propio
-navegador, autorizado con el código de ocho caracteres que el instalador imprime
-(`AAUS_SETUP_CODE`). Se guarda en Firestore (`config/auth`), así que sobrevive a
-los redespliegues; `AAUS_OAUTH_CLIENT_ID`, si está puesta, manda sobre él.
-
-Ese código **sigue valiendo después de instalar**, y es a propósito: un Client ID
-mal copiado deja la pantalla de entrada sin botón, y entonces «entra primero
-para corregirlo» es imposible. La pantalla de entrada ofrece *Cambiar el Client
-ID* para exactamente eso. Cinco intentos fallidos cierran la ruta un cuarto de
-hora.
+Activar el proveedor de Google en Firebase Authentication. El instalador lo
+intenta por API (`defaultSupportedIdpConfigs`), pero Google no documenta que se
+pueda sin dar un cliente de OAuth propio; si lo rechaza, el resumen final dice
+dónde está el interruptor. No hay nada que copiar ni escribir.
 
 ### La cola de trabajos
 
@@ -166,15 +175,11 @@ Cloud Tasks firmaría para la URL completa con su ruta y el worker comprobaría
 contra la URL base, y cada trabajo moriría en un 401 sin ningún error visible en
 la app.
 
-Y `AAUS_TASKS_TARGET_URL` es la URL del propio servicio, que no existe hasta
-haberlo desplegado: el paso `conectar-cola` de `cloudbuild.yaml` la lee después
-del despliegue y actualiza el servicio con ella.
-
 ### Lo que la compilación no toca
 
 `cloudbuild.yaml` usa `--update-env-vars`, nunca `--set-env-vars`. El correo del
-dueño, la clave de sesión, el código y el Client ID los pone `setup.sh` una vez;
-un `--set-env-vars` en el despliegue los borraría todos y dejaría el estudio
+dueño, la clave de sesión y la configuración de Firebase los pone `setup.sh` una
+vez; un `--set-env-vars` en el despliegue los borraría todos y dejaría el estudio
 público y sin puerta. El paso `comprobar-la-puerta` tumba la compilación si
 `AAUS_OWNER_EMAIL` acaba vacío, porque es el único de estos fallos que no se ve
 mirando la aplicación.

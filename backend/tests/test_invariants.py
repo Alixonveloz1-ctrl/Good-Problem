@@ -294,6 +294,11 @@ def test_la_audiencia_del_token_es_la_que_el_worker_comprueba(settings, studio):
 
 # --- La puerta (PRD 41) -----------------------------------------------------
 
+FIREBASE = (
+    '{"apiKey":"AIzaFalsa","authDomain":"alixon-jhan.firebaseapp.com",'
+    '"projectId":"alixon-jhan"}'
+)
+
 
 def test_la_cookie_de_sesion_no_se_puede_falsificar():
     """Sin esto, cualquiera que sepa el correo del dueno entra escribiendo una
@@ -320,7 +325,7 @@ def test_sin_sesion_no_se_ven_los_datos(client, studio):
     """La puerta se aplica en un middleware y no ruta por ruta a proposito: una
     ruta nueva se puede escribir sin acordarse de pedir identidad."""
     studio.settings.owner_email = "dueno@gmail.com"
-    studio.settings.oauth_client_id = "123.apps.googleusercontent.com"
+    studio.settings.firebase_config = FIREBASE
     studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
 
     assert client.get("/api/home").status_code == 403
@@ -333,23 +338,24 @@ def test_la_pantalla_de_entrada_si_carga_sin_sesion(client, studio):
     """Si la puerta tapara tambien el HTML, no habria forma de pintar el boton
     de entrar: la aplicacion seria inaccesible para su propio dueno."""
     studio.settings.owner_email = "dueno@gmail.com"
-    studio.settings.oauth_client_id = "123.apps.googleusercontent.com"
+    studio.settings.firebase_config = FIREBASE
     studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
 
     assert client.get("/api/health").status_code == 200
 
     config = client.get("/api/auth/config")
     assert config.status_code == 200
-    assert config.json()["login_required"] is True
-    assert config.json()["client_id"] == "123.apps.googleusercontent.com"
-    assert config.json()["signed_in"] is False
+    cuerpo = config.json()
+    assert cuerpo["login_required"] is True
+    assert cuerpo["firebase"]["projectId"] == "alixon-jhan"
+    assert cuerpo["signed_in"] is False
 
 
 def test_con_la_cookie_correcta_se_entra(client, studio):
     from app.auth import COOKIE, create_session
 
     studio.settings.owner_email = "Dueno@Gmail.com"
-    studio.settings.oauth_client_id = "123.apps.googleusercontent.com"
+    studio.settings.firebase_config = FIREBASE
     studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
 
     client.cookies.set(COOKIE, create_session("dueno@gmail.com", studio.settings.session_secret))
@@ -367,7 +373,7 @@ def test_la_ruta_interna_no_acepta_la_cookie_del_navegador(client, studio):
     from app.auth import COOKIE, create_session
 
     studio.settings.owner_email = "dueno@gmail.com"
-    studio.settings.oauth_client_id = "123.apps.googleusercontent.com"
+    studio.settings.firebase_config = FIREBASE
     studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
     client.cookies.set(COOKIE, create_session("dueno@gmail.com", studio.settings.session_secret))
 
@@ -381,120 +387,32 @@ def test_un_despliegue_a_medias_no_arranca():
     pintada. Tiene que romperse en el despliegue, no despues."""
     from app.settings import Settings
 
-    a_medias = Settings(owner_email="dueno@gmail.com", oauth_client_id="", session_secret="")
-    problemas = a_medias.check()
-    assert len(problemas) == 2
+    a_medias = Settings(owner_email="dueno@gmail.com", firebase_config="", session_secret="")
+    assert len(a_medias.check()) == 2
+
+    # Una configuracion rota cuenta como si no hubiera: un JSON a medias dejaria
+    # la puerta abierta creyendo que esta cerrada.
+    rota = Settings(
+        owner_email="dueno@gmail.com",
+        firebase_config="{esto no es json",
+        session_secret="un-secreto-de-treinta-y-dos-caracteres",
+    )
+    assert len(rota.check()) == 1
 
     corto = Settings(
-        owner_email="dueno@gmail.com", oauth_client_id="123.apps.googleusercontent.com",
-        session_secret="corto",
+        owner_email="dueno@gmail.com", firebase_config=FIREBASE, session_secret="corto"
     )
     assert len(corto.check()) == 1
 
     completo = Settings(
         owner_email="dueno@gmail.com",
-        oauth_client_id="123.apps.googleusercontent.com",
+        firebase_config=FIREBASE,
         session_secret="un-secreto-de-treinta-y-dos-caracteres",
     )
     assert completo.check() == []
 
     # En un portatil, sin correo de dueno, no hay nada que exigir.
     assert Settings(owner_email="").check() == []
-
-
-def test_el_client_id_no_lo_puede_poner_cualquiera(client, studio):
-    """Una direccion de Cloud Run es adivinable. Sin codigo, el primero que
-    pasara por ella podria dejar al dueno fuera de su propio estudio."""
-    studio.settings.owner_email = "dueno@gmail.com"
-    studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
-    studio.settings.setup_code = "K7M2QX9P"
-    bueno = "123456789012-abcdef.apps.googleusercontent.com"
-
-    sin_codigo = client.post(
-        "/api/auth/setup", json={"client_id": bueno, "code": "loquesea"}
-    )
-    assert sin_codigo.status_code == 403
-    assert studio.oauth_client_id == ""
-
-    # Y no se cuela cualquier cadena: un Client ID mal copiado dejaria la
-    # pantalla de entrada rota sin decir por que.
-    basura = client.post(
-        "/api/auth/setup",
-        json={"client_id": "https://console.cloud.google.com", "code": "K7M2QX9P"},
-    )
-    assert basura.status_code == 422
-
-    con_codigo = client.post("/api/auth/setup", json={"client_id": bueno, "code": "k7m2qx9p"})
-    assert con_codigo.status_code == 200
-    assert studio.oauth_client_id == bueno
-
-
-def test_un_client_id_mal_copiado_se_puede_corregir(client, studio):
-    """Sin esto no habria salida.
-
-    Un Client ID con una letra de mas deja la pantalla de entrada sin boton, y
-    entonces "entra primero para corregirlo" es imposible. La unica salida seria
-    volver a Cloud Shell, que es justo lo que el codigo evita.
-    """
-    from app.routers import auth as router_auth
-
-    router_auth._fallos.clear()
-    studio.settings.owner_email = "dueno@gmail.com"
-    studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
-    studio.settings.setup_code = "K7M2QX9P"
-    studio.save_oauth_client_id("123456789012-malo.apps.googleusercontent.com")
-
-    correcto = client.post(
-        "/api/auth/setup",
-        json={"client_id": "999999999999-bueno.apps.googleusercontent.com", "code": "K7M2QX9P"},
-    )
-    assert correcto.status_code == 200
-    assert studio.oauth_client_id == "999999999999-bueno.apps.googleusercontent.com"
-
-
-def test_el_codigo_no_se_puede_probar_a_lo_bruto(client, studio):
-    from app.routers import auth as router_auth
-
-    router_auth._fallos.clear()
-    studio.settings.owner_email = "dueno@gmail.com"
-    studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
-    studio.settings.setup_code = "K7M2QX9P"
-    bueno = "123456789012-abcdef.apps.googleusercontent.com"
-
-    for _ in range(5):
-        assert client.post(
-            "/api/auth/setup", json={"client_id": bueno, "code": "AAAAAAAA"}
-        ).status_code == 403
-
-    # A partir del sexto no se mira ni el codigo: ni el bueno pasa.
-    cerrado = client.post("/api/auth/setup", json={"client_id": bueno, "code": "K7M2QX9P"})
-    assert cerrado.status_code == 403
-    assert "intentos" in cerrado.json()["error"]["message"]
-    assert studio.oauth_client_id == ""
-    router_auth._fallos.clear()
-
-
-def test_la_variable_de_entorno_manda_sobre_lo_guardado(studio):
-    """Un despliegue con el dato ya puesto no lo tiene que ir a buscar, y no lo
-    puede pisar nada que quedara guardado de una instalacion anterior."""
-    studio.save_oauth_client_id("viejo-000.apps.googleusercontent.com")
-    studio.settings.oauth_client_id = "123456789012-nuevo.apps.googleusercontent.com"
-    assert studio.oauth_client_id == "123456789012-nuevo.apps.googleusercontent.com"
-
-
-def test_sin_client_id_la_app_pide_instalarse(client, studio):
-    studio.settings.owner_email = "dueno@gmail.com"
-    studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
-    studio.settings.setup_code = "K7M2QX9P"
-
-    config = client.get("/api/auth/config").json()
-    assert config["needs_setup"] is True
-    assert config["client_id"] == ""
-
-    # Y no se puede intentar entrar con Google mientras falte: el token no se
-    # podria comprobar contra nada.
-    intento = client.post("/api/auth/session", json={"credential": "loquesea"})
-    assert intento.status_code == 403
 
 
 def test_la_cookie_de_sesion_sale_marcada(client, studio, monkeypatch):
@@ -504,9 +422,9 @@ def test_la_cookie_de_sesion_sale_marcada(client, studio, monkeypatch):
     from app.routers import auth as router_auth
 
     studio.settings.owner_email = "dueno@gmail.com"
+    studio.settings.firebase_config = FIREBASE
     studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
-    studio.save_oauth_client_id("123456789012-abcdef.apps.googleusercontent.com")
-    monkeypatch.setattr(router_auth, "verify_google_token", lambda *_: "dueno@gmail.com")
+    monkeypatch.setattr(router_auth, "verify_firebase_token", lambda *_: "dueno@gmail.com")
 
     respuesta = client.post("/api/auth/session", json={"credential": "loquesea"})
     assert respuesta.status_code == 200
@@ -514,3 +432,48 @@ def test_la_cookie_de_sesion_sale_marcada(client, studio, monkeypatch):
     assert "HttpOnly" in galleta
     assert "Secure" in galleta   # aunque el test hable http
     assert "SameSite=lax" in galleta
+
+
+def test_un_token_bueno_de_otra_cuenta_no_entra(client, studio, monkeypatch):
+    """Comprobar que Google firmo el token no basta: lo firma para cualquiera
+    que tenga cuenta. La segunda comprobacion es la que cierra la puerta."""
+    from app.routers import auth as router_auth
+
+    studio.settings.owner_email = "dueno@gmail.com"
+    studio.settings.firebase_config = FIREBASE
+    studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
+    monkeypatch.setattr(router_auth, "verify_firebase_token", lambda *_: "otro@gmail.com")
+
+    respuesta = client.post("/api/auth/session", json={"credential": "token-de-otro"})
+    assert respuesta.status_code == 403
+    assert "set-cookie" not in respuesta.headers
+
+
+def test_sin_firebase_no_se_intenta_comprobar_nada(client, studio):
+    """Sin proyecto contra el que comprobar, un token no se puede verificar. Hay
+    que decirlo, no dejar pasar."""
+    studio.settings.owner_email = "dueno@gmail.com"
+    studio.settings.firebase_config = ""
+    studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
+
+    respuesta = client.post("/api/auth/session", json={"credential": "loquesea"})
+    assert respuesta.status_code == 403
+    assert "instalador" in respuesta.json()["error"]["message"]
+
+    # Y la pantalla de entrada lo sabe, para poder decirlo en vez de quedarse muda.
+    assert client.get("/api/auth/config").json()["firebase"] == {}
+
+
+def test_el_token_tiene_que_ir_dirigido_a_este_proyecto(studio):
+    """Sin exigir destinatario valdria un token emitido por el Firebase de
+    cualquier otro proyecto, que es un token perfectamente autentico."""
+    import inspect
+
+    from app.auth import verify_firebase_token
+
+    fuente = inspect.getsource(verify_firebase_token)
+    assert "project_id" in fuente
+    assert "securetoken.google.com" in fuente
+
+    studio.settings.firebase_config = FIREBASE
+    assert studio.settings.firebase_project == "alixon-jhan"

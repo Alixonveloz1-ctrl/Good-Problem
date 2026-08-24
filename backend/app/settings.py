@@ -7,6 +7,7 @@ account provides identity through Application Default Credentials (PRD 40).
 
 from __future__ import annotations
 
+import json
 from functools import lru_cache
 from pathlib import Path
 
@@ -37,12 +38,16 @@ class Settings(BaseSettings):
     tasks_service_account: str = ""
 
     # --- Entrada con Google (PRD 41) ---------------------------------------
-    oauth_client_id: str = ""
-    """Client ID del cliente OAuth de tipo web.
+    firebase_config: str = ""
+    """La configuracion web de Firebase, tal cual la devuelve su API.
 
-    Lo usa el navegador para pedirle a Google que identifique a la persona, y lo
-    usa el servidor para comprobar que el token que llega fue emitido para esta
-    aplicacion y no para otra distinta.
+    Un JSON con apiKey, authDomain y projectId. No es secreta: esta pensada
+    para ir escrita en el navegador, igual que en cualquier sitio que use
+    "Entrar con Google". Lo que protege el estudio es el correo del dueno y la
+    firma de la cookie.
+
+    Viene entera del instalador, que la lee de la API de Firebase. Nadie la
+    copia a mano.
     """
     session_secret: str = ""
     """Clave con la que se firma la cookie de sesion.
@@ -50,18 +55,6 @@ class Settings(BaseSettings):
     La genera el instalador y vive como variable de entorno del servicio. Si se
     cambia, todas las sesiones abiertas caducan, que es justo lo que se quiere
     si alguna vez hay que echar a alguien.
-    """
-    setup_code: str = ""
-    """Codigo de un solo uso para pegar el Client ID desde el propio telefono.
-
-    Google no ofrece ninguna API para crear un cliente OAuth de tipo web: hay que
-    crearlo a mano en la consola. Lo que sale de ahi es una cadena de setenta
-    caracteres, y Cloud Shell en un movil no deja pegar. Asi que el Client ID
-    entra por una pantalla del navegador, donde pegar si funciona, y este codigo
-    —ocho caracteres, se leen de la pantalla y se escriben— es lo que impide que
-    lo haga cualquiera que pase por la direccion antes que su dueno.
-
-    Deja de valer en cuanto hay un Client ID guardado.
     """
 
     # --- Modes --------------------------------------------------------------
@@ -83,6 +76,26 @@ class Settings(BaseSettings):
         return bool(self.bucket)
 
     @property
+    def firebase(self) -> dict[str, str]:
+        """La configuracion de Firebase ya leida, o vacia si no hay o esta rota."""
+        if not self.firebase_config:
+            return {}
+        try:
+            datos = json.loads(self.firebase_config)
+        except json.JSONDecodeError:
+            return {}
+        return datos if isinstance(datos, dict) else {}
+
+    @property
+    def firebase_project(self) -> str:
+        """El proyecto al que van dirigidos los tokens del login.
+
+        Es el destinatario que hay que exigirle a cada token: sin comprobarlo,
+        valdria un token emitido por el Firebase de cualquier otro.
+        """
+        return str(self.firebase.get("projectId", ""))
+
+    @property
     def login_required(self) -> bool:
         """Hay puerta cuando se sabe a quien hay que dejar entrar."""
         return bool(self.owner_email)
@@ -96,10 +109,10 @@ class Settings(BaseSettings):
         """
         problemas: list[str] = []
         if self.login_required:
-            if not self.oauth_client_id and len(self.setup_code) < 6:
+            if not self.firebase_project:
                 problemas.append(
-                    "AAUS_OWNER_EMAIL esta puesto pero no hay ni AAUS_OAUTH_CLIENT_ID "
-                    "ni AAUS_SETUP_CODE: nadie podria entrar ni terminar de instalar."
+                    "AAUS_OWNER_EMAIL esta puesto pero falta AAUS_FIREBASE_CONFIG: "
+                    "nadie podria entrar."
                 )
             if len(self.session_secret) < 32:
                 problemas.append(

@@ -143,11 +143,10 @@ El script no pide argumentos: toma el proyecto y la cuenta de Cloud Shell, monta
 todo, publica la aplicación y al final imprime el único paso que queda, con los
 enlaces exactos. Volver a ejecutarlo es seguro y no pierde nada de lo instalado.
 
-Ese paso es crear un cliente OAuth en la consola. No es pereza del script:
-Google no publica ninguna API para crear un cliente de tipo web ni para añadirle
-orígenes de JavaScript. Lo que sale de ahí se pega en la propia aplicación —en
-Cloud Shell desde un móvil no se puede pegar— autorizado con un código de ocho
-caracteres que el instalador enseña.
+El login lo monta también él: activa Firebase sobre el mismo proyecto, crea la
+aplicación web, lee su configuración y autoriza los dominios. Como mucho queda
+un interruptor que tocar en la consola de Firebase. No hay nada que copiar ni
+escribir a mano.
 
 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) explica el detalle técnico: roles,
 identidades y por qué cada cosa está donde está.

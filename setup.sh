@@ -44,6 +44,11 @@ SERVICIO="aaus"
 REGION="us-central1"
 COLA="aaus-generation"
 
+# Los ayudantes de Python viven en archivos y no incrustados aquí: mezclar
+# Python dentro de bash es donde se cuelan los errores de comillas, y en un
+# archivo además se pueden probar por separado.
+AYUDA="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/infra/setup"
+
 # ══════════════════════════════════════════════════════════════════════
 #  1 · Quién eres y dónde vamos a montar esto
 # ══════════════════════════════════════════════════════════════════════
@@ -98,6 +103,7 @@ gcloud services enable \
   aiplatform.googleapis.com texttospeech.googleapis.com firestore.googleapis.com \
   storage.googleapis.com cloudtasks.googleapis.com secretmanager.googleapis.com \
   iamcredentials.googleapis.com logging.googleapis.com monitoring.googleapis.com \
+  firebase.googleapis.com identitytoolkit.googleapis.com apikeys.googleapis.com \
   --project="$PROJECT_ID" >/dev/null
 ok "Servicios encendidos"
 
@@ -201,10 +207,9 @@ titulo "Publicando la aplicación"
 paso "Esto tarda entre 5 y 10 minutos. No cierres Cloud Shell."
 detalle "Construye la app y la sube. La primera vez es la más lenta."
 
-# La llave con la que se firman las sesiones y el código de un solo uso para
-# terminar la instalación desde el teléfono. Se generan aquí y no se escriben
-# a mano en ninguna parte. Si ya existen de una instalación anterior se
-# conservan: cambiarlos cerraría la sesión abierta en el iPhone sin motivo.
+# La llave con la que se firman las sesiones. Se genera aquí y no se escribe a
+# mano en ninguna parte. Si ya existe de una instalación anterior se conserva:
+# cambiarla cerraría la sesión abierta en el iPhone sin motivo.
 LEER_VAR() {
   gcloud run services describe "$SERVICIO" --region "$REGION" --project "$PROJECT_ID" \
     --format="value(spec.template.spec.containers[0].env.filter(\"name:$1\").extract(value))" \
@@ -214,18 +219,32 @@ LEER_VAR() {
 SECRETO="$(LEER_VAR AAUS_SESSION_SECRET)"
 [[ -n "$SECRETO" ]] || SECRETO="$(openssl rand -hex 32)"
 
-CLIENT_ID="$(LEER_VAR AAUS_OAUTH_CLIENT_ID)"
-CODIGO="$(LEER_VAR AAUS_SETUP_CODE)"
-# Ocho caracteres sin 0/O/1/I/L: hay que leerlos de la pantalla y escribirlos en
-# el móvil. openssl da ocho dígitos hexadecimales exactos y tr los reetiqueta.
-# Nada de canalizar /dev/urandom a `head`: head cierra la tubería al octavo byte,
-# la fuente infinita del otro lado recibe SIGPIPE, y con `pipefail` eso mata el
-# script entero justo antes de publicar nada.
-[[ -n "$CODIGO" ]] || CODIGO="$(openssl rand -hex 4 | tr '0123456789abcdef' '23456789ABCDEFGH')"
-
 # La app es pública en Cloud Run y tiene que serlo: para pintar la pantalla de
 # entrada hay que poder cargarla antes de saber quién eres. La puerta la pone la
 # propia app, con tu cuenta de Google, y también cubre /media/ y la cola.
+# Las variables van en un archivo y no con --set-env-vars: gcloud solo respeta
+# el último --set-env-vars que se le pase, y el JSON de Firebase lleva comas y
+# comillas que rompen el formato de la línea de comandos.
+ENV_FILE="$(mktemp)"
+trap 'rm -f "$ENV_FILE"' EXIT
+
+PROJECT_ID="$PROJECT_ID" REGION="$REGION" BUCKET="$BUCKET" CORREO="$CORREO" \
+SECRETO="$SECRETO" python3 - "$ENV_FILE" <<'PYENV'
+import json, os, sys
+
+variables = {
+    "AAUS_PROJECT_ID":    os.environ["PROJECT_ID"],
+    "AAUS_LOCATION":      os.environ["REGION"],
+    "AAUS_BUCKET":        os.environ["BUCKET"],
+    "AAUS_OWNER_EMAIL":   os.environ["CORREO"],
+    "AAUS_SESSION_SECRET": os.environ["SECRETO"],
+    "AAUS_DRY_RUN":       "false",
+}
+with open(sys.argv[1], "w", encoding="utf-8") as f:
+    for clave, valor in variables.items():
+        f.write("%s: %s\n" % (clave, json.dumps(valor)))
+PYENV
+
 gcloud run deploy "$SERVICIO" \
   --source . \
   --region "$REGION" \
@@ -233,7 +252,7 @@ gcloud run deploy "$SERVICIO" \
   --service-account "$SA_APP" \
   --allow-unauthenticated \
   --memory 2Gi --cpu 2 --timeout 3600 --concurrency 20 --max-instances 4 \
-  --set-env-vars "AAUS_PROJECT_ID=${PROJECT_ID},AAUS_LOCATION=${REGION},AAUS_BUCKET=${BUCKET},AAUS_OWNER_EMAIL=${CORREO},AAUS_DRY_RUN=false,AAUS_SESSION_SECRET=${SECRETO},AAUS_SETUP_CODE=${CODIGO}${CLIENT_ID:+,AAUS_OAUTH_CLIENT_ID=${CLIENT_ID}}" \
+  --env-vars-file "$ENV_FILE" \
   --quiet >/dev/null
 
 URL="$(gcloud run services describe "$SERVICIO" --region "$REGION" \
@@ -249,41 +268,194 @@ gcloud run services update "$SERVICIO" --region "$REGION" --project "$PROJECT_ID
 ok "Conectada"
 
 # ══════════════════════════════════════════════════════════════════════
-#  7 · Si el candado viejo quedó puesto, quitarlo
+#  7 · El login, montado solo
 # ══════════════════════════════════════════════════════════════════════
-# IAP se abandonó por dos motivos: en una cuenta personal de Gmail exige crear
-# a mano una marca y un cliente de OAuth en la consola —y hasta entonces el
-# servicio contesta "Empty Google Account OAuth client ID(s)/secret(s)" y nada
-# más—, y sus APIs de administración las apagó Google en marzo de 2026. Si
-# quedó encendido de un intento anterior, se apaga: con él delante, la pantalla
-# de entrada no llega ni a cargar.
+titulo "Entrar con tu cuenta de Google"
+detalle "Firebase se monta encima del mismo proyecto. No es otra cuenta."
+
+# Si quedó IAP encendido de un intento anterior, se apaga: con él delante, la
+# pantalla de entrada no llega ni a cargar.
 if gcloud beta run services describe "$SERVICIO" --region "$REGION" \
      --project "$PROJECT_ID" --format='value(metadata.annotations)' 2>/dev/null \
    | grep -q 'iap-enabled.*[Tt]rue'; then
-  paso "Quitando el candado viejo"
   gcloud beta run services update "$SERVICIO" --region "$REGION" \
     --project "$PROJECT_ID" --no-iap --quiet >/dev/null 2>&1 || true
-  ok "Quitado"
+  ok "Quitado el candado viejo"
 fi
+
+TOKEN="$(gcloud auth print-access-token)"
+TMP_FB="$(mktemp)"
+
+firebase_activo() {
+  local codigo
+  codigo="$(curl -sS -o "$TMP_FB" -w '%{http_code}' \
+    -H "Authorization: Bearer ${TOKEN}" \
+    "https://firebase.googleapis.com/v1beta1/projects/${PROJECT_ID}" 2>/dev/null || echo 000)"
+  [[ "$codigo" == "200" ]]
+}
+
+paso "Activando Firebase sobre el proyecto"
+if firebase_activo; then
+  ok "Ya estaba activo"
+else
+  CODIGO_FB="$(curl -sS -o "$TMP_FB" -w '%{http_code}' -X POST \
+    -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
+    "https://firebase.googleapis.com/v1beta1/projects/${PROJECT_ID}:addFirebase" \
+    -d '{}' 2>/dev/null || echo 000)"
+  if [[ "$CODIGO_FB" != "200" ]]; then
+    error "Google rechazó activar Firebase (HTTP ${CODIGO_FB}). Respondió:"
+    head -6 "$TMP_FB" | sed 's/^/      /'
+    morir "Sin Firebase no hay forma de entrar en la app."
+  fi
+  # Se espera a que la activación sea CIERTA. Dar el visto bueno sin comprobar
+  # deja todo lo de después chocando contra un 404 que no dice nada.
+  detalle "esperando a que Google lo confirme…"
+  ACTIVO="no"
+  for intento in $(seq 1 18); do
+    sleep 10
+    if firebase_activo; then ACTIVO="si"; break; fi
+    (( intento % 6 == 0 )) && detalle "sigue en ello… ($((intento / 6)) min)"
+  done
+  [[ "$ACTIVO" == "si" ]] || morir "Firebase no terminó de activarse. Vuelve a ejecutar el script."
+  ok "Activado"
+fi
+
+# --- La configuración que el navegador necesita -------------------------
+#
+# Son tres datos y ninguno es secreto: están pensados para ir escritos en la
+# página, igual que en cualquier sitio con "Entrar con Google". Quien decide
+# quién entra es el correo del dueño y la firma de la cookie.
+#
+# Primero por la aplicación web de Firebase. Si Google no la termina a tiempo
+# —se queda colgada a menudo— hay un segundo camino que no depende de ella.
+paso "Consiguiendo la configuración del login"
+
+leer_app_id() {
+  curl -sS -H "Authorization: Bearer ${TOKEN}" \
+    "https://firebase.googleapis.com/v1beta1/projects/${PROJECT_ID}/webApps" 2>/dev/null \
+    | python3 "${AYUDA}/primer_app_id.py" 2>/dev/null || echo ""
+}
+
+APP_ID="$(leer_app_id)"
+if [[ -z "$APP_ID" ]]; then
+  detalle "creando la aplicación web…"
+  curl -sS -X POST -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
+    "https://firebase.googleapis.com/v1beta1/projects/${PROJECT_ID}/webApps" \
+    -d '{"displayName":"Universe Studio"}' >/dev/null 2>&1 || true
+  for intento in 1 2 3 4; do
+    sleep 15
+    APP_ID="$(leer_app_id)"
+    [[ -n "$APP_ID" ]] && break
+    detalle "aún creándose… ($intento de 4; si no llega, hay otro camino)"
+  done
+fi
+
+CONFIG=""
+if [[ -n "$APP_ID" ]]; then
+  CONFIG="$(curl -sS -H "Authorization: Bearer ${TOKEN}" \
+    "https://firebase.googleapis.com/v1beta1/projects/${PROJECT_ID}/webApps/${APP_ID}/config" \
+    2>/dev/null | python3 "${AYUDA}/limpiar_config.py" 2>/dev/null || echo "")"
+fi
+
+if [[ -z "$CONFIG" ]]; then
+  # El otro camino. El login sólo necesita apiKey, authDomain y projectId; el
+  # appId lo piden Analytics e Installations, que esta app no lleva. Esperar
+  # por la aplicación web sería esperar por un dato que no hace falta.
+  detalle "la aplicación web no estuvo lista; armándola por el otro camino…"
+  NOMBRE_CLAVE="$(gcloud services api-keys list --project="$PROJECT_ID" --format=json 2>/dev/null \
+    | python3 "${AYUDA}/elegir_clave.py" 2>/dev/null || echo "")"
+
+  if [[ -z "$NOMBRE_CLAVE" ]]; then
+    NOMBRE_CLAVE="$(gcloud services api-keys create --display-name="Universe Studio web" \
+      --project="$PROJECT_ID" --format=json 2>/dev/null \
+      | python3 "${AYUDA}/nombre_clave_nueva.py" 2>/dev/null || echo "")"
+  fi
+
+  CLAVE=""
+  [[ -n "$NOMBRE_CLAVE" ]] && CLAVE="$(gcloud services api-keys get-key-string "$NOMBRE_CLAVE" \
+    --project="$PROJECT_ID" --format='value(keyString)' 2>/dev/null || echo "")"
+
+  [[ -n "$CLAVE" ]] || morir "No pude conseguir la clave del navegador. Manda esta captura."
+
+  CONFIG="$(python3 "${AYUDA}/armar_config.py" "$CLAVE" "$PROJECT_ID")"
+fi
+ok "Conseguida (no tuviste que copiar nada)"
+
+# --- Dominios autorizados ----------------------------------------------
+#
+# Sin esto el login falla y el error de Google no dice por qué. Cloud Run le da
+# a un servicio más de una dirección válida y basta abrir la que no esté en la
+# lista para que falle, así que se autorizan las dos.
+paso "Autorizando la dirección de tu app"
+CONFIG_AUTH="https://identitytoolkit.googleapis.com/admin/v2/projects/${PROJECT_ID}/config"
+
+curl -sS -o "$TMP_FB" -H "Authorization: Bearer ${TOKEN}" "$CONFIG_AUTH" >/dev/null 2>&1 || true
+NUEVA="$(python3 "${AYUDA}/dominios.py" "$TMP_FB" "${URL#https://}" \
+         "${SERVICIO}-${NUMERO}.${REGION}.run.app" 2>/dev/null || echo "")"
+
+if [[ -z "$NUEVA" ]]; then
+  ok "Ya estaba autorizada"
+else
+  CODIGO_DOM="$(curl -sS -o "$TMP_FB" -w '%{http_code}' -X PATCH \
+    -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
+    "${CONFIG_AUTH}?updateMask=authorizedDomains" -d "$NUEVA" 2>/dev/null || echo 000)"
+  if [[ "$CODIGO_DOM" == "200" ]]; then
+    ok "Autorizada"
+  else
+    aviso "Google no dejó autorizarla sola (HTTP ${CODIGO_DOM}). Te lo digo al final."
+  fi
+fi
+
+# --- El botón de "Entrar con Google" ------------------------------------
+#
+# Se intenta encender por API. Google no documenta que se pueda sin dar un
+# cliente de OAuth propio, así que puede que no funcione; si no funciona es un
+# solo interruptor en la consola y se dice al final. Intentarlo no cuesta nada
+# y si sale, no queda ni un paso a mano.
+paso "Encendiendo el botón de Entrar con Google"
+PROVEEDOR="https://identitytoolkit.googleapis.com/admin/v2/projects/${PROJECT_ID}/defaultSupportedIdpConfigs"
+GOOGLE_LISTO="no"
+
+CODIGO_P="$(curl -sS -o "$TMP_FB" -w '%{http_code}' \
+  -H "Authorization: Bearer ${TOKEN}" "${PROVEEDOR}/google.com" 2>/dev/null || echo 000)"
+if [[ "$CODIGO_P" == "200" ]] && grep -q '"enabled": *true' "$TMP_FB"; then
+  GOOGLE_LISTO="si"
+  ok "Ya estaba encendido"
+else
+  CODIGO_P="$(curl -sS -o "$TMP_FB" -w '%{http_code}' -X POST \
+    -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
+    "${PROVEEDOR}?idpId=google.com" -d '{"enabled":true}' 2>/dev/null || echo 000)"
+  if [[ "$CODIGO_P" == "200" ]]; then
+    GOOGLE_LISTO="si"
+    ok "Encendido"
+  else
+    aviso "Este hay que encenderlo a mano. Es un interruptor; te digo dónde al final."
+  fi
+fi
+
+# --- Dejársela a la app -------------------------------------------------
+paso "Guardando la configuración en la app"
+# El separador se cambia a @ porque el JSON lleva comas, y una coma dentro del
+# valor haría que gcloud lo partiera en variables inventadas.
+gcloud run services update "$SERVICIO" --region "$REGION" --project "$PROJECT_ID" \
+  --update-env-vars "^@^AAUS_FIREBASE_CONFIG=${CONFIG}" --quiet >/dev/null
+ok "Guardada"
 
 # ══════════════════════════════════════════════════════════════════════
 #  8 · Resumen
 # ══════════════════════════════════════════════════════════════════════
 titulo "Listo"
 
-# La propia app dice si le falta el Client ID. Es la única fuente fiable: el
-# dato puede haber entrado por la pantalla del teléfono y no por aquí.
-paso "Comprobando la aplicación"
-ESTADO="$(curl -s --max-time 90 "${URL}/api/auth/config" 2>/dev/null || true)"
-if [[ -z "$ESTADO" ]]; then
-  aviso "La app aún está arrancando. Espera un minuto y abre ${URL}"
-  FALTA_CLIENTE="si"
-elif echo "$ESTADO" | grep -q '"needs_setup":true'; then
-  FALTA_CLIENTE="si"
-else
-  FALTA_CLIENTE="no"
-  ok "Responde y ya está instalada"
-fi
+paso "Comprobando que la app sirve su configuración"
+SIRVIENDO="no"
+for intento in 1 2 3 4 5 6; do
+  sleep 8
+  if curl -sS --max-time 20 "${URL}/api/auth/config" 2>/dev/null | grep -q '"apiKey"'; then
+    SIRVIENDO="si"; break
+  fi
+  detalle "todavía arrancando la versión nueva… ($intento de 6)"
+done
+[[ "$SIRVIENDO" == "si" ]] && ok "La sirve" || aviso "Aún no responde. Espera un minuto y abre la app."
 
 cat <<RESUMEN
 
@@ -293,49 +465,27 @@ cat <<RESUMEN
 
 RESUMEN
 
-if [[ "$FALTA_CLIENTE" == "si" ]]; then
+if [[ "$GOOGLE_LISTO" == "no" ]]; then
   cat <<PENDIENTE
-  ${YELLOW}${BOLD}FALTA UN PASO.${RESET} Google no deja automatizarlo: hay que crear a mano
-  el permiso para que puedas entrar con tu cuenta.
+  ${YELLOW}${BOLD}FALTA UN INTERRUPTOR.${RESET} Es lo único que Google no deja encender solo.
 
-  ${BOLD}Tu código:${RESET}   ${BOLD}${GREEN}${CODIGO}${RESET}   ${DIM}(lo pide el punto 5)${RESET}
+  ${BOLD}1.${RESET} Abre:  https://console.firebase.google.com/project/${PROJECT_ID}/authentication/providers?authuser=${CORREO}
+  ${BOLD}2.${RESET} Toca:  ${BOLD}Comenzar${RESET}  →  ${BOLD}Google${RESET}  →  ${BOLD}Habilitar${RESET}  →  ${BOLD}Guardar${RESET}
+  ${BOLD}3.${RESET} Abre tu app y entra:  ${URL}
 
-  ${BOLD}1.${RESET} Abre:  https://console.cloud.google.com/auth/branding?project=${PROJECT_ID}&${CUENTA}
-     Nombre de la app:  Universe Studio
-     Correo de asistencia y de contacto:  ${CORREO}
-     Público:  ${BOLD}Externo${RESET}   →   Crear
-
-  ${BOLD}2.${RESET} Abre:  https://console.cloud.google.com/auth/audience?project=${PROJECT_ID}&${CUENTA}
-     Toca:  ${BOLD}Publicar aplicación${RESET}   →   Confirmar
-     ${DIM}Sin esto, Google te bloquea a ti mismo al intentar entrar.${RESET}
-
-  ${BOLD}3.${RESET} Abre:  https://console.cloud.google.com/auth/clients?project=${PROJECT_ID}&${CUENTA}
-     Toca:  ${BOLD}Crear cliente${RESET}
-     Tipo:  ${BOLD}Aplicación web${RESET}
-     En ${BOLD}Orígenes autorizados de JavaScript${RESET} → Añadir URI:
-        ${BOLD}${URL}${RESET}
-     Toca:  Crear
-
-  ${BOLD}4.${RESET} Copia el ${BOLD}ID de cliente${RESET} que aparece.
-     ${DIM}Termina en .apps.googleusercontent.com${RESET}
-
-  ${BOLD}5.${RESET} Abre tu app en ${BOLD}Safari${RESET}:  ${URL}
-     Pega el ID, escribe el código ${BOLD}${CODIGO}${RESET}, y toca Terminar instalación.
-     ${DIM}Ahí sí se puede pegar. La dirección del punto 3 también sale
-     en esa pantalla, con un botón para copiarla.${RESET}
+  ${DIM}No tienes que copiar ni escribir nada. Solo tocar.${RESET}
 
 PENDIENTE
 else
-  # ¿Ya está conectada la publicación automática desde GitHub?
   CONTINUA="$(gcloud builds triggers list --project="$PROJECT_ID" --region="$REGION" \
               --format='value(name)' 2>/dev/null | head -1 || true)"
 
   cat <<TERMINADO
-  ${GREEN}${BOLD}La aplicación ya está en marcha.${RESET}
+  ${GREEN}${BOLD}Ya está todo. No queda ningún paso.${RESET}
 
   ${BOLD}Instálala en el iPhone:${RESET}
      1. Abre ${URL} en ${BOLD}Safari${RESET}
-     2. Entra con ${CORREO}
+     2. Toca ${BOLD}Entrar con Google${RESET} y elige ${CORREO}
      3. Compartir → Añadir a pantalla de inicio
 
 TERMINADO
@@ -344,7 +494,6 @@ TERMINADO
     cat <<CONTINUA_PENDIENTE
   ${BOLD}Queda una cosa: que se actualice sola${RESET}   ${DIM}(recomendado, 1 minuto)${RESET}
      Sin esto, cada cambio te obliga a volver aquí y ejecutar el script otra vez.
-     Con esto, se publica sola en unos minutos.
 
      Abre:  https://console.cloud.google.com/run/detail/${REGION}/${SERVICIO}/revisions?project=${PROJECT_ID}&${CUENTA}
      Toca:  Configurar implementación continua
@@ -358,12 +507,6 @@ CONTINUA_PENDIENTE
     ok "La publicación automática desde GitHub ya está conectada"
     echo
   fi
-
-  cat <<COMPROBAR
-  ${DIM}Para comprobar que quedó bien: entra en Ajustes dentro de la app.
-  Debe decir "En producción" en verde, y tu proyecto en vez de "local".${RESET}
-
-COMPROBAR
 fi
 
 echo "${BOLD}${GREEN}  Bienvenido a AI Artist Universe Studio.${RESET}"

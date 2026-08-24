@@ -4,13 +4,16 @@ Una sola persona entra: el propietario, con su cuenta de Google. No hay
 registro, ni roles, ni recuperación de contraseña. Solo un botón de "Entrar con
 Google" y una lista de correos permitidos que tiene exactamente un nombre.
 
-Por qué no IAP, que es lo que el PRD daba por hecho: Identity Aware Proxy sobre
-Cloud Run en una cuenta personal de Gmail exige crear a mano una marca y un
-cliente de OAuth en la consola, y hasta que eso está hecho el servicio responde
-"Empty Google Account OAuth client ID(s)/secret(s)" sin más explicación. La
-premisa del PRD tampoco se sostenía: IAP necesita esa misma pantalla de
-consentimiento que se quería evitar. Con Google Sign-In la pantalla se
-configura una vez y el resto vive en el código, que es donde se puede probar.
+Quien identifica es Firebase Authentication. El PRD daba por hecho IAM más
+Identity Aware Proxy, "sin pantalla de consentimiento OAuth"; esa premisa no se
+sostiene, porque IAP sobre una cuenta personal de Gmail exige crear a mano
+exactamente esa pantalla y un cliente de OAuth, y hasta entonces el servicio
+responde "Empty Google Account OAuth client ID(s)/secret(s)" y nada más.
+
+Con Firebase el instalador lo consigue todo por API: activa Firebase sobre el
+mismo proyecto, crea la aplicación web y lee su configuración. Nadie copia un
+Client ID de setenta caracteres a mano, que es lo que hacía falta por el otro
+camino.
 
 Lo que sí se conserva del PRD: nadie se registra, no hay contraseñas, y la
 identidad la pone Google.
@@ -41,7 +44,6 @@ PUBLIC_PATHS: frozenset[str] = frozenset(
         "/api/auth/config",
         "/api/auth/session",
         "/api/auth/logout",
-        "/api/auth/setup",
     }
 )
 
@@ -102,25 +104,26 @@ def read_session(cookie: str, secret: str) -> str | None:
 # --- La identidad que pone Google ------------------------------------------
 
 
-def verify_google_token(credential: str, client_id: str) -> str:
-    """Comprueba contra Google que el token es auténtico y devuelve el correo.
+def verify_firebase_token(credential: str, project_id: str) -> str:
+    """Comprueba el token del login y devuelve el correo.
 
     La verificación la hace la librería oficial: descarga las claves públicas de
-    Google, comprueba la firma, la caducidad, el emisor y que el token fue
-    emitido para esta aplicación y no para otra.
+    Google, comprueba la firma, la caducidad, el emisor y que el token vaya
+    dirigido a este proyecto. Sin lo último valdría un token emitido por el
+    Firebase de cualquier otro.
     """
     from google.auth.transport import requests as google_requests
     from google.oauth2 import id_token
 
     try:
-        datos = id_token.verify_oauth2_token(
-            credential, google_requests.Request(), client_id
+        datos = id_token.verify_firebase_token(
+            credential, google_requests.Request(), project_id
         )
     except ValueError as exc:
         raise Forbidden(f"Google no dio por bueno ese acceso: {exc}") from exc
 
-    if datos.get("iss") not in {"accounts.google.com", "https://accounts.google.com"}:
-        raise Forbidden("El token no viene de Google.")
+    if datos.get("iss") != f"https://securetoken.google.com/{project_id}":
+        raise Forbidden("Ese token no lo emitió este estudio.")
     if not datos.get("email_verified"):
         raise Forbidden("Esa cuenta de Google no tiene el correo verificado.")
     correo = (datos.get("email") or "").strip().lower()
