@@ -230,6 +230,7 @@ if gcloud beta run services describe "$SERVICIO" --region "$REGION" \
 fi
 
 TOKEN="$(gcloud auth print-access-token)"
+DOMINIO_LISTO="si"
 TMP_FB="$(mktemp)"
 
 firebase_activo() {
@@ -423,31 +424,6 @@ gcloud run services update "$SERVICIO" --region "$REGION" --project "$PROJECT_ID
   --quiet >/dev/null
 ok "Conectada"
 
-# --- Dominios autorizados ----------------------------------------------
-#
-# Sin esto el login falla y el error de Google no dice por qué. Cloud Run le da
-# a un servicio más de una dirección válida y basta abrir la que no esté en la
-# lista para que falle, así que se autorizan las dos.
-paso "Autorizando la dirección de tu app"
-CONFIG_AUTH="https://identitytoolkit.googleapis.com/admin/v2/projects/${PROJECT_ID}/config"
-
-curl -sS -o "$TMP_FB" -H "Authorization: Bearer ${TOKEN}" "$CONFIG_AUTH" >/dev/null 2>&1 || true
-NUEVA="$(python3 "${AYUDA}/dominios.py" "$TMP_FB" "${URL#https://}" \
-         "${SERVICIO}-${NUMERO}.${REGION}.run.app" 2>/dev/null || echo "")"
-
-if [[ -z "$NUEVA" ]]; then
-  ok "Ya estaba autorizada"
-else
-  CODIGO_DOM="$(curl -sS -o "$TMP_FB" -w '%{http_code}' -X PATCH \
-    -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
-    "${CONFIG_AUTH}?updateMask=authorizedDomains" -d "$NUEVA" 2>/dev/null || echo 000)"
-  if [[ "$CODIGO_DOM" == "200" ]]; then
-    ok "Autorizada"
-  else
-    aviso "Google no dejó autorizarla sola (HTTP ${CODIGO_DOM}). Te lo digo al final."
-  fi
-fi
-
 # --- El botón de "Entrar con Google" ------------------------------------
 #
 # Se intenta encender por API. Google no documenta que se pueda sin dar un
@@ -472,6 +448,33 @@ else
     ok "Encendido"
   else
     aviso "Este hay que encenderlo a mano. Es un interruptor; te digo dónde al final."
+  fi
+fi
+
+# --- Dominios autorizados ----------------------------------------------
+#
+# Sin esto el login falla y el error de Google no dice por qué. Cloud Run le da
+# a un servicio más de una dirección válida y basta abrir la que no esté en la
+# lista para que falle, así que se autorizan las dos.
+paso "Autorizando la dirección de tu app"
+DOMINIO_LISTO="si"
+CONFIG_AUTH="https://identitytoolkit.googleapis.com/admin/v2/projects/${PROJECT_ID}/config"
+
+curl -sS -o "$TMP_FB" -H "Authorization: Bearer ${TOKEN}" "$CONFIG_AUTH" >/dev/null 2>&1 || true
+NUEVA="$(python3 "${AYUDA}/dominios.py" "$TMP_FB" "${URL#https://}" \
+         "${SERVICIO}-${NUMERO}.${REGION}.run.app" 2>/dev/null || echo "")"
+
+if [[ -z "$NUEVA" ]]; then
+  ok "Ya estaba autorizada"
+else
+  CODIGO_DOM="$(curl -sS -o "$TMP_FB" -w '%{http_code}' -X PATCH \
+    -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
+    "${CONFIG_AUTH}?updateMask=authorizedDomains" -d "$NUEVA" 2>/dev/null || echo 000)"
+  if [[ "$CODIGO_DOM" == "200" ]]; then
+    ok "Autorizada"
+  else
+    DOMINIO_LISTO="no"
+    aviso "Google no dejó autorizarla sola (HTTP ${CODIGO_DOM}). Te lo digo al final."
   fi
 fi
 
@@ -505,11 +508,24 @@ if [[ "$GOOGLE_LISTO" == "no" ]]; then
 
   ${BOLD}1.${RESET} Abre:  https://console.firebase.google.com/project/${PROJECT_ID}/authentication/providers?authuser=${CORREO}
   ${BOLD}2.${RESET} Toca:  ${BOLD}Comenzar${RESET}  →  ${BOLD}Google${RESET}  →  ${BOLD}Habilitar${RESET}  →  ${BOLD}Guardar${RESET}
-  ${BOLD}3.${RESET} Abre tu app y entra:  ${URL}
+  ${BOLD}3.${RESET} Vuelve aquí y ejecuta otra vez:  ${BOLD}./setup.sh${RESET}
 
-  ${DIM}No tienes que copiar ni escribir nada. Solo tocar.${RESET}
+  ${DIM}Ese interruptor es lo que crea la configuración del login. Hasta que
+  exista no se puede autorizar la dirección de tu app, así que la segunda
+  pasada es la que deja todo terminado. No copias ni escribes nada.${RESET}
 
 PENDIENTE
+elif [[ "$DOMINIO_LISTO" == "no" ]]; then
+  cat <<PENDIENTE_DOM
+  ${YELLOW}${BOLD}FALTA AUTORIZAR TU DIRECCIÓN.${RESET} Sin esto, al entrar sale
+  "unauthorized-domain" y no deja pasar.
+
+  ${BOLD}1.${RESET} Abre:  https://console.firebase.google.com/project/${PROJECT_ID}/authentication/settings?authuser=${CORREO}
+  ${BOLD}2.${RESET} En ${BOLD}Dominios autorizados${RESET} toca ${BOLD}Agregar dominio${RESET} y pega:
+     ${BOLD}${URL#https://}${RESET}
+  ${BOLD}3.${RESET} Abre tu app y entra:  ${URL}
+
+PENDIENTE_DOM
 else
   CONTINUA="$(gcloud builds triggers list --project="$PROJECT_ID" --region="$REGION" \
               --format='value(name)' 2>/dev/null | head -1 || true)"
