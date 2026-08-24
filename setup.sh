@@ -426,55 +426,66 @@ ok "Conectada"
 
 # --- El botón de "Entrar con Google" ------------------------------------
 #
-# Se intenta encender por API. Google no documenta que se pueda sin dar un
-# cliente de OAuth propio, así que puede que no funcione; si no funciona es un
-# solo interruptor en la consola y se dice al final. Intentarlo no cuesta nada
-# y si sale, no queda ni un paso a mano.
-paso "Encendiendo el botón de Entrar con Google"
+# Se intenta encender por API, y si no se puede se dice. Lo que NO se hace es
+# confundir "está apagado" con "no pude preguntarlo": esta API contesta 403 a
+# quien no puede administrarla, y leer ese 403 como "apagado" manda a encender
+# un interruptor que ya estaba encendido. Ya pasó una vez.
+paso "El botón de Entrar con Google"
 PROVEEDOR="https://identitytoolkit.googleapis.com/admin/v2/projects/${PROJECT_ID}/defaultSupportedIdpConfigs"
-GOOGLE_LISTO="no"
+GOOGLE_LISTO="no"       # si | no | nose
 
 CODIGO_P="$(curl -sS -o "$TMP_FB" -w '%{http_code}' \
   -H "Authorization: Bearer ${TOKEN}" "${PROVEEDOR}/google.com" 2>/dev/null || echo 000)"
-if [[ "$CODIGO_P" == "200" ]] && grep -q '"enabled": *true' "$TMP_FB"; then
-  GOOGLE_LISTO="si"
-  ok "Ya estaba encendido"
-else
-  CODIGO_P="$(curl -sS -o "$TMP_FB" -w '%{http_code}' -X POST \
-    -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
-    "${PROVEEDOR}?idpId=google.com" -d '{"enabled":true}' 2>/dev/null || echo 000)"
-  if [[ "$CODIGO_P" == "200" ]]; then
-    GOOGLE_LISTO="si"
-    ok "Encendido"
-  else
-    aviso "Este hay que encenderlo a mano. Es un interruptor; te digo dónde al final."
-  fi
-fi
+
+case "$CODIGO_P" in
+  200)
+    if grep -q '"enabled"[[:space:]]*:[[:space:]]*true' "$TMP_FB"; then
+      GOOGLE_LISTO="si"; ok "Ya estaba encendido"
+    else
+      CODIGO_P="$(curl -sS -o "$TMP_FB" -w '%{http_code}' -X POST \
+        -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
+        "${PROVEEDOR}?idpId=google.com" -d '{"enabled":true}' 2>/dev/null || echo 000)"
+      if [[ "$CODIGO_P" == "200" ]]; then GOOGLE_LISTO="si"; ok "Encendido"
+      else GOOGLE_LISTO="no"; aviso "Hay que encenderlo a mano; te digo dónde al final."; fi
+    fi ;;
+  404)
+    # No existe todavía: se intenta crear.
+    CODIGO_P="$(curl -sS -o "$TMP_FB" -w '%{http_code}' -X POST \
+      -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
+      "${PROVEEDOR}?idpId=google.com" -d '{"enabled":true}' 2>/dev/null || echo 000)"
+    if [[ "$CODIGO_P" == "200" ]]; then GOOGLE_LISTO="si"; ok "Encendido"
+    else GOOGLE_LISTO="no"; aviso "Hay que encenderlo a mano; te digo dónde al final."; fi ;;
+  *)
+    GOOGLE_LISTO="nose"
+    detalle "Google no deja consultarlo desde aquí (HTTP ${CODIGO_P}); no es un fallo." ;;
+esac
 
 # --- Dominios autorizados ----------------------------------------------
 #
-# Sin esto el login falla y el error de Google no dice por qué. Cloud Run le da
-# a un servicio más de una dirección válida y basta abrir la que no esté en la
-# lista para que falle, así que se autorizan las dos.
-paso "Autorizando la dirección de tu app"
+# Sin esto el login falla con "unauthorized-domain" y el error no dice por qué.
+# Cloud Run le da a un servicio más de una dirección válida y basta abrir la que
+# no esté en la lista para que falle, así que se autorizan las dos.
+paso "La dirección de tu app en la lista de Firebase"
 DOMINIO_LISTO="si"
 CONFIG_AUTH="https://identitytoolkit.googleapis.com/admin/v2/projects/${PROJECT_ID}/config"
 
-curl -sS -o "$TMP_FB" -H "Authorization: Bearer ${TOKEN}" "$CONFIG_AUTH" >/dev/null 2>&1 || true
-NUEVA="$(python3 "${AYUDA}/dominios.py" "$TMP_FB" "${URL#https://}" \
-         "${SERVICIO}-${NUMERO}.${REGION}.run.app" 2>/dev/null || echo "")"
+CODIGO_LEER="$(curl -sS -o "$TMP_FB" -w '%{http_code}' \
+  -H "Authorization: Bearer ${TOKEN}" "$CONFIG_AUTH" 2>/dev/null || echo 000)"
 
-if [[ -z "$NUEVA" ]]; then
-  ok "Ya estaba autorizada"
+if [[ "$CODIGO_LEER" != "200" ]]; then
+  DOMINIO_LISTO="nose"
+  detalle "Google no deja consultarlo desde aquí (HTTP ${CODIGO_LEER}); no es un fallo."
 else
-  CODIGO_DOM="$(curl -sS -o "$TMP_FB" -w '%{http_code}' -X PATCH \
-    -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
-    "${CONFIG_AUTH}?updateMask=authorizedDomains" -d "$NUEVA" 2>/dev/null || echo 000)"
-  if [[ "$CODIGO_DOM" == "200" ]]; then
-    ok "Autorizada"
+  NUEVA="$(python3 "${AYUDA}/dominios.py" "$TMP_FB" "${URL#https://}" \
+           "${SERVICIO}-${NUMERO}.${REGION}.run.app" 2>/dev/null || echo "")"
+  if [[ -z "$NUEVA" ]]; then
+    ok "Ya estaba en la lista"
   else
-    DOMINIO_LISTO="no"
-    aviso "Google no dejó autorizarla sola (HTTP ${CODIGO_DOM}). Te lo digo al final."
+    CODIGO_DOM="$(curl -sS -o "$TMP_FB" -w '%{http_code}' -X PATCH \
+      -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
+      "${CONFIG_AUTH}?updateMask=authorizedDomains" -d "$NUEVA" 2>/dev/null || echo 000)"
+    if [[ "$CODIGO_DOM" == "200" ]]; then ok "Añadida"
+    else DOMINIO_LISTO="no"; aviso "No la pude añadir (HTTP ${CODIGO_DOM}); te digo dónde al final."; fi
   fi
 fi
 
@@ -502,36 +513,36 @@ cat <<RESUMEN
 
 RESUMEN
 
-if [[ "$GOOGLE_LISTO" == "no" ]]; then
-  cat <<PENDIENTE
-  ${YELLOW}${BOLD}FALTA UN INTERRUPTOR.${RESET} Es lo único que Google no deja encender solo.
+# Nada de mandar a arreglar lo que no se pudo comprobar. Cuando la respuesta es
+# "no sé", la unica prueba que vale es abrir la app: si entra, estaba bien.
+if [[ "$GOOGLE_LISTO" == "no" || "$DOMINIO_LISTO" == "no" ]]; then
+  echo "  ${YELLOW}${BOLD}FALTA ESTO:${RESET}"
+  echo
+  if [[ "$GOOGLE_LISTO" == "no" ]]; then
+    cat <<PENDIENTE_G
+  ${BOLD}·${RESET} Encender el botón de Entrar con Google:
+     https://console.firebase.google.com/project/${PROJECT_ID}/authentication/providers?authuser=${CORREO}
+     Toca:  ${BOLD}Comenzar${RESET} → ${BOLD}Google${RESET} → ${BOLD}Habilitar${RESET} → ${BOLD}Guardar${RESET}
 
-  ${BOLD}1.${RESET} Abre:  https://console.firebase.google.com/project/${PROJECT_ID}/authentication/providers?authuser=${CORREO}
-  ${BOLD}2.${RESET} Toca:  ${BOLD}Comenzar${RESET}  →  ${BOLD}Google${RESET}  →  ${BOLD}Habilitar${RESET}  →  ${BOLD}Guardar${RESET}
-  ${BOLD}3.${RESET} Vuelve aquí y ejecuta otra vez:  ${BOLD}./setup.sh${RESET}
-
-  ${DIM}Ese interruptor es lo que crea la configuración del login. Hasta que
-  exista no se puede autorizar la dirección de tu app, así que la segunda
-  pasada es la que deja todo terminado. No copias ni escribes nada.${RESET}
-
-PENDIENTE
-elif [[ "$DOMINIO_LISTO" == "no" ]]; then
-  cat <<PENDIENTE_DOM
-  ${YELLOW}${BOLD}FALTA AUTORIZAR TU DIRECCIÓN.${RESET} Sin esto, al entrar sale
-  "unauthorized-domain" y no deja pasar.
-
-  ${BOLD}1.${RESET} Abre:  https://console.firebase.google.com/project/${PROJECT_ID}/authentication/settings?authuser=${CORREO}
-  ${BOLD}2.${RESET} En ${BOLD}Dominios autorizados${RESET} toca ${BOLD}Agregar dominio${RESET} y pega:
+PENDIENTE_G
+  fi
+  if [[ "$DOMINIO_LISTO" == "no" ]]; then
+    cat <<PENDIENTE_D
+  ${BOLD}·${RESET} Añadir tu dirección a la lista de Firebase:
+     https://console.firebase.google.com/project/${PROJECT_ID}/authentication/settings?authuser=${CORREO}
+     En ${BOLD}Dominios autorizados${RESET} → ${BOLD}Agregar dominio${RESET} → pega:
      ${BOLD}${URL#https://}${RESET}
-  ${BOLD}3.${RESET} Abre tu app y entra:  ${URL}
 
-PENDIENTE_DOM
+PENDIENTE_D
+  fi
+  echo "  Después abre tu app:  ${BOLD}${URL}${RESET}"
+  echo
 else
   CONTINUA="$(gcloud builds triggers list --project="$PROJECT_ID" --region="$REGION" \
               --format='value(name)' 2>/dev/null | head -1 || true)"
 
   cat <<TERMINADO
-  ${GREEN}${BOLD}Ya está todo. No queda ningún paso.${RESET}
+  ${GREEN}${BOLD}Todo listo por aquí.${RESET}
 
   ${BOLD}Instálala en el iPhone:${RESET}
      1. Abre ${URL} en ${BOLD}Safari${RESET}
@@ -539,6 +550,17 @@ else
      3. Compartir → Añadir a pantalla de inicio
 
 TERMINADO
+
+  if [[ "$GOOGLE_LISTO" == "nose" || "$DOMINIO_LISTO" == "nose" ]]; then
+    cat <<NOSE
+  ${DIM}Dos ajustes del login no se pueden consultar desde aquí, así que no sé
+  decirte si están. Abre la app y entra: si entras, estaban bien. Si te dice
+  algo de "dominio no autorizado", añádela aquí:
+     https://console.firebase.google.com/project/${PROJECT_ID}/authentication/settings?authuser=${CORREO}
+     Dominios autorizados → Agregar dominio → ${URL#https://}${RESET}
+
+NOSE
+  fi
 
   if [[ -z "$CONTINUA" ]]; then
     cat <<CONTINUA_PENDIENTE
