@@ -60,6 +60,9 @@ CORREO="$(gcloud config get-value account 2>/dev/null || true)"
 [[ -n "$CORREO" && "$CORREO" != "(unset)" ]] || morir "No hay ninguna cuenta de Google activa."
 
 NUMERO="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
+# Con varias cuentas de Google en el navegador, un enlace sin esto abre la
+# cuenta equivocada y no encuentra el proyecto.
+CUENTA="authuser=${CORREO}"
 BUCKET="${PROJECT_ID}-aaus"
 SA_APP="aaus-run@${PROJECT_ID}.iam.gserviceaccount.com"
 SA_COLA="aaus-tasks@${PROJECT_ID}.iam.gserviceaccount.com"
@@ -80,7 +83,7 @@ if ! gcloud beta billing projects describe "$PROJECT_ID" \
   aviso "Este proyecto no tiene facturación activada."
   detalle "Sin tarjeta, Google no deja usar Veo ni Lyria (aunque tengas los \$300 de crédito)."
   detalle "Actívala aquí y vuelve a ejecutar el script:"
-  echo "  https://console.cloud.google.com/billing/linkedaccount?project=${PROJECT_ID}"
+  echo "  https://console.cloud.google.com/billing/linkedaccount?project=${PROJECT_ID}&${CUENTA}"
   exit 1
 fi
 ok "Facturación activada"
@@ -265,7 +268,7 @@ if [[ "$IAP_LISTO" == "no" ]]; then
   ${YELLOW}${BOLD}TE QUEDAN DOS COSAS:${RESET}
 
   ${BOLD}1. Activar el candado${RESET}   ${DIM}(obligatorio: sin esto no puedes entrar)${RESET}
-     Abre:  https://console.cloud.google.com/security/iap?project=${PROJECT_ID}
+     Abre:  https://console.cloud.google.com/security/iap?project=${PROJECT_ID}&${CUENTA}
      Toca:  el interruptor de "${SERVICIO}"
      Si te pide configurar la pantalla de consentimiento, elige ${BOLD}Externo${RESET},
      pon tu correo donde te lo pida y guarda. No hace falta nada más.
@@ -298,7 +301,7 @@ TERMINADO
      Sin esto, cada cambio te obliga a volver aquí y ejecutar el script otra vez.
      Con esto, se publica sola en unos minutos.
 
-     Abre:  https://console.cloud.google.com/run/detail/${REGION}/${SERVICIO}/revisions?project=${PROJECT_ID}
+     Abre:  https://console.cloud.google.com/run/detail/${REGION}/${SERVICIO}/revisions?project=${PROJECT_ID}&${CUENTA}
      Toca:  Configurar implementación continua
             →  Conectar tu cuenta de GitHub (te pedirá autorizar)
             →  Repositorio: Good-Problem   ·   Rama: main
