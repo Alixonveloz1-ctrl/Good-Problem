@@ -748,3 +748,35 @@ def test_en_la_aplicacion_no_se_habla_de_dinero():
     # no pasa nada, que es como se aprende a ignorarla.
     for rastro in ("money(", "US$", "$${", "USD", "currency:"):
         assert rastro not in pintado, f"quedo dinero en la interfaz: {rastro}"
+
+
+def test_todo_lo_que_se_crea_se_puede_borrar(client, universe):
+    """Dije que el universo si se podia borrar y era falso: la ruta existia en
+    el servidor pero no habia boton en ninguna parte, y una ruta sin boton no
+    existe para quien usa la app. Aqui se comprueban las dos mitades."""
+    import pathlib
+
+    creables = {
+        "characters": {"name": "Nova", "role": "lead"},
+        "wardrobe": {"name": "Chaqueta", "category": "signature"},
+        "locations": {"name": "Azotea"},
+        "songs": {"title": "Neon"},
+    }
+    for coleccion, cuerpo in creables.items():
+        creado = client.post(f"/api/universes/{universe}/{coleccion}", json=cuerpo)
+        assert creado.status_code == 200, f"{coleccion}: {creado.text}"
+        doc_id = creado.json()["id"]
+
+        borrado = client.delete(f"/api/universes/{universe}/{coleccion}/{doc_id}")
+        assert borrado.status_code == 200, f"{coleccion} no se borra: {borrado.text}"
+        quedan = [d["id"] for d in client.get(f"/api/universes/{universe}/{coleccion}").json()]
+        assert doc_id not in quedan
+
+    assert client.delete(f"/api/universes/{universe}").status_code == 200
+
+    # La otra mitad: que el boton exista de verdad en alguna pantalla.
+    pantallas = pathlib.Path(__file__).resolve().parents[2] / "frontend" / "src" / "screens"
+    codigo = "\n".join(p.read_text() for p in pantallas.glob("*.tsx"))
+    for ruta in ("/characters/", "/wardrobe/", "/locations/", "/songs/", "/video-projects/"):
+        assert f"api.del(`/api/universes/${{universeId}}{ruta}" in codigo, f"sin boton: {ruta}"
+    assert "api.del(`/api/universes/${universe.id}`)" in codigo, "sin boton: el artista"

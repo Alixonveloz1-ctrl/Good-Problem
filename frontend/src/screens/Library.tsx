@@ -5,7 +5,17 @@ import { useAction, useResource } from '../hooks/useApi'
 import type { Location, Outfit } from '../api/types'
 import { JobWatcher } from '../components/JobWatcher'
 import { ModelPicker, type ModelChoice } from '../components/ModelPicker'
-import { Card, Empty, ErrorNote, Field, Loading, Sheet, StatusBadge, TopBar } from '../components/ui'
+import {
+  Card,
+  DeleteButton,
+  Empty,
+  ErrorNote,
+  Field,
+  Loading,
+  Sheet,
+  StatusBadge,
+  TopBar,
+} from '../components/ui'
 
 const CATEGORIES = [
   'signature',
@@ -88,7 +98,18 @@ export function WardrobeScreen() {
             <Card key={outfit.id}>
               <div className="row between">
                 <strong>{outfit.name}</strong>
-                <StatusBadge status={outfit.status} />
+                <div className="row">
+                  <StatusBadge status={outfit.status} />
+                  <DeleteButton
+                    busy={action.busy}
+                    onDelete={async () => {
+                      await action.run(() =>
+                        api.del(`/api/universes/${universeId}/wardrobe/${outfit.id}`),
+                      )
+                      await reload()
+                    }}
+                  />
+                </div>
               </div>
               <div className="sub">{outfit.description}</div>
               <span className="badge">{outfit.category}</span>
@@ -213,7 +234,18 @@ export function LocationsScreen() {
             <Card key={location.id}>
               <div className="row between">
                 <strong>{location.name}</strong>
-                <StatusBadge status={location.status} />
+                <div className="row">
+                  <StatusBadge status={location.status} />
+                  <DeleteButton
+                    busy={action.busy}
+                    onDelete={async () => {
+                      await action.run(() =>
+                        api.del(`/api/universes/${universeId}/locations/${location.id}`),
+                      )
+                      await reload()
+                    }}
+                  />
+                </div>
               </div>
               <div className="sub">{location.description}</div>
               {location.reference_paths.length > 0 && (

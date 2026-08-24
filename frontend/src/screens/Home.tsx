@@ -3,7 +3,17 @@ import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAction, useResource } from '../hooks/useApi'
 import type { Home as HomeData } from '../api/types'
-import { Card, Empty, ErrorNote, Field, JobBadge, Loading, Sheet, TopBar } from '../components/ui'
+import {
+  Card,
+  DeleteButton,
+  Empty,
+  ErrorNote,
+  Field,
+  JobBadge,
+  Loading,
+  Sheet,
+  TopBar,
+} from '../components/ui'
 
 export function HomeScreen() {
   const { data, loading, error, reload } = useResource<HomeData>('/api/home', 8000)
@@ -95,11 +105,23 @@ export function HomeScreen() {
             ) : (
               <div className="list">
                 {data.universes.map((universe) => (
-                  <Link key={universe.id} to={`/u/${universe.id}`} className="card tappable">
-                    <strong>{universe.name}</strong>
-                    {universe.tagline && <div className="sub">{universe.tagline}</div>}
-                    <div className="muted mono">{universe.id}</div>
-                  </Link>
+                  <div key={universe.id} className="card fila-borrable">
+                    <Link to={`/u/${universe.id}`} className="grow">
+                      <strong>{universe.name}</strong>
+                      {universe.tagline && <div className="sub">{universe.tagline}</div>}
+                    </Link>
+                    {/* Borrar un artista se lleva por delante sus canciones,
+                        sus videoclips y todo lo aprobado. La confirmación lo
+                        dice: "¿Seguro?" no basta cuando lo que se va es todo. */}
+                    <DeleteButton
+                      confirmLabel="¿Borrar todo?"
+                      busy={action.busy}
+                      onDelete={async () => {
+                        await action.run(() => api.del(`/api/universes/${universe.id}`))
+                        await reload()
+                      }}
+                    />
+                  </div>
                 ))}
               </div>
             )}

@@ -177,10 +177,12 @@ export function Sheet({
 export function DeleteButton({
   onDelete,
   label = 'Borrar',
+  confirmLabel = '¿Seguro?',
   busy = false,
 }: {
   onDelete: () => void | Promise<void>
   label?: string
+  confirmLabel?: string
   busy?: boolean
 }) {
   const [armado, setArmado] = useState(false)
@@ -207,7 +209,7 @@ export function DeleteButton({
         }
       }}
     >
-      {busy ? '…' : armado ? '¿Seguro?' : label}
+      {busy ? '…' : armado ? confirmLabel : label}
     </button>
   )
 }
