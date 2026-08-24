@@ -7,6 +7,7 @@ import { ModelPicker, type ModelChoice } from '../components/ModelPicker'
 import { JobWatcher } from '../components/JobWatcher'
 import { Empty, ErrorNote, Field, Loading, Sheet, StatusBadge, TopBar, DeleteButton } from '../components/ui'
 import { Proponer } from '../components/Proponer'
+import { ElegirGenero } from '../components/Genero'
 
 export function CharactersScreen() {
   const { universeId = '' } = useParams()
@@ -15,7 +16,7 @@ export function CharactersScreen() {
   )
   const borrado = useAction()
   const [creating, setCreating] = useState(false)
-  const [open, setOpen] = useState<Character | null>(null)
+  const [abiertoId, setAbiertoId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [appearance, setAppearance] = useState('')
   const action = useAction()
@@ -35,6 +36,9 @@ export function CharactersScreen() {
       await reload()
     }
   }
+
+  // Si el personaje se borro mientras estaba abierto, la ficha desaparece sola.
+  const abierto = (data ?? []).find((c) => c.id === abiertoId) ?? null
 
   return (
     <>
@@ -66,7 +70,7 @@ export function CharactersScreen() {
         <div className="list">
           {(data ?? []).map((character) => (
             <div key={character.id} className="card fila-borrable">
-              <button type="button" className="grow destapado" onClick={() => setOpen(character)}>
+              <button type="button" className="grow destapado" onClick={() => setAbiertoId(character.id)}>
                 <div className="row between">
                   <strong>{character.name || 'Sin nombre'}</strong>
                   <StatusBadge status={character.status} />
@@ -115,15 +119,12 @@ export function CharactersScreen() {
         </Sheet>
       )}
 
-      {open && (
+      {abierto && (
         <CharacterSheet
           universeId={universeId}
-          character={open}
-          onClose={() => setOpen(null)}
-          onChanged={async () => {
-            await reload()
-            setOpen(null)
-          }}
+          character={abierto}
+          onClose={() => setAbiertoId(null)}
+          onChanged={reload}
         />
       )}
     </>
@@ -179,12 +180,33 @@ function CharacterSheet({
     await onChanged()
   }
 
+  // Quien es. Va antes que nada porque es lo unico que el Director no puede
+  // cambiar, y sin ello lo elige el: un nombre de mujer salia como hombre.
+  const ponerGenero = async (valor: string) => {
+    await action.run(() =>
+      api.patch(`/api/universes/${universeId}/characters/${character.id}`, { gender: valor }),
+    )
+    await onChanged()
+  }
+
   return (
     <Sheet title={character.name || 'Personaje'} onClose={onClose}>
       <ErrorNote error={action.error} onDismiss={action.clearError} />
 
-      <button className="btn block" onClick={design} disabled={action.busy}>
-        Pedir diseno al Director de casting
+      <ElegirGenero value={character.gender ?? ''} onChange={ponerGenero} />
+      {!character.gender && (
+        <p className="muted" style={{ margin: 0 }}>
+          Dilo antes de pedir el diseño. Si se queda en blanco lo decide el
+          Director, y no acierta: de un nombre de mujer puede sacar un hombre.
+        </p>
+      )}
+
+      <button
+        className="btn block"
+        onClick={design}
+        disabled={action.busy || !character.gender}
+      >
+        Pedir diseño al Director de casting
       </button>
 
       <ModelPicker kind="image" value={choice} onChange={setChoice} label="Modelo de imagen" />

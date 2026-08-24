@@ -185,6 +185,8 @@ MASTER_SHOTS: tuple[tuple[str, str], ...] = (
 class Character(Entity):
     name: str
     role: CharacterRole = CharacterRole.SUPPORTING
+    gender: str = ""
+    """Lo decide quien crea al artista, y el Director no puede cambiarlo."""
     apparent_age: str = ""
     appearance: str = ""
     personality: str = ""

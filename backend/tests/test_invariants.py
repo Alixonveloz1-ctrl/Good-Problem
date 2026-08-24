@@ -260,6 +260,50 @@ def test_el_director_no_puede_cambiarle_el_nombre_ni_el_sexo(client, studio):
     assert personaje["master_shots"][0]["prompt"] == "portrait of a man"
 
 
+def test_se_le_puede_decir_quien_es_a_un_artista_que_ya_existe(client, studio):
+    """Y esa decision viaja hasta el Director.
+
+    El bloqueo del nombre y el sexo no sirve de nada si el sexo esta vacio:
+    entonces lo elige el Director, y de un nombre de mujer saca un hombre. Al
+    crear el artista ahora es obligatorio, pero los que ya existian se quedaron
+    sin ello y no habia ningun sitio donde decirlo.
+    """
+    from app.routers.characters import _lo_que_ya_decidio
+
+    creado = client.post("/api/universes", json={"name": "Feri"}).json()
+    uid, char_id = creado["id"], creado["lead_character_id"]
+    studio.jobs.wait_for_idle(20)
+
+    # Sin sexo, al Director solo le llega el nombre: lo demas se lo inventa.
+    personaje = client.get(f"/api/universes/{uid}/characters/{char_id}").json()
+    assert "gender" not in _lo_que_ya_decidio(personaje)
+
+    # Se le dice, desde su propia ficha.
+    respuesta = client.patch(
+        f"/api/universes/{uid}/characters/{char_id}", json={"gender": "mujer"}
+    )
+    assert respuesta.status_code == 200, respuesta.text
+
+    personaje = client.get(f"/api/universes/{uid}/characters/{char_id}").json()
+    assert personaje["gender"] == "mujer"
+    assert _lo_que_ya_decidio(personaje) == {"name": "Feri", "gender": "mujer"}
+
+
+def test_hay_donde_decir_quien_es_en_la_pantalla():
+    """La otra mitad: que el selector exista donde se usa.
+
+    "Sigo sin poder escoger el genero." La ruta aceptaba el campo desde hacia
+    rato; lo que no habia era ningun sitio donde tocarlo. Una ruta sin boton no
+    existe para quien usa la app.
+    """
+    import pathlib as rutas
+
+    fuente = rutas.Path(__file__).resolve().parents[2] / "frontend" / "src"
+    codigo = "\n".join(f.read_text() for f in fuente.rglob("*.tsx"))
+    assert codigo.count("<ElegirGenero") >= 2, "falta el selector al crear o en la ficha"
+    assert "{ gender: valor }" in codigo, "el selector no guarda nada"
+
+
 def test_el_estudio_propone_el_vestuario_y_las_locaciones(client, studio):
     """Sin escribir un nombre ni una descripcion.
 

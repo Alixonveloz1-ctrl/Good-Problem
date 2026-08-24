@@ -137,6 +137,7 @@ export interface Character {
   id: string
   name: string
   role: string
+  gender: string
   apparent_age: string
   appearance: string
   personality: string

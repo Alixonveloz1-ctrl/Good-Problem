@@ -4,6 +4,7 @@ import { api, mediaUrl } from '../api/client'
 import { useAction, useResource } from '../hooks/useApi'
 import type { Home as HomeData, RecentProject, UniverseCard } from '../api/types'
 import { ErrorNote, Field, Loading, Sheet } from '../components/ui'
+import { ElegirGenero } from '../components/Genero'
 
 /**
  * La portada de la aplicación.
@@ -132,21 +133,7 @@ export function HomeScreen() {
             onChange={setNombre}
             placeholder="Feri"
           />
-          <div className="field">
-            <label>Es</label>
-            <div className="opciones">
-              {['mujer', 'hombre', 'no binario'].map((cual) => (
-                <button
-                  key={cual}
-                  type="button"
-                  className={`chip ${sexo === cual ? 'active' : ''}`}
-                  onClick={() => setSexo(cual)}
-                >
-                  {cual}
-                </button>
-              ))}
-            </div>
-          </div>
+          <ElegirGenero value={sexo} onChange={setSexo} />
           <Field
             label="Estilo musical"
             value={genero}
@@ -163,14 +150,14 @@ export function HomeScreen() {
           <ErrorNote error={accion.error} onDismiss={accion.clearError} />
           <button
             className="btn primary block"
-            disabled={!nombre.trim() || accion.busy}
+            disabled={!nombre.trim() || !sexo || accion.busy}
             onClick={crear}
           >
             {accion.busy ? 'Creando…' : 'Crear artista'}
           </button>
           <p className="muted" style={{ margin: 0 }}>
             Con esto basta. El estudio le escribe la identidad y prepara sus
-            retratos; el nombre y el resto no te los cambia nadie.
+            retratos; el nombre y quién es no te los cambia nadie.
           </p>
         </Sheet>
       )}
