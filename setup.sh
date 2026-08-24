@@ -170,6 +170,18 @@ else
   ok "Creada"
 fi
 
+paso "Sitio donde guardar la app construida"
+detalle "Lo necesita la publicación automática para dejar ahí cada versión."
+if gcloud artifacts repositories describe "$SERVICIO" --location="$REGION" \
+     --project="$PROJECT_ID" >/dev/null 2>&1; then
+  ok "Ya existía"
+else
+  gcloud artifacts repositories create "$SERVICIO" --repository-format=docker \
+    --location="$REGION" --project="$PROJECT_ID" \
+    --description="AI Artist Universe Studio" >/dev/null 2>&1 \
+    && ok "Creado" || aviso "No se pudo crear; la publicación manual sigue funcionando."
+fi
+
 paso "Sitio para los vídeos, imágenes y canciones"
 if gcloud storage buckets describe "gs://${BUCKET}" --project="$PROJECT_ID" >/dev/null 2>&1; then
   ok "Ya existía: gs://${BUCKET}"
@@ -527,7 +539,44 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
-#  8 · Resumen
+#  8 · Que se actualice sola
+# ══════════════════════════════════════════════════════════════════════
+titulo "Publicación automática"
+
+AUTO_LISTO="no"
+DISPARADOR="$(gcloud builds triggers list --project="$PROJECT_ID" --region="$REGION" \
+              --format='value(name)' 2>/dev/null | head -1 || true)"
+
+if [[ -n "$DISPARADOR" ]]; then
+  AUTO_LISTO="si"
+  ok "Ya estaba conectada: cada cambio se publica solo"
+else
+  # Autorizar la app de GitHub es una pantalla del navegador y no hay forma de
+  # hacerlo desde aquí: es Google pidiéndole permiso a GitHub en tu nombre.
+  # Lo que sí se puede es todo lo demás, así que si esa autorización ya existe
+  # de antes, el disparador se crea aquí sin que nadie toque nada.
+  CONEXION="$(gcloud builds connections list --project="$PROJECT_ID" --region="$REGION" \
+              --format='value(name)' 2>/dev/null | head -1 || true)"
+
+  if [[ -n "$CONEXION" ]]; then
+    detalle "GitHub ya está autorizado; creando el disparador…"
+    REPO_CB="$(gcloud builds repositories list --project="$PROJECT_ID" --region="$REGION" \
+               --connection="${CONEXION##*/}" --format='value(name)' 2>/dev/null \
+               | grep -i 'good-problem' | head -1 || true)"
+    if [[ -n "$REPO_CB" ]] && gcloud builds triggers create github \
+         --name="${SERVICIO}-main" --project="$PROJECT_ID" --region="$REGION" \
+         --repository="$REPO_CB" --branch-pattern='^main$' \
+         --build-config=cloudbuild.yaml >/dev/null 2>&1; then
+      AUTO_LISTO="si"
+      ok "Conectada: cada cambio se publica solo"
+    else
+      aviso "No pude crearlo solo. Te digo los toques al final."
+    fi
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+#  9 · Resumen
 # ══════════════════════════════════════════════════════════════════════
 titulo "Listo"
 
@@ -575,9 +624,6 @@ PENDIENTE_D
   echo "  Después abre tu app:  ${BOLD}${URL}${RESET}"
   echo
 else
-  CONTINUA="$(gcloud builds triggers list --project="$PROJECT_ID" --region="$REGION" \
-              --format='value(name)' 2>/dev/null | head -1 || true)"
-
   cat <<TERMINADO
   ${GREEN}${BOLD}Todo listo por aquí.${RESET}
 
@@ -599,21 +645,25 @@ TERMINADO
 NOSE
   fi
 
-  if [[ -z "$CONTINUA" ]]; then
+  if [[ "$AUTO_LISTO" == "no" ]]; then
     cat <<CONTINUA_PENDIENTE
-  ${BOLD}Queda una cosa: que se actualice sola${RESET}   ${DIM}(recomendado, 1 minuto)${RESET}
-     Sin esto, cada cambio te obliga a volver aquí y ejecutar el script otra vez.
+  ${BOLD}${YELLOW}Queda esto, y es de una sola vez:${RESET} que la app se publique sola.
+  ${DIM}Sin esto tienes que volver aquí a ejecutar ./setup.sh en cada cambio.
+  Con esto, no vuelves nunca.${RESET}
 
-     Abre:  https://console.cloud.google.com/run/detail/${REGION}/${SERVICIO}/revisions?project=${PROJECT_ID}&${CUENTA}
-     Toca:  Configurar implementación continua
-            →  Conectar tu cuenta de GitHub (te pedirá autorizar)
-            →  Repositorio: Good-Problem   ·   Rama: main
-            →  Tipo de compilación: Dockerfile
-            →  Guardar
+  ${DIM}No lo puedo hacer yo desde aquí: es Google pidiéndole permiso a GitHub
+  en tu nombre, y eso solo se autoriza desde el navegador.${RESET}
+
+  ${BOLD}1.${RESET} Abre:  https://console.cloud.google.com/run/detail/${REGION}/${SERVICIO}/revisions?project=${PROJECT_ID}&${CUENTA}
+  ${BOLD}2.${RESET} Toca:  ${BOLD}Configurar implementación continua${RESET}
+  ${BOLD}3.${RESET} Conectar tu cuenta de GitHub  ${DIM}(te pedirá autorizar; acepta)${RESET}
+  ${BOLD}4.${RESET} Repositorio: ${BOLD}Good-Problem${RESET}   ·   Rama: ${BOLD}main${RESET}
+  ${BOLD}5.${RESET} Tipo de compilación: ${BOLD}Dockerfile${RESET}
+  ${BOLD}6.${RESET} Guardar
 
 CONTINUA_PENDIENTE
   else
-    ok "La publicación automática desde GitHub ya está conectada"
+    ok "Cada cambio se publica solo. No tienes que volver aquí."
     echo
   fi
 fi
