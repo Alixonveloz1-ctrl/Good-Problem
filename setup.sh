@@ -216,8 +216,12 @@ SECRETO="$(LEER_VAR AAUS_SESSION_SECRET)"
 
 CLIENT_ID="$(LEER_VAR AAUS_OAUTH_CLIENT_ID)"
 CODIGO="$(LEER_VAR AAUS_SETUP_CODE)"
-# Alfabeto sin 0/O/1/I/L: hay que leerlo de la pantalla y escribirlo en el móvil.
-[[ -n "$CODIGO" ]] || CODIGO="$(LC_ALL=C tr -dc 'ABCDEFGHJKMNPQRSTUVWXYZ23456789' </dev/urandom | head -c 8)"
+# Ocho caracteres sin 0/O/1/I/L: hay que leerlos de la pantalla y escribirlos en
+# el móvil. openssl da ocho dígitos hexadecimales exactos y tr los reetiqueta.
+# Nada de canalizar /dev/urandom a `head`: head cierra la tubería al octavo byte,
+# la fuente infinita del otro lado recibe SIGPIPE, y con `pipefail` eso mata el
+# script entero justo antes de publicar nada.
+[[ -n "$CODIGO" ]] || CODIGO="$(openssl rand -hex 4 | tr '0123456789abcdef' '23456789ABCDEFGH')"
 
 # La app es pública en Cloud Run y tiene que serlo: para pintar la pantalla de
 # entrada hay que poder cargarla antes de saber quién eres. La puerta la pone la
