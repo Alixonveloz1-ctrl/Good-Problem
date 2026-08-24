@@ -780,3 +780,37 @@ def test_todo_lo_que_se_crea_se_puede_borrar(client, universe):
     for ruta in ("/characters/", "/wardrobe/", "/locations/", "/songs/", "/video-projects/"):
         assert f"api.del(`/api/universes/${{universeId}}{ruta}" in codigo, f"sin boton: {ruta}"
     assert "api.del(`/api/universes/${universe.id}`)" in codigo, "sin boton: el artista"
+
+
+def test_la_cola_puede_entrar_con_su_token(client, studio, monkeypatch):
+    """El camino que hace que un trabajo pase de "en cola" a hecho.
+
+    Cloud Tasks vuelve a llamar a /api/internal/jobs/run con su token. Ya se
+    comprueba que la cookie del navegador NO vale ahi; falta lo contrario: que
+    el token si abra. Si esa puerta estuviera mal cerrada del otro lado, cada
+    trabajo se quedaria en cola para siempre y en la pantalla no habria ningun
+    error que mirar, que es la peor forma de fallar.
+    """
+    from app import auth as modulo_auth
+
+    studio.settings.owner_email = "dueno@gmail.com"
+    studio.settings.firebase_config = FIREBASE
+    studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
+    studio.settings.tasks_service_account = "aaus-tasks@proyecto.iam.gserviceaccount.com"
+    studio.settings.tasks_target_url = "https://aaus-abc.a.run.app"
+
+    # Sin token, fuera.
+    assert client.post(
+        "/api/internal/jobs/run", json={"universe_id": "u", "job_id": "j"}
+    ).status_code == 403
+
+    # Con un token que Google da por bueno, entra: llega al orquestador y este
+    # contesta que ese trabajo no existe, que es lo correcto para un id inventado.
+    monkeypatch.setattr(modulo_auth, "verify_service_token", lambda *_: True)
+    respuesta = client.post(
+        "/api/internal/jobs/run",
+        json={"universe_id": "uni_inventado", "job_id": "job_inventado"},
+        headers={"Authorization": "Bearer loquesea"},
+    )
+    assert respuesta.status_code == 404, respuesta.text
+    assert respuesta.json()["error"]["code"] == "not_found"
