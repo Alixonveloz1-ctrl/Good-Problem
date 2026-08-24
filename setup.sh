@@ -201,74 +201,7 @@ gcloud tasks queues update "$COLA" --location="$REGION" --project="$PROJECT_ID" 
 ok "Configurada: 4 a la vez, sin reintentos automáticos"
 
 # ══════════════════════════════════════════════════════════════════════
-#  6 · Publicar la aplicación
-# ══════════════════════════════════════════════════════════════════════
-titulo "Publicando la aplicación"
-paso "Esto tarda entre 5 y 10 minutos. No cierres Cloud Shell."
-detalle "Construye la app y la sube. La primera vez es la más lenta."
-
-# La llave con la que se firman las sesiones. Se genera aquí y no se escribe a
-# mano en ninguna parte. Si ya existe de una instalación anterior se conserva:
-# cambiarla cerraría la sesión abierta en el iPhone sin motivo.
-LEER_VAR() {
-  gcloud run services describe "$SERVICIO" --region "$REGION" --project "$PROJECT_ID" \
-    --format="value(spec.template.spec.containers[0].env.filter(\"name:$1\").extract(value))" \
-    2>/dev/null | tr -d '[]' || true
-}
-
-SECRETO="$(LEER_VAR AAUS_SESSION_SECRET)"
-[[ -n "$SECRETO" ]] || SECRETO="$(openssl rand -hex 32)"
-
-# La app es pública en Cloud Run y tiene que serlo: para pintar la pantalla de
-# entrada hay que poder cargarla antes de saber quién eres. La puerta la pone la
-# propia app, con tu cuenta de Google, y también cubre /media/ y la cola.
-# Las variables van en un archivo y no con --set-env-vars: gcloud solo respeta
-# el último --set-env-vars que se le pase, y el JSON de Firebase lleva comas y
-# comillas que rompen el formato de la línea de comandos.
-ENV_FILE="$(mktemp)"
-trap 'rm -f "$ENV_FILE"' EXIT
-
-PROJECT_ID="$PROJECT_ID" REGION="$REGION" BUCKET="$BUCKET" CORREO="$CORREO" \
-SECRETO="$SECRETO" python3 - "$ENV_FILE" <<'PYENV'
-import json, os, sys
-
-variables = {
-    "AAUS_PROJECT_ID":    os.environ["PROJECT_ID"],
-    "AAUS_LOCATION":      os.environ["REGION"],
-    "AAUS_BUCKET":        os.environ["BUCKET"],
-    "AAUS_OWNER_EMAIL":   os.environ["CORREO"],
-    "AAUS_SESSION_SECRET": os.environ["SECRETO"],
-    "AAUS_DRY_RUN":       "false",
-}
-with open(sys.argv[1], "w", encoding="utf-8") as f:
-    for clave, valor in variables.items():
-        f.write("%s: %s\n" % (clave, json.dumps(valor)))
-PYENV
-
-gcloud run deploy "$SERVICIO" \
-  --source . \
-  --region "$REGION" \
-  --project "$PROJECT_ID" \
-  --service-account "$SA_APP" \
-  --allow-unauthenticated \
-  --memory 2Gi --cpu 2 --timeout 3600 --concurrency 20 --max-instances 4 \
-  --env-vars-file "$ENV_FILE" \
-  --quiet >/dev/null
-
-URL="$(gcloud run services describe "$SERVICIO" --region "$REGION" \
-       --project "$PROJECT_ID" --format='value(status.url)')"
-[[ -n "$URL" ]] || morir "El despliegue terminó pero no devolvió ninguna dirección."
-ok "Publicada en ${URL}"
-
-paso "Conectando la cola con la aplicación"
-detalle "La cola necesita la dirección, que no existía hasta ahora."
-gcloud run services update "$SERVICIO" --region "$REGION" --project "$PROJECT_ID" \
-  --update-env-vars "AAUS_TASKS_QUEUE=${COLA},AAUS_TASKS_TARGET_URL=${URL},AAUS_TASKS_SERVICE_ACCOUNT=${SA_COLA}" \
-  --quiet >/dev/null
-ok "Conectada"
-
-# ══════════════════════════════════════════════════════════════════════
-#  7 · El login, montado solo
+#  6 · El login, montado solo
 # ══════════════════════════════════════════════════════════════════════
 titulo "Entrar con tu cuenta de Google"
 detalle "Firebase se monta encima del mismo proyecto. No es otra cuenta."
@@ -381,6 +314,74 @@ if [[ -z "$CONFIG" ]]; then
 fi
 ok "Conseguida (no tuviste que copiar nada)"
 
+# ══════════════════════════════════════════════════════════════════════
+#  7 · Publicar la aplicación
+# ══════════════════════════════════════════════════════════════════════
+titulo "Publicando la aplicación"
+paso "Esto tarda entre 5 y 10 minutos. No cierres Cloud Shell."
+detalle "Construye la app y la sube. La primera vez es la más lenta."
+
+# La llave con la que se firman las sesiones. Se genera aquí y no se escribe a
+# mano en ninguna parte. Si ya existe de una instalación anterior se conserva:
+# cambiarla cerraría la sesión abierta en el iPhone sin motivo.
+LEER_VAR() {
+  gcloud run services describe "$SERVICIO" --region "$REGION" --project "$PROJECT_ID" \
+    --format="value(spec.template.spec.containers[0].env.filter(\"name:$1\").extract(value))" \
+    2>/dev/null | tr -d '[]' || true
+}
+
+SECRETO="$(LEER_VAR AAUS_SESSION_SECRET)"
+[[ -n "$SECRETO" ]] || SECRETO="$(openssl rand -hex 32)"
+
+# La app es pública en Cloud Run y tiene que serlo: para pintar la pantalla de
+# entrada hay que poder cargarla antes de saber quién eres. La puerta la pone la
+# propia app, con tu cuenta de Google, y también cubre /media/ y la cola.
+# Las variables van en un archivo y no con --set-env-vars: gcloud solo respeta
+# el último --set-env-vars que se le pase, y el JSON de Firebase lleva comas y
+# comillas que rompen el formato de la línea de comandos.
+ENV_FILE="$(mktemp)"
+trap 'rm -f "$ENV_FILE"' EXIT
+
+PROJECT_ID="$PROJECT_ID" REGION="$REGION" BUCKET="$BUCKET" CORREO="$CORREO" \
+SECRETO="$SECRETO" CONFIG="$CONFIG" python3 - "$ENV_FILE" <<'PYENV'
+import json, os, sys
+
+variables = {
+    "AAUS_PROJECT_ID":    os.environ["PROJECT_ID"],
+    "AAUS_LOCATION":      os.environ["REGION"],
+    "AAUS_BUCKET":        os.environ["BUCKET"],
+    "AAUS_OWNER_EMAIL":   os.environ["CORREO"],
+    "AAUS_SESSION_SECRET": os.environ["SECRETO"],
+    "AAUS_FIREBASE_CONFIG": os.environ["CONFIG"],
+    "AAUS_DRY_RUN":       "false",
+}
+with open(sys.argv[1], "w", encoding="utf-8") as f:
+    for clave, valor in variables.items():
+        f.write("%s: %s\n" % (clave, json.dumps(valor)))
+PYENV
+
+gcloud run deploy "$SERVICIO" \
+  --source . \
+  --region "$REGION" \
+  --project "$PROJECT_ID" \
+  --service-account "$SA_APP" \
+  --allow-unauthenticated \
+  --memory 2Gi --cpu 2 --timeout 3600 --concurrency 20 --max-instances 4 \
+  --env-vars-file "$ENV_FILE" \
+  --quiet >/dev/null
+
+URL="$(gcloud run services describe "$SERVICIO" --region "$REGION" \
+       --project "$PROJECT_ID" --format='value(status.url)')"
+[[ -n "$URL" ]] || morir "El despliegue terminó pero no devolvió ninguna dirección."
+ok "Publicada en ${URL}"
+
+paso "Conectando la cola con la aplicación"
+detalle "La cola necesita la dirección, que no existía hasta ahora."
+gcloud run services update "$SERVICIO" --region "$REGION" --project "$PROJECT_ID" \
+  --update-env-vars "AAUS_TASKS_QUEUE=${COLA},AAUS_TASKS_TARGET_URL=${URL},AAUS_TASKS_SERVICE_ACCOUNT=${SA_COLA}" \
+  --quiet >/dev/null
+ok "Conectada"
+
 # --- Dominios autorizados ----------------------------------------------
 #
 # Sin esto el login falla y el error de Google no dice por qué. Cloud Run le da
@@ -432,14 +433,6 @@ else
     aviso "Este hay que encenderlo a mano. Es un interruptor; te digo dónde al final."
   fi
 fi
-
-# --- Dejársela a la app -------------------------------------------------
-paso "Guardando la configuración en la app"
-# El separador se cambia a @ porque el JSON lleva comas, y una coma dentro del
-# valor haría que gcloud lo partiera en variables inventadas.
-gcloud run services update "$SERVICIO" --region "$REGION" --project "$PROJECT_ID" \
-  --update-env-vars "^@^AAUS_FIREBASE_CONFIG=${CONFIG}" --quiet >/dev/null
-ok "Guardada"
 
 # ══════════════════════════════════════════════════════════════════════
 #  8 · Resumen

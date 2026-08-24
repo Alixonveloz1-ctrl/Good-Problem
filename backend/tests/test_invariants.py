@@ -523,3 +523,47 @@ def test_el_guardia_de_musica_apunta_a_un_modelo_que_existe(registry):
     from app.domain.guards import MUSIC_MODEL_ID
 
     assert MUSIC_MODEL_ID in {spec.id for spec in registry.all()}
+
+
+def test_la_app_arranca_con_lo_que_pone_el_instalador(tmp_root, monkeypatch):
+    """El despliegue se cayo por esto y el error no lo decia.
+
+    setup.sh publicaba con el correo del dueno puesto pero conseguia la
+    configuracion de Firebase DESPUES. La app se niega a arrancar sin ella —con
+    razon: seria una puerta pintada—, asi que el contenedor moria al nacer y
+    Cloud Run solo decia "failed to start and listen on the port".
+
+    Esta prueba arranca la app con exactamente las variables que pone el
+    instalador. Si vuelven a faltarle, falla aqui y no en un despliegue de diez
+    minutos.
+    """
+    from fastapi.testclient import TestClient
+
+    from app.container import set_studio
+    from app.settings import get_settings
+
+    puestas = {
+        "AAUS_PROJECT_ID": "",  # sin proyecto: no se toca Firestore de verdad
+        "AAUS_LOCATION": "us-central1",
+        "AAUS_BUCKET": "",
+        "AAUS_OWNER_EMAIL": "dueno@gmail.com",
+        "AAUS_SESSION_SECRET": "0" * 48,
+        "AAUS_FIREBASE_CONFIG": FIREBASE,
+        "AAUS_DRY_RUN": "true",
+        "AAUS_LOCAL_DATA_DIR": str(tmp_root / "arranque"),
+        "AAUS_STATIC_DIR": str(tmp_root / "sin-frontend"),
+    }
+    for clave, valor in puestas.items():
+        monkeypatch.setenv(clave, valor)
+    get_settings.cache_clear()
+    set_studio(None)
+
+    try:
+        from app.main import app
+
+        with TestClient(app) as cliente:          # dispara el startup de verdad
+            assert cliente.get("/api/health").status_code == 200
+            assert cliente.get("/api/auth/config").json()["firebase"]["projectId"]
+    finally:
+        get_settings.cache_clear()
+        set_studio(None)
