@@ -154,6 +154,39 @@ class VertexClient:
             f"/publishers/google/models/{model}:{method}"
         )
 
+    def publisher_url(self, model: str) -> str:
+        """La ficha del modelo en el catalogo de Google.
+
+        Pedirla no genera nada y no cuesta nada: es lo unico que dice si un ID
+        existe sin gastar dinero probandolo.
+        """
+        return f"{self._host()}/v1/publishers/google/models/{model}"
+
+    def model_exists(self, model: str) -> bool | None:
+        """True si existe, False si no, None si no se pudo averiguar.
+
+        None y False no son lo mismo, y mezclarlos seria peor que no comprobar
+        nada: un tropiezo de red diria que el modelo no existe y mandaria a
+        cambiar un ID que estaba bien.
+        """
+        if self.dry_run:
+            return None
+        try:
+            response = httpx.get(
+                self.publisher_url(model),
+                headers={"Authorization": f"Bearer {self._token()}"},
+                timeout=30.0,
+            )
+        except httpx.HTTPError:
+            return None
+        if response.status_code == 200:
+            return True
+        # 404 es que no existe. 403 tambien: el catalogo es publico, asi que un
+        # permiso denegado sobre un modelo suele ser uno que ya no esta.
+        if response.status_code in (403, 404):
+            return False
+        return None
+
     def _token(self) -> str:
         import google.auth
         from google.auth.transport.requests import Request as AuthRequest

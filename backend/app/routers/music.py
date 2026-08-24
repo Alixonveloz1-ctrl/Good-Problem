@@ -256,7 +256,7 @@ def generate_song(
             kind="music",
             target_type="song",
             target_id=song_id,
-            model=None,  # resolved to lyria-3-pro by the orchestrator
+            model=None,  # resolved to lyria-3-pro-preview by the orchestrator
             idempotency_key=body.idempotency_key,
             payload={
                 "duration_seconds": body.duration_seconds

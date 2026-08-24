@@ -55,7 +55,7 @@ def test_banned_models_cannot_be_re_enabled_from_the_registry():
 
 
 def test_music_selector_offers_exactly_one_model(registry):
-    assert [m.id for m in registry.all(ModelKind.MUSIC)] == ["lyria-3-pro"]
+    assert [m.id for m in registry.all(ModelKind.MUSIC)] == ["lyria-3-pro-preview"]
 
 
 def test_music_falls_back_to_nothing(studio):
@@ -64,7 +64,7 @@ def test_music_falls_back_to_nothing(studio):
     resolved = studio.orchestrator.resolve_model(
         GenerationRequest(universe_id="u", kind="music", model=None)
     )
-    assert resolved.spec.id == "lyria-3-pro"
+    assert resolved.spec.id == "lyria-3-pro-preview"
     assert resolved.source == "system"
 
 
@@ -73,7 +73,11 @@ def test_music_falls_back_to_nothing(studio):
 
 def test_every_veo_request_disables_audio(registry):
     client = VertexClient("p", dry_run=True)
-    for model_id in ("veo-3.1", "veo-3.1-fast", "veo-3.1-lite"):
+    for model_id in (
+        "veo-3.1-generate-001",
+        "veo-3.1-fast-generate-001",
+        "veo-3.1-lite-generate-001",
+    ):
         veo.start_generation(
             client,
             registry.get(model_id),
@@ -118,7 +122,7 @@ def test_at_most_three_reference_images(registry):
     with pytest.raises(InvalidGenerationRequest):
         veo.start_generation(
             VertexClient("p", dry_run=True),
-            registry.get("veo-3.1"),
+            registry.get("veo-3.1-generate-001"),
             prompt="x",
             variant="1080p",
             reference_images=[veo.SourceImage(data=b"a") for _ in range(4)],
@@ -131,18 +135,18 @@ def test_at_most_three_reference_images(registry):
 def test_retry_never_substitutes_the_model(studio, client):
     uid = client.post("/api/universes", json={"name": "Nova"}).json()["id"]
     job = studio.jobs.create(
-        uid, kind="video", model="veo-3.1", variant="1080p", target_type="scene",
+        uid, kind="video", model="veo-3.1-generate-001", variant="1080p", target_type="scene",
         target_id="scene_x", request={}, estimated_cost_usd=1.6,
     )
     studio.jobs.mark_failed(uid, job["id"], "boom")
     with pytest.raises(ModelNotAllowed):
-        studio.jobs.retry(uid, job["id"], model="veo-3.1-lite")
+        studio.jobs.retry(uid, job["id"], model="veo-3.1-lite-generate-001")
 
 
 def test_retry_stops_after_max_attempts(studio, client):
     uid = client.post("/api/universes", json={"name": "Nova"}).json()["id"]
     job = studio.jobs.create(
-        uid, kind="text", model="gemini-3-pro", variant="default", target_type="song",
+        uid, kind="text", model="gemini-3.1-pro-preview", variant="default", target_type="song",
         target_id="s", request={}, estimated_cost_usd=0.01,
     )
     studio.db.update(
@@ -159,11 +163,11 @@ def test_retry_stops_after_max_attempts(studio, client):
 
 def test_reference_cost_of_a_three_minute_video(registry):
     """PRD 44: 24 escenas, dos intentos por pieza, gemini-3.1-flash-image y
-    veo-3.1-fast 1080p sin audio."""
+    veo-3.1-fast-generate-001 1080p sin audio."""
     song = estimate_song(registry, attempts=15)
     images = estimate_images(registry, "gemini-3.1-flash-image", "1K", images=42)
-    video = estimate_video(registry, "veo-3.1-fast", "1080p", seconds=8, clips=36)
-    director = estimate_text(registry, "gemini-3-pro", input_tokens=900_000,
+    video = estimate_video(registry, "veo-3.1-fast-generate-001", "1080p", seconds=8, clips=36)
+    director = estimate_text(registry, "gemini-3.1-pro-preview", input_tokens=900_000,
                              output_tokens=100_000)
     assert round(song.amount_usd, 2) == 1.20
     assert round(images.amount_usd, 2) == 2.81
@@ -175,16 +179,16 @@ def test_reference_cost_of_a_three_minute_video(registry):
 
 def test_video_is_billed_per_second_not_per_clip(registry):
     """The Vertex console labels the unit '1 count'. It is not per video."""
-    one_clip = estimate_video(registry, "veo-3.1-lite", "1080p", seconds=8, clips=1)
+    one_clip = estimate_video(registry, "veo-3.1-lite-generate-001", "1080p", seconds=8, clips=1)
     assert one_clip.amount_usd == 0.40
     assert one_clip.quantity == 8
 
 
 def test_switching_model_is_the_main_lever(registry):
     """PRD 44: the same video is about $15 on lite 720p and about $65 on
-    veo-3.1 1080p."""
-    cheap = estimate_video(registry, "veo-3.1-lite", "720p", seconds=8, clips=36)
-    dear = estimate_video(registry, "veo-3.1", "1080p", seconds=8, clips=36)
+    veo-3.1-generate-001 1080p."""
+    cheap = estimate_video(registry, "veo-3.1-lite-generate-001", "720p", seconds=8, clips=36)
+    dear = estimate_video(registry, "veo-3.1-generate-001", "1080p", seconds=8, clips=36)
     assert round(cheap.amount_usd, 2) == 8.64
     assert round(dear.amount_usd, 2) == 57.60
     assert dear.amount_usd / cheap.amount_usd > 6
@@ -477,3 +481,59 @@ def test_el_token_tiene_que_ir_dirigido_a_este_proyecto(studio):
 
     studio.settings.firebase_config = FIREBASE
     assert studio.settings.firebase_project == "alixon-jhan"
+
+
+# --- Los nombres de los modelos ---------------------------------------------
+
+
+def test_los_ids_son_los_que_vertex_quiere(registry):
+    """Los del PRD eran nombres comerciales, no identificadores.
+
+    Con "veo-3.1" en vez de "veo-3.1-generate-001", la URL que se arma no existe
+    y cada video muere en un 404 que en la pantalla solo se ve como un trabajo
+    fallido. Estos son los que estan comprobados funcionando en
+    studio.LegadodeHierro.
+    """
+    ids = {spec.id for spec in registry.all()}
+    assert {
+        "gemini-3.1-pro-preview",
+        "gemini-3-pro-image",
+        "gemini-3.1-flash-image",
+        "lyria-3-pro-preview",
+        "veo-3.1-generate-001",
+        "veo-3.1-fast-generate-001",
+        "veo-3.1-lite-generate-001",
+    } <= ids
+
+    # Los nombres comerciales no vuelven a colarse.
+    assert not ids & {"veo-3.1", "veo-3.1-fast", "veo-3.1-lite", "lyria-3-pro", "gemini-3-pro"}
+
+
+def test_el_guardia_de_musica_apunta_a_un_modelo_que_existe(registry):
+    """guards.py y el registro se escriben por separado y nadie los lee juntos.
+
+    Si el guardia exige un ID que el registro no tiene, no se puede generar
+    musica en absoluto y el error no dice eso.
+    """
+    from app.domain.guards import MUSIC_MODEL_ID
+
+    assert MUSIC_MODEL_ID in {spec.id for spec in registry.all()}
+
+
+def test_no_confundir_no_existe_con_no_se_sabe():
+    """Un tropiezo de red no puede hacerse pasar por un modelo inexistente: eso
+    mandaria a cambiar un ID que estaba bien."""
+    from app.providers.vertex import VertexClient
+
+    # En dry run no hay a quien preguntar, y eso es "no se sabe", no "no existe".
+    assert VertexClient("p", dry_run=True).model_exists("veo-3.1-generate-001") is None
+
+
+def test_la_ficha_del_modelo_no_lleva_proyecto(registry):
+    """El catalogo de modelos de Google es global. Meterle el proyecto delante
+    da un 404 en todos, y pareceria que no existe ninguno."""
+    from app.providers.vertex import VertexClient
+
+    url = VertexClient("mi-proyecto", location="us-central1").publisher_url("veo-3.1-generate-001")
+    assert url.endswith("/v1/publishers/google/models/veo-3.1-generate-001")
+    assert "mi-proyecto" not in url

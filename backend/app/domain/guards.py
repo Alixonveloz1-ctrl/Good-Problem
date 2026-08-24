@@ -21,11 +21,12 @@ from ..errors import InvalidGenerationRequest, ModelNotAllowed
 
 # --- 1. Music --------------------------------------------------------------
 
-MUSIC_MODEL_ID = "lyria-3-pro"
+MUSIC_MODEL_ID = "lyria-3-pro-preview"
 
 BANNED_MODEL_IDS: frozenset[str] = frozenset(
     {
         # 30 second clip models. Excluded from the selector and from fallback.
+        "lyria-3-clip-preview",
         "lyria-3",
         "lyria-2",
         "lyria-002",
@@ -40,6 +41,7 @@ BANNED_MODEL_IDS: frozenset[str] = frozenset(
 )
 
 BANNED_REASONS: dict[str, str] = {
+    "lyria-3-clip-preview": "Genera clips de 30 s. Solo se usa Lyria 3 Pro.",
     "lyria-3": "Genera clips de 30 s. Solo se usa Lyria 3 Pro.",
     "lyria-2": "Genera clips de 30 s. Solo se usa Lyria 3 Pro.",
     "lyria-002": "Genera clips de 30 s. Solo se usa Lyria 3 Pro.",

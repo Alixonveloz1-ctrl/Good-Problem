@@ -37,7 +37,7 @@ class AudioResult:
 def generate_song(
     client: VertexClient,
     *,
-    model: str = "lyria-3-pro",
+    model: str = "lyria-3-pro-preview",
     prompt: str,
     duration_seconds: int,
     negative_prompt: str = "",

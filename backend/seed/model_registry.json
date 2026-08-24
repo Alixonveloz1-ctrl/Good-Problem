@@ -4,7 +4,7 @@
   "currency": "USD",
   "models": [
     {
-      "id": "gemini-3-pro",
+      "id": "gemini-3.1-pro-preview",
       "kind": "text",
       "label": "Gemini 3 Pro",
       "role_hint": "Director, Producer, Music Director",
@@ -129,7 +129,7 @@
       }
     },
     {
-      "id": "lyria-3-pro",
+      "id": "lyria-3-pro-preview",
       "kind": "music",
       "label": "Lyria 3 Pro",
       "status": "active",
@@ -151,7 +151,7 @@
       }
     },
     {
-      "id": "veo-3.1",
+      "id": "veo-3.1-generate-001",
       "kind": "video",
       "label": "Veo 3.1",
       "status": "active",
@@ -185,7 +185,7 @@
       }
     },
     {
-      "id": "veo-3.1-fast",
+      "id": "veo-3.1-fast-generate-001",
       "kind": "video",
       "label": "Veo 3.1 Fast",
       "status": "active",
@@ -219,7 +219,7 @@
       }
     },
     {
-      "id": "veo-3.1-lite",
+      "id": "veo-3.1-lite-generate-001",
       "kind": "video",
       "label": "Veo 3.1 Lite",
       "status": "active",
@@ -278,7 +278,7 @@
   ],
   "excluded": [
     {
-      "id": "lyria-3",
+      "id": "lyria-3-clip-preview",
       "kind": "music",
       "reason": "Genera clips de 30 s, no canciones completas. Prohibido tambien como respaldo ante un fallo (PRD 14)."
     },

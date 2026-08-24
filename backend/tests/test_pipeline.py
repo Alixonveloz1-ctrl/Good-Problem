@@ -87,7 +87,7 @@ def test_full_production_from_a_phone(client, studio):
     # 12. Generar cancion con Lyria 3 Pro a la duracion pedida.
     music_job = _run(client, studio, "post", f"/api/universes/{uid}/songs/{sid}/generate",
                      json={"duration_seconds": 150})
-    assert music_job["model"] == "lyria-3-pro"
+    assert music_job["model"] == "lyria-3-pro-preview"
     assert music_job["result"]["duration_seconds"] == 150
 
     # 15. Aprobar cancion.
@@ -133,7 +133,7 @@ def test_full_production_from_a_phone(client, studio):
 
     # 25-29. Clips con Veo, cambio de modelo y aprobacion.
     for index, scene in enumerate(generated):
-        model = "veo-3.1-fast" if index == 0 else "veo-3.1-lite"
+        model = "veo-3.1-fast-generate-001" if index == 0 else "veo-3.1-lite-generate-001"
         clip_job = _run(client, studio, "post",
                         f"/api/universes/{uid}/scenes/{scene['id']}/clip",
                         json={"model": model, "variant": "1080p"})
@@ -230,9 +230,9 @@ def test_content_studio_makes_a_bts_clip(client, studio):
          json={"prompt": "Nova at the mixing desk", "model": "gemini-3.1-flash-image"})
 
     clip = _run(client, studio, "post", f"/api/universes/{uid}/content/{cid}/clip",
-                json={"model": "veo-3.1-lite", "variant": "720p"})
+                json={"model": "veo-3.1-lite-generate-001", "variant": "720p"})
     assert clip["result"]["generate_audio"] is False
-    assert clip["model"] == "veo-3.1-lite"
+    assert clip["model"] == "veo-3.1-lite-generate-001"
 
     _run(client, studio, "post", f"/api/universes/{uid}/content/{cid}/voice",
          json={"text": "Llevamos tres dias con esta cancion."})
