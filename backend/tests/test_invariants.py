@@ -258,42 +258,49 @@ def test_la_ruta_de_voz_no_la_tapa_la_de_contenido(client, universe):
 def test_la_cola_de_trabajos_lleva_su_propia_identidad(settings, studio):
     """PRD 37: los trabajos siguen en Google Cloud aunque se cierre el iPhone.
 
-    Eso solo se cumple si van por Cloud Tasks. La audiencia del token se pone a
-    mano: si se deja al valor por defecto, Cloud Tasks firma para la URL con su
-    ruta, el worker comprueba contra la URL base, y cada trabajo muere en un 401.
+    Eso solo se cumple si van por Cloud Tasks, y la cola solo puede volver a
+    entrar si trae con que demostrar quien es. Antes eso era un token OIDC de
+    Google; emitirlo exigia un permiso que hay que ir a dar a mano, y sin el no
+    arrancaba ni una sola generacion. Ahora el pase lo firma el propio estudio.
     """
+    from app.auth import COLA
     from app.services.jobs import JobService
 
     settings.tasks_queue = "aaus-generation"
     settings.tasks_target_url = "https://aaus-abc.a.run.app"
-    settings.tasks_service_account = "aaus-tasks@proyecto.iam.gserviceaccount.com"
 
     tarea = JobService(studio.db, settings).build_task("uni_1", "job_1", "POST")
     peticion = tarea["http_request"]
 
     assert peticion["url"] == "https://aaus-abc.a.run.app/api/internal/jobs/run"
-    assert peticion["oidc_token"]["audience"] == "https://aaus-abc.a.run.app"
-    assert peticion["oidc_token"]["service_account_email"].startswith("aaus-tasks@")
+    assert peticion["headers"][COLA]
+    # Y nada de OIDC: es justo lo que pedia el permiso que faltaba.
+    assert "oidc_token" not in peticion
 
 
-def test_la_audiencia_del_token_es_la_que_el_worker_comprueba(settings, studio):
-    """El que firma y el que comprueba tienen que mirar el mismo sitio.
+def test_el_pase_de_la_cola_va_atado_a_su_trabajo(settings, studio):
+    """Un encargo firmado no puede servir de llave para otra generacion.
 
-    Estas dos lineas viven en archivos distintos y nadie las lee juntas. Esta
-    prueba es el unico sitio donde se encuentran.
+    La puerta solo mira que la firma cuadre. Si el pase no dijera de que trabajo
+    es, cualquier encargo legitimo -y hay uno por cada imagen que se genera-
+    valdria para lanzar el que quisiera quien lo pillase.
     """
+    from app.auth import COLA, firmar_encargo, leer_encargo
     from app.services.jobs import JobService
 
-    settings.tasks_target_url = "https://aaus-abc.a.run.app/"
-    settings.tasks_service_account = "aaus-tasks@proyecto.iam.gserviceaccount.com"
+    settings.tasks_queue = "aaus-generation"
+    settings.tasks_target_url = "https://aaus-abc.a.run.app"
+    settings.session_secret = "clave-de-prueba"
 
     tarea = JobService(studio.db, settings).build_task("uni_1", "job_1", "POST")
-    firmada = tarea["http_request"]["oidc_token"]["audience"]
+    pase = tarea["http_request"]["headers"][COLA]
 
-    # Lo mismo que comprueba verify_service_token al recibir la peticion.
-    from app.auth import service_audience
-
-    assert firmada == service_audience(settings) == "https://aaus-abc.a.run.app"
+    assert leer_encargo(pase, settings.session_secret) == ("uni_1", "job_1")
+    # Con otra clave no vale, y manipulado tampoco.
+    assert leer_encargo(pase, "otra-clave") is None
+    cuerpo, firma = pase.rsplit(".", 1)
+    otra = firmar_encargo("uni_1", "job_2", settings.session_secret).rsplit(".", 1)[1]
+    assert leer_encargo(f"{cuerpo}.{otra}", settings.session_secret) is None
 
 
 # --- La puerta (PRD 41) -----------------------------------------------------
@@ -810,38 +817,94 @@ def test_todo_lo_que_se_crea_se_puede_borrar(client, universe):
     assert borra_artista, "sin boton: el artista"
 
 
-def test_la_cola_puede_entrar_con_su_token(client, studio, monkeypatch):
+def test_la_cola_puede_entrar_con_su_pase(client, studio):
     """El camino que hace que un trabajo pase de "en cola" a hecho.
 
-    Cloud Tasks vuelve a llamar a /api/internal/jobs/run con su token. Ya se
-    comprueba que la cookie del navegador NO vale ahi; falta lo contrario: que
-    el token si abra. Si esa puerta estuviera mal cerrada del otro lado, cada
-    trabajo se quedaria en cola para siempre y en la pantalla no habria ningun
-    error que mirar, que es la peor forma de fallar.
+    Cloud Tasks vuelve a llamar a /api/internal/jobs/run con el pase que firmo
+    esta misma aplicacion. Ya se comprueba que la cookie del navegador NO vale
+    ahi; falta lo contrario: que el pase si abra. Si esa puerta estuviera mal
+    cerrada del otro lado, cada trabajo se quedaria en cola para siempre y en la
+    pantalla no habria ningun error que mirar, que es la peor forma de fallar.
     """
-    from app import auth as modulo_auth
+    from app.auth import COLA, firmar_encargo
 
+    clave = "un-secreto-de-treinta-y-dos-caracteres"
+    studio.settings.owner_email = "dueno@gmail.com"
+    studio.settings.firebase_config = FIREBASE
+    studio.settings.session_secret = clave
+    studio.settings.tasks_target_url = "https://aaus-abc.a.run.app"
+
+    cuerpo = {"universe_id": "uni_inventado", "job_id": "job_inventado"}
+
+    # Sin pase, fuera.
+    assert client.post("/api/internal/jobs/run", json=cuerpo).status_code == 403
+
+    # Con un pase firmado con otra clave, tambien fuera.
+    ajeno = firmar_encargo(cuerpo["universe_id"], cuerpo["job_id"], "clave-de-otro")
+    assert client.post(
+        "/api/internal/jobs/run", json=cuerpo, headers={COLA: ajeno}
+    ).status_code == 403
+
+    # Con el pase bueno entra: llega al orquestador y este contesta que ese
+    # trabajo no existe, que es lo correcto para un id inventado.
+    pase = firmar_encargo(cuerpo["universe_id"], cuerpo["job_id"], clave)
+    respuesta = client.post("/api/internal/jobs/run", json=cuerpo, headers={COLA: pase})
+    assert respuesta.status_code == 404, respuesta.text
+    assert respuesta.json()["error"]["code"] == "not_found"
+
+    # Y un pase bueno de OTRO trabajo no sirve para este.
+    otro = firmar_encargo("uni_inventado", "job_distinto", clave)
+    assert client.post(
+        "/api/internal/jobs/run", json=cuerpo, headers={COLA: otro}
+    ).status_code == 403
+
+
+def test_el_bucle_entero_de_la_cola(client, studio, universe):
+    """Encargar, entregar y ejecutar, sin dar nada por hecho.
+
+    Aqui han ido a morir dos fallos seguidos -una audiencia mal puesta y un
+    permiso que faltaba- y las dos veces el sintoma fue el mismo: nada. El
+    trabajo se quedaba "en cola" y no habia error que mirar.
+
+    Las otras pruebas miran cada mitad por separado: que build_task prepara un
+    pase, y que la puerta acepta un pase escrito a mano. Esta las junta: lo que
+    build_task prepara se entrega tal cual, con la puerta cerrada, y el trabajo
+    tiene que terminar hecho.
+    """
+    from app.services.jobs import JobService
+
+    personaje = client.post(
+        f"/api/universes/{universe}/characters", json={"name": "Nova", "role": "lead"}
+    ).json()
+
+    # Y ahora la puerta, cerrada de verdad: sin el pase esto seria un 403.
     studio.settings.owner_email = "dueno@gmail.com"
     studio.settings.firebase_config = FIREBASE
     studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
-    studio.settings.tasks_service_account = "aaus-tasks@proyecto.iam.gserviceaccount.com"
     studio.settings.tasks_target_url = "https://aaus-abc.a.run.app"
 
-    # Sin token, fuera.
-    assert client.post(
-        "/api/internal/jobs/run", json={"universe_id": "u", "job_id": "j"}
-    ).status_code == 403
+    trabajo = studio.jobs.create(
+        universe,
+        kind="image",
+        model="gemini-3-pro-image",
+        variant="1K",
+        target_type="character",
+        target_id=personaje["id"],
+        request={"kind": "image", "prompt": "retrato", "target_type": "character",
+                 "target_id": personaje["id"], "shot_key": "front"},
+        estimated_cost_usd=0.0,
+    )
 
-    # Con un token que Google da por bueno, entra: llega al orquestador y este
-    # contesta que ese trabajo no existe, que es lo correcto para un id inventado.
-    monkeypatch.setattr(modulo_auth, "verify_service_token", lambda *_: True)
+    tarea = JobService(studio.db, studio.settings).build_task(universe, trabajo["id"], "POST")
+    peticion = tarea["http_request"]
+
     respuesta = client.post(
         "/api/internal/jobs/run",
-        json={"universe_id": "uni_inventado", "job_id": "job_inventado"},
-        headers={"Authorization": "Bearer loquesea"},
+        content=peticion["body"],
+        headers=peticion["headers"],
     )
-    assert respuesta.status_code == 404, respuesta.text
-    assert respuesta.json()["error"]["code"] == "not_found"
+    assert respuesta.status_code == 200, respuesta.text
+    assert studio.jobs.get(universe, trabajo["id"])["state"] != "QUEUED"
 
 
 def test_un_trabajo_que_no_se_pudo_encargar_no_dice_en_cola(studio, universe, monkeypatch):

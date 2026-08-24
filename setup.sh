@@ -233,14 +233,14 @@ detalle "Es lo que hace que un vídeo siga generándose aunque cierres Safari."
 crear_cuenta "aaus-tasks" "Cola de generación"
 dar_rol "serviceAccount:${SA_COLA}" "roles/run.invoker"
 
-# Y lo que faltaba: para encargar un trabajo, la aplicación tiene que poder
-# actuar EN NOMBRE de la cuenta de la cola. Es un permiso sobre esa cuenta
-# concreta, no un rol del proyecto, y por eso no bastaba con los de arriba.
+# La aplicación ya no necesita actuar en nombre de esta cuenta para encargar
+# trabajos: el pase que la cola presenta al volver lo firma ella misma con la
+# clave del estudio. Antes hacía falta el permiso iam.serviceAccounts.actAs, y
+# mientras no estuviera puesto no arrancaba ni una sola generación —un candado
+# que hay que ir a montar a otro sitio es un candado que un día no está—.
 #
-# Sin esto, cada generación muere nada más empezar con un
-# "lacks IAM permission iam.serviceAccounts.actAs", que en la pantalla se ve
-# como un ladrillo de texto de Google y no como lo que es: un permiso que el
-# instalador no dio.
+# Se sigue dando, por si algún día la cola se reconfigura con tokens de Google,
+# y porque quitarlo de una instalación que ya lo tiene no arregla nada.
 gcloud iam service-accounts add-iam-policy-binding "$SA_COLA" \
   --member="serviceAccount:${SA_APP}" \
   --role=roles/iam.serviceAccountUser \

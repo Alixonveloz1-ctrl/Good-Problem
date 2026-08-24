@@ -183,26 +183,24 @@ class JobService:
         Separada de la llamada para poder comprobarla sin red: es el punto donde
         un detalle mal puesto deja los trabajos sin ejecutarse.
         """
-        task: dict[str, Any] = {
+        from ..auth import COLA, firmar_encargo
+
+        # El pase va firmado con la clave del estudio, no con un token de
+        # Google. El token OIDC era mejor sobre el papel, pero para emitirlo
+        # hacia falta el permiso de actuar en nombre de la cuenta de la cola, y
+        # eso no se puede dar desde el codigo: hay que ir a darlo a mano. Sin
+        # el, ni una imagen, ni una cancion, ni un video llegaban a empezar.
+        return {
             "http_request": {
                 "http_method": http_method,
                 "url": f"{self.settings.tasks_target_url.rstrip('/')}/api/internal/jobs/run",
-                "headers": {"Content-Type": "application/json"},
+                "headers": {
+                    "Content-Type": "application/json",
+                    COLA: firmar_encargo(universe_id, job_id, self.settings.session_secret),
+                },
                 "body": json.dumps({"universe_id": universe_id, "job_id": job_id}).encode(),
             }
         }
-        if self.settings.tasks_service_account:
-            # La audiencia se pone a mano. Cloud Tasks, si no se le dice nada,
-            # firma el token para la URL completa con su ruta; el worker lo
-            # comprueba contra la URL base. Dejarlo al azar es un 401 en cada
-            # trabajo y ningun video terminado.
-            from ..auth import service_audience
-
-            task["http_request"]["oidc_token"] = {
-                "service_account_email": self.settings.tasks_service_account,
-                "audience": service_audience(self.settings),
-            }
-        return task
 
     def _enqueue_cloud_task(self, universe_id: str, job_id: str) -> None:
         from google.cloud import tasks_v2
@@ -215,14 +213,13 @@ class JobService:
         try:
             client.create_task(request={"parent": parent, "task": task})
         except Exception as exc:
-            # Los fallos de permisos aqui llegan como un ladrillo de texto de
-            # Google que no dice que hacer. Casi siempre es lo mismo: falta que
-            # la aplicacion pueda actuar en nombre de la cuenta de la cola, y
-            # eso lo arregla el instalador. Decirlo asi ahorra buscar.
-            if "actAs" in str(exc) or "PermissionDenied" in type(exc).__name__:
+            # Ya no hace falta ningun permiso especial para encargar: el pase lo
+            # firma la propia aplicacion. Si aun asi Google dice que no, lo que
+            # falta es la cola, y eso si lo monta el instalador.
+            if "PermissionDenied" in type(exc).__name__ or "NotFound" in type(exc).__name__:
                 raise ProviderError(
-                    "Falta un permiso para encargar el trabajo. Ejecuta ./setup.sh "
-                    "una vez en Cloud Shell y vuelve a intentarlo."
+                    f"La cola de trabajos no responde ({self.settings.tasks_queue}). "
+                    "Ejecuta ./setup.sh una vez en Cloud Shell."
                 ) from exc
             raise
         logger.info("job_enqueued %s %s", universe_id, job_id)

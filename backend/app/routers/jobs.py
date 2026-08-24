@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
+from ..auth import COLA, leer_encargo
 from ..domain.enums import JobState
+from ..errors import Forbidden
 from .deps import OwnerDep, StudioDep
 
 router = APIRouter(prefix="/api/universes/{universe_id}/jobs", tags=["jobs"])
@@ -70,7 +72,14 @@ class RunIn(BaseModel):
 
 
 @internal_router.post("/jobs/run")
-def run_job(studio: StudioDep, body: RunIn) -> dict[str, Any]:
-    """Cloud Tasks pushes here. Protected by the same IAM boundary as the rest
-    of the service, plus the OIDC token Cloud Tasks attaches."""
+def run_job(request: Request, studio: StudioDep, body: RunIn) -> dict[str, Any]:
+    """Aqui empuja Cloud Tasks cuando le toca a un trabajo.
+
+    Que el pase este bien firmado ya lo comprobo la puerta. Lo que se comprueba
+    aqui es lo otro: que el pase sea de ESTE trabajo y no de otro. Sin esto, un
+    encargo legitimo valdria de llave para lanzar cualquier generacion.
+    """
+    encargo = leer_encargo(request.headers.get(COLA, ""), studio.settings.session_secret)
+    if encargo is not None and encargo != (body.universe_id, body.job_id):
+        raise Forbidden("Ese pase no es de este trabajo.")
     return studio.orchestrator.run_job(body.universe_id, body.job_id)

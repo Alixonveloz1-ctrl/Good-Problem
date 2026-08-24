@@ -155,6 +155,62 @@ def verify_service_token(request: Request, settings: Settings) -> bool:
     return (datos.get("email") or "").lower() == settings.tasks_service_account.lower()
 
 
+# --- El encargo firmado -----------------------------------------------------
+
+COLA = "x-aaus-cola"
+"""La cabecera con la que la cola demuestra que el encargo salio de aqui."""
+
+ENCARGO_DIAS = 7
+
+
+def firmar_encargo(universe_id: str, job_id: str, secret: str) -> str:
+    """Un pase para un trabajo concreto, firmado con la clave del estudio.
+
+    Antes esto lo hacia un token OIDC de Google, y era mejor en teoria. En la
+    practica exigia un permiso —actuar en nombre de la cuenta de la cola— que
+    solo se puede dar desde una consola o escribiendo ordenes a mano, y sin el
+    ninguna generacion arrancaba. Un candado que hay que ir a montar a otro
+    sitio es un candado que un dia no esta puesto.
+
+    La firma no es mas debil que lo que ya protege el estudio entero: es la
+    misma clave que firma la sesion del navegador. Quien la tuviera podria
+    entrar como el dueño y lanzar generaciones por la puerta principal, asi que
+    esta puerta no es el eslabon flojo.
+
+    Va atado a un trabajo concreto y caduca, para que un encargo repescado no
+    sirva de llave general.
+    """
+    payload = json.dumps(
+        {"u": universe_id, "j": job_id, "exp": int(time.time()) + ENCARGO_DIAS * 86400},
+        separators=(",", ":"),
+    ).encode()
+    cuerpo = base64.urlsafe_b64encode(payload).decode().rstrip("=")
+    return f"{cuerpo}.{_sign(payload, secret)}"
+
+
+def leer_encargo(valor: str, secret: str) -> tuple[str, str] | None:
+    """Devuelve (universo, trabajo) del pase, o None si no vale."""
+    if not valor or "." not in valor or not secret:
+        return None
+    cuerpo, firma = valor.rsplit(".", 1)
+    try:
+        payload = base64.urlsafe_b64decode(cuerpo + "=" * (-len(cuerpo) % 4))
+    except (ValueError, TypeError):
+        return None
+    if not hmac.compare_digest(firma, _sign(payload, secret)):
+        return None
+    try:
+        datos = json.loads(payload)
+    except json.JSONDecodeError:
+        return None
+    if int(datos.get("exp", 0)) < time.time():
+        return None
+    universo, trabajo = datos.get("u"), datos.get("j")
+    if not universo or not trabajo:
+        return None
+    return str(universo), str(trabajo)
+
+
 def service_audience(settings: Settings) -> str | None:
     """El destinatario del token de la cola, escrito una sola vez.
 
@@ -207,6 +263,10 @@ def gate(request: Request, settings: Settings) -> Forbidden | None:
         return None
 
     if ruta.startswith(SERVICE_PREFIX):
+        # Vale el pase firmado por el estudio o, si alguien monto la cola con
+        # OIDC a mano, el token de Google. Cualquiera de los dos, no los dos.
+        if leer_encargo(request.headers.get(COLA, ""), settings.session_secret):
+            return None
         if verify_service_token(request, settings):
             return None
         return Forbidden("Esta ruta es solo para la cola de trabajos.")
