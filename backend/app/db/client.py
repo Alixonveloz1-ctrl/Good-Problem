@@ -177,12 +177,34 @@ class FirestoreDatabase:
         query = self._client.collection("/".join(_split(collection)))
         for field, value in (where or {}).items():
             query = query.where(filter=FieldFilter(field, "==", value))
-        if order_by:
-            direction = "DESCENDING" if descending else "ASCENDING"
-            query = query.order_by(order_by, direction=direction)
-        if limit:
+
+        # Filtrar y ordenar a la vez exige un indice compuesto, y Firestore no
+        # lo dice hasta que la consulta se ejecuta de verdad: se cae con un 400
+        # y un enlace para crearlo a mano. Cada combinacion nueva de filtro y
+        # orden seria otro 400 y otra visita a la consola.
+        #
+        # Filtrar solo, u ordenar solo, usa los indices que Firestore mantiene
+        # por su cuenta. Asi que cuando hacen falta las dos cosas, el filtro lo
+        # hace Firestore y el orden se hace aqui. Lo que se filtra en este
+        # sistema son los trabajos de un universo por estado: decenas.
+        ordenar_en_memoria = bool(where) and bool(order_by)
+
+        if order_by and not ordenar_en_memoria:
+            query = query.order_by(
+                order_by, direction="DESCENDING" if descending else "ASCENDING"
+            )
+        if limit and not ordenar_en_memoria:
             query = query.limit(limit)
-        return [snap.to_dict() for snap in query.stream()]
+
+        filas = [snap.to_dict() for snap in query.stream()]
+
+        if ordenar_en_memoria:
+            # El mismo criterio que MemoryDatabase, para que las pruebas y la
+            # produccion ordenen igual.
+            filas.sort(key=lambda d: _sort_key(d, order_by), reverse=descending)
+            if limit:
+                filas = filas[:limit]
+        return filas
 
 
 def build_database(settings) -> Database:

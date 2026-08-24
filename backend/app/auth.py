@@ -30,7 +30,7 @@ from dataclasses import dataclass
 
 from fastapi import Request
 
-from .errors import Forbidden
+from .errors import Forbidden, SinSesion
 from .settings import Settings
 
 COOKIE = "aaus_session"
@@ -186,7 +186,7 @@ def current_owner(request: Request, settings: Settings) -> Owner | None:
 def identify(request: Request, settings: Settings) -> Owner:
     propietario = current_owner(request, settings)
     if propietario is None:
-        raise Forbidden("Entra con tu cuenta de Google para usar el estudio.")
+        raise SinSesion("Entra con tu cuenta de Google para usar el estudio.")
     return propietario
 
 
@@ -215,5 +215,5 @@ def gate(request: Request, settings: Settings) -> Forbidden | None:
         return None  # el HTML y el JavaScript de la pantalla de entrada
 
     if current_owner(request, settings) is None:
-        return Forbidden("Entra con tu cuenta de Google para usar el estudio.")
+        return SinSesion("Entra con tu cuenta de Google para usar el estudio.")
     return None

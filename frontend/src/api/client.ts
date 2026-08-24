@@ -48,9 +48,10 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const text = await response.text()
   const payload = text ? JSON.parse(text) : null
   if (!response.ok) {
-    // Un 403 de la propia puerta no es una sesion caducada, es un intento de
-    // entrar que no cuadro. Avisar ahi seria un bucle.
-    if (response.status === 403 && !path.startsWith(PUERTA)) {
+    // Solo "sin_sesion" devuelve a la pantalla de entrada. Un 403 cualquiera
+    // puede ser una regla del estudio -algo que todavia no se puede hacer- y
+    // sacar al usuario por eso seria perder lo que estaba haciendo sin motivo.
+    if (payload?.error?.code === 'sin_sesion' && !path.startsWith(PUERTA)) {
       oyentes.forEach((oyente) => oyente())
     }
     const error: ApiError = payload?.error ?? {

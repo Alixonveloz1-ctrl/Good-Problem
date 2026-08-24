@@ -89,7 +89,7 @@ AYUDA="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/infra/setup"
 # Si faltan, lo de Firebase se cae mucho mas adelante y con un mensaje que no
 # tiene nada que ver ("no pude conseguir la clave del navegador"). Mejor aqui.
 for AYUDANTE in primer_app_id limpiar_config elegir_clave nombre_clave_nueva \
-                armar_config dominios; do
+                armar_config dominios variable_del_servicio; do
   [[ -f "${AYUDA}/${AYUDANTE}.py" ]] || {
     echo "Falta ${AYUDA}/${AYUDANTE}.py. Vuelve a ejecutar ./setup.sh" >&2
     exit 1
@@ -418,12 +418,16 @@ detalle "Construye la app y la sube. La primera vez es la más lenta."
 # cambiarla cerraría la sesión abierta en el iPhone sin motivo.
 LEER_VAR() {
   gcloud run services describe "$SERVICIO" --region "$REGION" --project "$PROJECT_ID" \
-    --format="value(spec.template.spec.containers[0].env.filter(\"name:$1\").extract(value))" \
-    2>/dev/null | tr -d '[]' || true
+    --format=json 2>/dev/null | python3 "${AYUDA}/variable_del_servicio.py" "$1" 2>/dev/null || true
 }
 
 SECRETO="$(LEER_VAR AAUS_SESSION_SECRET)"
-[[ -n "$SECRETO" ]] || SECRETO="$(openssl rand -hex 32)"
+if [[ -n "$SECRETO" ]]; then
+  detalle "conservando la clave de sesión: no tendrás que volver a entrar"
+else
+  SECRETO="$(openssl rand -hex 32)"
+  detalle "clave de sesión nueva: tendrás que entrar una vez más"
+fi
 
 # La app es pública en Cloud Run y tiene que serlo: para pintar la pantalla de
 # entrada hay que poder cargarla antes de saber quién eres. La puerta la pone la

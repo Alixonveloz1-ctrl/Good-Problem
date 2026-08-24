@@ -26,6 +26,19 @@ class Forbidden(DomainError):
     code = "forbidden"
 
 
+class SinSesion(Forbidden):
+    """No hay sesion, que no es lo mismo que "esto no se puede".
+
+    Comparten codigo HTTP porque los dos son 403, pero el navegador tiene que
+    distinguirlos: ante el primero vuelve a la pantalla de entrada, y ante el
+    segundo se queda donde esta y ensena el motivo. Sin esta distincion, la
+    primera regla del dominio que conteste 403 echa al usuario de la aplicacion
+    sin ninguna explicacion.
+    """
+
+    code = "sin_sesion"
+
+
 class Conflict(DomainError):
     status_code = 409
     code = "conflict"

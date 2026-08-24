@@ -596,3 +596,86 @@ def test_un_fallo_del_servidor_se_cuenta_en_json(studio, monkeypatch):
     assert "la base de datos dijo que no" in cuerpo["error"]["message"]
     assert cuerpo["error"]["details"]["ruta"] == "/api/home"
     app.state.studio = None
+
+
+def test_no_se_pide_ningun_indice_compuesto_a_firestore():
+    """Firestore exige un indice compuesto para filtrar y ordenar a la vez, y no
+    lo dice hasta que la consulta corre de verdad: 400 y un enlace para crearlo
+    a mano. Paso en la primera pantalla, recien instalado.
+
+    Filtrar solo, u ordenar solo, usa los indices automaticos. Esta prueba mira
+    lo que se le pide a Firestore.
+    """
+    from app.db import client as modulo
+
+    pedido: dict = {"where": [], "order_by": None, "limit": None}
+
+    class ConsultaFalsa:
+        def where(self, filter=None):  # noqa: A002
+            pedido["where"].append(filter)
+            return self
+
+        def order_by(self, campo, direction=None):
+            pedido["order_by"] = campo
+            return self
+
+        def limit(self, n):
+            pedido["limit"] = n
+            return self
+
+        def stream(self):
+            return iter(())
+
+    class ClienteFalso:
+        def collection(self, _ruta):
+            return ConsultaFalsa()
+
+    db = modulo.FirestoreDatabase.__new__(modulo.FirestoreDatabase)
+    db._client = ClienteFalso()
+
+    db.list("universes/u1/jobs", where={"state": "READY"}, order_by="created_at", limit=10)
+    assert len(pedido["where"]) == 1
+    assert pedido["order_by"] is None, "pedir orden con filtro exige un indice compuesto"
+    assert pedido["limit"] is None, "el limite se aplica despues de ordenar aqui"
+
+    pedido.update({"where": [], "order_by": None, "limit": None})
+    db.list("universes", order_by="updated_at", limit=50)
+    assert pedido["order_by"] == "updated_at"
+    assert pedido["limit"] == 50
+
+
+def test_los_dos_almacenes_ordenan_igual(tmp_root):
+    """Si en memoria y en Firestore el orden no coincide, las pruebas pasan y la
+    app se comporta distinto en el telefono."""
+    from app.db.client import MemoryDatabase, _sort_key
+
+    db = MemoryDatabase(str(tmp_root / "orden"))
+    for i, cuando in enumerate(["2026-01-03", "2026-01-01", "2026-01-02"]):
+        db.set(f"c/d{i}", {"id": f"d{i}", "created_at": cuando, "state": "READY"})
+
+    filas = db.list("c", where={"state": "READY"}, order_by="created_at")
+    assert [f["created_at"] for f in filas] == ["2026-01-03", "2026-01-02", "2026-01-01"]
+
+    copia = sorted(filas, key=lambda d: _sort_key(d, "created_at"), reverse=True)
+    assert copia == filas
+
+
+def test_no_es_lo_mismo_sin_sesion_que_no_se_puede(client, studio):
+    """Los dos son 403, pero el navegador tiene que distinguirlos: ante el
+    primero vuelve a la pantalla de entrada, ante el segundo se queda donde
+    esta. Sin esto, la primera regla del estudio que conteste 403 echa al
+    usuario de la aplicacion sin ninguna explicacion."""
+    from app.errors import Forbidden, SinSesion
+
+    studio.settings.owner_email = "dueno@gmail.com"
+    studio.settings.firebase_config = FIREBASE
+    studio.settings.session_secret = "un-secreto-de-treinta-y-dos-caracteres"
+
+    sin = client.get("/api/home")
+    assert sin.status_code == 403
+    assert sin.json()["error"]["code"] == "sin_sesion"
+
+    # Y una prohibicion del dominio sigue siendo 403 pero con otro codigo.
+    assert Forbidden("x").code == "forbidden"
+    assert SinSesion("x").status_code == 403
+    assert SinSesion("x").code == "sin_sesion"
