@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Body, Query
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
 
 from ..container import Studio
 from ..db.repositories import (
@@ -23,6 +24,8 @@ from ..providers.vertex import redact
 from .deps import OwnerDep, StudioDep
 
 router = APIRouter(prefix="/api", tags=["system"])
+
+logger = logging.getLogger("aaus.media")
 
 
 @router.get("/health")
@@ -247,18 +250,32 @@ def vertex_calls(
     }
 
 
-# --- Media (local development only) ---------------------------------------
+# --- Media -----------------------------------------------------------------
 
 media_router = APIRouter(tags=["media"])
 
 
 @media_router.get("/media/{path:path}")
 def media(path: str, studio: StudioDep):
-    """Serves generated assets when no bucket is configured. With a bucket, the
-    API hands out signed URLs instead and this route is never used."""
+    """Por donde el iPhone se descarga lo generado.
+
+    Con bucket lo normal es mandarlo directo a Google con un enlace firmado: no
+    pasa por aqui y no cuesta ni memoria ni tiempo de esta aplicacion.
+
+    Pero firmar necesita un permiso que hay que tener puesto, y si falta, lo que
+    se ve es una imagen rota sin ninguna explicacion. Asi que si la firma falla,
+    el archivo sale por aqui igualmente. Mas lento, pero se ve.
+    """
     storage = studio.storage
     if not isinstance(storage, LocalStorage):
-        return RedirectResponse(storage.signed_url(path))
+        try:
+            return RedirectResponse(storage.signed_url(path))
+        except Exception:
+            logger.exception("no se pudo firmar %s; se sirve desde la aplicacion", path)
+            datos = storage.read_bytes(path)
+            from ..providers.storage import guess_content_type
+
+            return Response(content=datos, media_type=guess_content_type(path))
     full = storage.root / path
     if not full.exists():
         raise NotFound(f"No existe {path}")

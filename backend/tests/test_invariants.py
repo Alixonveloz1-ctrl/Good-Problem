@@ -1082,6 +1082,54 @@ def test_ninguna_pantalla_obliga_a_escribir_un_nombre():
     assert "/${ruta}/propose" in codigo, "el boton no llama a ninguna ruta"
 
 
+def test_los_enlaces_se_firman_pidiendoselo_a_google():
+    """En Cloud Run no hay clave privada con la que firmar.
+
+    Las credenciales del servidor de metadatos solo traen un token. Si no se le
+    dice a quien pedirle la firma, la libreria intenta firmar en local y
+    contesta "you need a private key to sign credentials", que fue justo lo que
+    salio en pantalla DESPUES de generar y pagar la imagen.
+
+    Yo habia escrito un comentario diciendo que esto funcionaba. No lo comprobe.
+    """
+    from app.providers.storage import GcsStorage
+
+    pedido = {}
+
+    class BlobFalso:
+        def generate_signed_url(self, **kwargs):
+            pedido.update(kwargs)
+            return "https://firmado"
+
+    almacen = GcsStorage.__new__(GcsStorage)
+    almacen._bucket = type("B", (), {"blob": lambda self, p: BlobFalso()})()
+    almacen._firmante = lambda: ("aaus-run@proyecto.iam.gserviceaccount.com", "un-token")
+
+    assert almacen.signed_url("universes/u/character/a.png") == "https://firmado"
+    assert pedido["service_account_email"].startswith("aaus-run@")
+    assert pedido["access_token"] == "un-token"
+    assert pedido["version"] == "v4"
+
+
+def test_generar_algo_no_depende_de_poder_firmar_un_enlace():
+    """Un enlace que no se puede firmar no puede tirar el trabajo entero.
+
+    La imagen se generaba, se guardaba, se pagaba... y entonces el trabajo
+    moria al firmar el enlace y la pantalla decia FALLO. El archivo estaba en el
+    bucket y no habia forma de saberlo.
+
+    Ademas un enlace firmado caduca en una hora, asi que guardarlo en la base de
+    datos era guardar basura. La verdad es la ruta; el enlace se firma al
+    leerlo, que es cuando sirve.
+    """
+    import pathlib as rutas
+
+    handlers = rutas.Path(__file__).resolve().parents[1] / "app" / "orchestrator" / "handlers.py"
+    assert "signed_url" not in handlers.read_text(), (
+        "generar algo volvio a depender de firmar un enlace"
+    )
+
+
 def test_la_cola_puede_entrar_con_su_pase(client, studio):
     """El camino que hace que un trabajo pase de "en cola" a hecho.
 

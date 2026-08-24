@@ -444,7 +444,6 @@ def handle_image(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
         result={
             "purpose": purpose,
             "storage_path": stored.path,
-            "url": studio.storage.signed_url(stored.path),
             "image_id": doc.get("id") if doc else None,
             "model": spec.id,
             "variant": variant,
@@ -628,7 +627,6 @@ def handle_music(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
             "song_id": song_id,
             "version": version,
             "storage_path": stored.path,
-            "url": studio.storage.signed_url(stored.path),
             "duration_seconds": duration,
             "model": result.model,
         },
@@ -762,7 +760,6 @@ def handle_video(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
             "scene_id": scene_id,
             "clip_id": clip["id"],
             "storage_path": stored.path,
-            "url": studio.storage.signed_url(stored.path),
             "duration_seconds": duration,
             "model": spec.id,
             "variant": variant,
@@ -832,7 +829,6 @@ def _handle_content_video(studio, universe_id: str, job: dict[str, Any]) -> Outc
         result={
             "content_id": content_id,
             "storage_path": stored.path,
-            "url": studio.storage.signed_url(stored.path),
             "duration_seconds": duration,
             "model": spec.id,
             "variant": variant,
@@ -909,7 +905,6 @@ def handle_speech(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
     return Outcome(
         result={
             "storage_path": stored.path,
-            "url": studio.storage.signed_url(stored.path),
             "characters": len(text),
         },
         cost=cost,

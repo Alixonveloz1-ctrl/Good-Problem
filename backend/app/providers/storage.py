@@ -105,6 +105,7 @@ class GcsStorage:
         self.bucket_name = bucket
         self._client = storage.Client(project=project) if project else storage.Client()
         self._bucket = self._client.bucket(bucket)
+        self._credenciales = None
 
     def write_bytes(self, path: str, data: bytes, content_type: str | None = None) -> StoredObject:
         blob = self._bucket.blob(path.strip("/"))
@@ -120,10 +121,43 @@ class GcsStorage:
     def exists(self, path: str) -> bool:
         return self._bucket.blob(path.strip("/")).exists()
 
+    def _firmante(self) -> tuple[str | None, str | None]:
+        """Quien firma los enlaces, sin ningun archivo de clave.
+
+        En Cloud Run las credenciales vienen del servidor de metadatos y NO
+        contienen clave privada: solo un token. Firmar con ellas hay que
+        pedirlo a Google, con la API de IAM, y para eso hay que decirle a quien
+        se lo pides. Si no se le dice, intenta firmar aqui mismo y contesta:
+
+            "you need a private key to sign credentials"
+
+        Es exactamente lo que salia en pantalla despues de generar la imagen.
+        """
+        import google.auth
+        from google.auth.transport import requests as peticiones
+
+        if self._credenciales is None:
+            self._credenciales, _ = google.auth.default(
+                scopes=["https://www.googleapis.com/auth/cloud-platform"]
+            )
+        if not self._credenciales.valid:
+            self._credenciales.refresh(peticiones.Request())
+        return getattr(self._credenciales, "service_account_email", None), self._credenciales.token
+
     def signed_url(self, path: str, *, minutes: int = 60) -> str:
         blob = self._bucket.blob(path.strip("/"))
-        # V4 signing works with the Cloud Run service account through the IAM
-        # signBlob API, so no service account key file is involved (PRD 40).
+        correo, token = self._firmante()
+        if correo and token:
+            # Firma la API de IAM en nombre de la cuenta de la aplicacion. El
+            # permiso ya lo da el instalador (serviceAccountTokenCreator sobre
+            # si misma) y asi no hay ningun JSON de credenciales (PRD 40).
+            return blob.generate_signed_url(
+                version="v4",
+                expiration=timedelta(minutes=minutes),
+                service_account_email=correo,
+                access_token=token,
+            )
+        # En un portatil, con una cuenta de persona, se firma en local.
         return blob.generate_signed_url(version="v4", expiration=timedelta(minutes=minutes))
 
     def uri(self, path: str) -> str:
