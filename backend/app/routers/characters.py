@@ -31,6 +31,7 @@ class CharacterIn(BaseModel):
     name: str
     role: CharacterRole = CharacterRole.SUPPORTING
     gender: str = ""
+    rasgos: dict[str, str] = Field(default_factory=dict)
     apparent_age: str = ""
     appearance: str = ""
     personality: str = ""
@@ -39,6 +40,7 @@ class CharacterIn(BaseModel):
 class CharacterPatch(BaseModel):
     name: str | None = None
     gender: str | None = None
+    rasgos: dict[str, str] | None = None
     apparent_age: str | None = None
     appearance: str | None = None
     personality: str | None = None
@@ -138,11 +140,13 @@ def _lo_que_ya_decidio(personaje: dict[str, Any]) -> dict[str, Any]:
     generador que cambia el nombre y el sexo de lo que le das no esta
     proponiendo: esta empezando otra cosa.
     """
-    return {
-        clave: personaje[clave]
-        for clave in ("name", "gender")
-        if personaje.get(clave)
+    fijo = {
+        clave: personaje[clave] for clave in ("name", "gender") if personaje.get(clave)
     }
+    # Y como es, si lo eligio. Lo que dejo en blanco lo decide el Director, que
+    # para eso esta; lo que eligio no se discute.
+    fijo.update({k: v for k, v in (personaje.get("rasgos") or {}).items() if v})
+    return fijo
 
 
 def _proponer(studio, universe_id: str, tarea: str, cuantos: int, brief: str, modelo: str | None):

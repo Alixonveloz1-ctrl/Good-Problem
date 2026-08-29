@@ -1203,7 +1203,7 @@ video {
   color: var(--muted);
 }
 
-/* Los botones de una respuesta corta: mujer / hombre / no binario. */
+/* Los botones de una respuesta corta: mujer / hombre, el pelo, la piel. */
 .opciones {
   display: flex;
   gap: 8px;

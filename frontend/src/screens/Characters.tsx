@@ -8,6 +8,7 @@ import { JobWatcher } from '../components/JobWatcher'
 import { Empty, ErrorNote, Field, Loading, Sheet, StatusBadge, TopBar, DeleteButton } from '../components/ui'
 import { Proponer } from '../components/Proponer'
 import { ElegirGenero } from '../components/Genero'
+import { Rasgos } from '../components/Rasgos'
 
 export function CharactersScreen() {
   const { universeId = '' } = useParams()
@@ -178,11 +179,13 @@ function CharacterSheet({
   const [choice, setChoice] = useState<ModelChoice | null>(null)
   const [jobId, setJobId] = useState<string | null>(null)
   const [shotKey, setShotKey] = useState('portrait')
+  // Lo que no cabe en un boton: una cicatriz, un tatuaje, unas gafas.
+  const [extra, setExtra] = useState('')
 
   const design = async () => {
     const job = await action.run(() =>
       api.post<{ id: string }>(`/api/universes/${universeId}/characters/${character.id}/design`, {
-        brief: character.appearance,
+        brief: [character.appearance, extra].filter(Boolean).join('\n'),
         idempotency_key: newIdempotencyKey('design'),
       }),
     )
@@ -212,20 +215,26 @@ function CharacterSheet({
     await onChanged()
   }
 
-  // Quien es. Va antes que nada porque es lo unico que el Director no puede
-  // cambiar, y sin ello lo elige el: un nombre de mujer salia como hombre.
-  const ponerGenero = async (valor: string) => {
+  // Como es, decidido aqui. Lo que se elija manda sobre el Director; lo que se
+  // deje en blanco lo decide el, que para eso esta.
+  const guardar = async (patch: Record<string, unknown>) => {
     await action.run(() =>
-      api.patch(`/api/universes/${universeId}/characters/${character.id}`, { gender: valor }),
+      api.patch(`/api/universes/${universeId}/characters/${character.id}`, patch),
     )
     await onChanged()
   }
+
+  const rasgos = character.rasgos ?? {}
+  const elegidos = Object.values(rasgos).filter(Boolean).length
 
   return (
     <Sheet title={character.name || 'Personaje'} onClose={onClose}>
       <ErrorNote error={action.error} onDismiss={action.clearError} />
 
-      <ElegirGenero value={character.gender ?? ''} onChange={ponerGenero} />
+      <ElegirGenero
+        value={character.gender ?? ''}
+        onChange={(valor) => guardar({ gender: valor })}
+      />
       {!character.gender && (
         <p className="muted" style={{ margin: 0 }}>
           Dilo antes de pedir el diseño. Si se queda en blanco lo decide el
@@ -233,12 +242,33 @@ function CharacterSheet({
         </p>
       )}
 
+      <div className="section-title">Cómo es</div>
+      <p className="muted" style={{ margin: 0 }}>
+        Elige lo que tengas claro. Lo que dejes en blanco lo decide el Director
+        de casting; lo que elijas no te lo cambia. Toca otra vez para quitarlo.
+      </p>
+      <Rasgos
+        value={rasgos}
+        ocupado={action.busy}
+        onChange={(clave, valor) => guardar({ rasgos: { ...rasgos, [clave]: valor } })}
+      />
+
+      <Field
+        label="Algo más"
+        value={extra}
+        onChange={setExtra}
+        multiline
+        placeholder="Un tatuaje en el cuello, cicatriz en la ceja, siempre con gafas de sol…"
+      />
+
       <button
         className="btn block"
         onClick={design}
         disabled={action.busy || !character.gender}
       >
-        Pedir diseño al Director de casting
+        {elegidos > 0
+          ? `Que el Director lo termine (${elegidos} elegidos)`
+          : 'Que lo diseñe entero el Director'}
       </button>
 
       <ModelPicker kind="image" value={choice} onChange={setChoice} label="Modelo de imagen" />

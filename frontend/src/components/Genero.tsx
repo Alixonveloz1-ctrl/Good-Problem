@@ -1,4 +1,4 @@
-const OPCIONES = ['mujer', 'hombre', 'no binario']
+const OPCIONES = ['mujer', 'hombre']
 
 /**
  * Quién es, en un toque.

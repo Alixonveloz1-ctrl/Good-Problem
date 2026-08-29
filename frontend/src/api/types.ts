@@ -138,6 +138,7 @@ export interface Character {
   name: string
   role: string
   gender: string
+  rasgos?: Record<string, string>
   apparent_age: string
   appearance: string
   personality: string

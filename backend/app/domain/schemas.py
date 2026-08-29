@@ -187,6 +187,12 @@ class Character(Entity):
     role: CharacterRole = CharacterRole.SUPPORTING
     gender: str = ""
     """Lo decide quien crea al artista, y el Director no puede cambiarlo."""
+    rasgos: dict[str, str] = Field(default_factory=dict)
+    """Como es: piel, pelo, cuerpo, estilo. Lo elegido manda sobre el Director.
+
+    Lo que se deje en blanco si lo decide el, que para eso esta. Pero lo que se
+    elige no se discute: si aqui pone pelo morado, sale con el pelo morado.
+    """
     apparent_age: str = ""
     appearance: str = ""
     personality: str = ""

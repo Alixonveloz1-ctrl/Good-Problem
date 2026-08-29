@@ -230,8 +230,12 @@ def _apply_director_result(
         }
         # Y por encima de todo, lo que el usuario ya habia decidido. Al Director
         # se le pide en el prompt que lo respete, pero un prompt es una peticion:
-        # esto es la garantia. El nombre que se escribio es el nombre.
-        patch.update({k: v for k, v in (_payload(job).get("locked") or {}).items() if v})
+        # esto es la garantia. El nombre que se escribio es el nombre, y el pelo
+        # que se eligio es el pelo.
+        anterior = repo.get(target_id) or {}
+        for clave in ("name", "gender", "rasgos"):
+            if anterior.get(clave):
+                patch[clave] = anterior[clave]
         if repo.get(target_id) is None:
             repo.create(target_id, patch)
         else:

@@ -260,6 +260,66 @@ def test_el_director_no_puede_cambiarle_el_nombre_ni_el_sexo(client, studio):
     assert personaje["master_shots"][0]["prompt"] == "portrait of a man"
 
 
+def test_lo_que_elige_el_usuario_manda_sobre_el_director(client, studio):
+    """"O decido yo o lo decide el director, pero yo no tengo donde decidir."
+
+    Tenia razon: la unica decision que quedaba era el nombre. Ahora se eligen el
+    pelo, la piel, el cuerpo, la edad y el estilo, y lo elegido no se discute:
+    viaja como dado hasta el prompt de cada imagen. Lo que se deja en blanco si
+    lo decide el Director, que para eso esta.
+    """
+    from app.orchestrator.handlers import _apply_director_result
+    from app.routers.characters import _lo_que_ya_decidio
+
+    creado = client.post(
+        "/api/universes", json={"name": "Feri", "gender": "mujer"}
+    ).json()
+    uid, char_id = creado["id"], creado["lead_character_id"]
+    studio.jobs.wait_for_idle(20)
+
+    elegidos = {"pelo": "teñido", "piel": "morena", "cuerpo": "atlético", "edad": "25-34"}
+    client.patch(f"/api/universes/{uid}/characters/{char_id}", json={"rasgos": elegidos})
+
+    personaje = client.get(f"/api/universes/{uid}/characters/{char_id}").json()
+    assert personaje["rasgos"] == elegidos
+    # Todo lo elegido llega al Director como algo dado, no como una sugerencia.
+    fijo = _lo_que_ya_decidio(personaje)
+    assert fijo["name"] == "Feri" and fijo["gender"] == "mujer"
+    for clave, valor in elegidos.items():
+        assert fijo[clave] == valor
+
+    # Y si el modelo devuelve otra cosa, lo elegido se queda.
+    _apply_director_result(
+        studio,
+        uid,
+        {"target_id": char_id, "request": {"payload": {"task": "character"}}},
+        "character",
+        {"name": "Otra", "apparent_age": "50", "appearance": "rubia de pelo largo",
+         "master_prompts": [{"key": "portrait", "prompt": "portrait"}]},
+    )
+    personaje = client.get(f"/api/universes/{uid}/characters/{char_id}").json()
+    assert personaje["rasgos"] == elegidos
+    assert personaje["name"] == "Feri"
+    # Y lo que NO se eligio si lo escribe el: eso es su trabajo.
+    assert personaje["apparent_age"] == "50"
+
+
+def test_hay_donde_elegir_como_es_en_la_pantalla():
+    """La otra mitad: los botones existen y guardan.
+
+    Una ruta sin boton no existe para quien usa la app, y esto era exactamente
+    eso: el campo se podia guardar desde el primer dia y no habia donde tocarlo.
+    """
+    import pathlib as rutas
+
+    fuente = rutas.Path(__file__).resolve().parents[2] / "frontend" / "src"
+    codigo = "\n".join(f.read_text() for f in fuente.rglob("*.tsx"))
+    assert "<Rasgos" in codigo, "no hay donde elegir como es"
+    assert "rasgos: { ...rasgos" in codigo, "elegir no guarda nada"
+    for rasgo in ("pelo", "piel", "cuerpo", "edad", "estilo"):
+        assert f"clave: '{rasgo}'" in codigo, f"falta poder elegir {rasgo}"
+
+
 def test_la_pantalla_del_artista_dice_que_toca_ahora(client, studio):
     """El camino entero, paso a paso, sin adelantarse ni saltarse ninguno.
 

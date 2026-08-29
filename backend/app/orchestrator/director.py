@@ -158,9 +158,13 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
         fijo = payload.get("locked") or {}
         if fijo:
             sections.append(
-                "THESE ARE GIVEN, NOT YOURS TO CHOOSE. Use them exactly as written in every "
-                "field and in every image prompt. Never rename, never change the gender, "
-                "never propose an alternative:\n" + _kv(fijo)
+                "THESE ARE GIVEN, NOT YOURS TO CHOOSE. The user decided them. Use every one "
+                "of them exactly as written, in the description and in every single image "
+                "prompt. Never rename, never change the gender, never swap a chosen trait "
+                "for one you like better, never propose an alternative:\n" + _kv(fijo) +
+                "\n\nWhatever is NOT listed above is yours to decide, and you must decide it: "
+                "the description has to be precise enough that two separate generations look "
+                "like the same person."
             )
         if brief:
             sections.append(f"WHAT THE PRODUCTION NEEDS\n{brief}")
