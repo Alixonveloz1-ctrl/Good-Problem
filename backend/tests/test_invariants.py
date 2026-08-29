@@ -277,16 +277,28 @@ def test_lo_que_elige_el_usuario_manda_sobre_el_director(client, studio):
     uid, char_id = creado["id"], creado["lead_character_id"]
     studio.jobs.wait_for_idle(20)
 
-    elegidos = {"pelo": "teñido", "piel": "morena", "cuerpo": "atlético", "edad": "25-34"}
+    elegidos = {
+        "edad": "27",
+        "piel": "morena",
+        "pelo_color": "rubio platino",
+        "pelo_corte": "bob asimétrico",
+        "cuerpo": "curvilínea",
+        "detalles": "pecas, tatuajes en el cuello",
+    }
     client.patch(f"/api/universes/{uid}/characters/{char_id}", json={"rasgos": elegidos})
 
     personaje = client.get(f"/api/universes/{uid}/characters/{char_id}").json()
     assert personaje["rasgos"] == elegidos
     # Todo lo elegido llega al Director como algo dado, no como una sugerencia.
     fijo = _lo_que_ya_decidio(personaje)
-    assert fijo["name"] == "Feri" and fijo["gender"] == "mujer"
-    for clave, valor in elegidos.items():
-        assert fijo[clave] == valor
+    assert fijo["Stage name"] == "Feri" and fijo["Gender"] == "mujer"
+    # Cada rasgo llega con un nombre que se lee, no con la clave del documento.
+    assert fijo["Exact age"] == "27"
+    assert fijo["Hair colour"] == "rubio platino"
+    assert fijo["Hair cut and style"] == "bob asimétrico"
+    assert fijo["Body type"] == "curvilínea"
+    assert fijo["Distinctive features"] == "pecas, tatuajes en el cuello"
+    assert len(fijo) == 2 + len(elegidos), "algun rasgo elegido no llega al Director"
 
     # Y si el modelo devuelve otra cosa, lo elegido se queda.
     _apply_director_result(
@@ -316,8 +328,21 @@ def test_hay_donde_elegir_como_es_en_la_pantalla():
     codigo = "\n".join(f.read_text() for f in fuente.rglob("*.tsx"))
     assert "<Rasgos" in codigo, "no hay donde elegir como es"
     assert "rasgos: { ...rasgos" in codigo, "elegir no guarda nada"
-    for rasgo in ("pelo", "piel", "cuerpo", "edad", "estilo"):
+
+    # Y que el catalogo sea un catalogo, no cuatro plantillas: "esas son muy
+    # poquitas opciones". Cada fila tiene que dar de verdad donde elegir.
+    from app.routers.characters import ETIQUETAS
+
+    for rasgo in ETIQUETAS:
+        if rasgo == "edad":
+            continue  # la edad es exacta, no una lista
         assert f"clave: '{rasgo}'" in codigo, f"falta poder elegir {rasgo}"
+
+    largos = ("pelo_color", "pelo_corte", "cuerpo", "estilo", "detalles")
+    for rasgo in largos:
+        trozo = codigo.split(f"clave: '{rasgo}'", 1)[1].split("clave:", 1)[0]
+        cuantas = trozo.count("'")  // 2
+        assert cuantas >= 15, f"{rasgo} solo ofrece {cuantas} opciones"
 
 
 def test_la_pantalla_del_artista_dice_que_toca_ahora(client, studio):
@@ -436,7 +461,7 @@ def test_se_le_puede_decir_quien_es_a_un_artista_que_ya_existe(client, studio):
 
     # Sin sexo, al Director solo le llega el nombre: lo demas se lo inventa.
     personaje = client.get(f"/api/universes/{uid}/characters/{char_id}").json()
-    assert "gender" not in _lo_que_ya_decidio(personaje)
+    assert "Gender" not in _lo_que_ya_decidio(personaje)
 
     # Se le dice, desde su propia ficha.
     respuesta = client.patch(
@@ -446,7 +471,7 @@ def test_se_le_puede_decir_quien_es_a_un_artista_que_ya_existe(client, studio):
 
     personaje = client.get(f"/api/universes/{uid}/characters/{char_id}").json()
     assert personaje["gender"] == "mujer"
-    assert _lo_que_ya_decidio(personaje) == {"name": "Feri", "gender": "mujer"}
+    assert _lo_que_ya_decidio(personaje) == {"Stage name": "Feri", "Gender": "mujer"}
 
 
 def test_hay_donde_decir_quien_es_en_la_pantalla():

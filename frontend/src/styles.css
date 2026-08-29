@@ -1256,3 +1256,45 @@ video {
   border-color: #ffffff;
   color: var(--text);
 }
+
+/* La edad, exacta. Un tramo de diez años no es elegir la edad. */
+.edad {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.edad input {
+  width: 84px;
+  text-align: center;
+  font-size: 26px;
+  font-weight: 600;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  /* Safari pone unas flechitas diminutas encima del número. */
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
+.edad input::-webkit-outer-spin-button,
+.edad input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.edad .chip {
+  min-width: 48px;
+  font-size: 20px;
+  font-weight: 500;
+}
+
+/* Con catálogos largos, las filas se leen mejor un poco más juntas. */
+.field .opciones .chip {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+}

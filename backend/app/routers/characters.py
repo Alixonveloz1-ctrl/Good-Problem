@@ -141,12 +141,39 @@ def _lo_que_ya_decidio(personaje: dict[str, Any]) -> dict[str, Any]:
     proponiendo: esta empezando otra cosa.
     """
     fijo = {
-        clave: personaje[clave] for clave in ("name", "gender") if personaje.get(clave)
+        "Stage name": personaje["name"],
+        "Gender": personaje["gender"],
     }
+    fijo = {k: v for k, v in fijo.items() if v}
     # Y como es, si lo eligio. Lo que dejo en blanco lo decide el Director, que
     # para eso esta; lo que eligio no se discute.
-    fijo.update({k: v for k, v in (personaje.get("rasgos") or {}).items() if v})
+    for clave, valor in (personaje.get("rasgos") or {}).items():
+        if valor:
+            fijo[ETIQUETAS.get(clave, clave.replace("_", " "))] = valor
     return fijo
+
+
+ETIQUETAS = {
+    "edad": "Exact age",
+    "piel": "Skin tone",
+    "pelo_color": "Hair colour",
+    "pelo_corte": "Hair cut and style",
+    "cuerpo": "Body type",
+    "estatura": "Height",
+    "rostro": "Face shape",
+    "ojos": "Eyes",
+    "cejas": "Eyebrows",
+    "labios": "Lips",
+    "vello_facial": "Facial hair",
+    "estilo": "Style and wardrobe",
+    "actitud": "Attitude on camera",
+    "detalles": "Distinctive features",
+}
+"""Como se lee cada rasgo en el encargo al Director.
+
+Los prompts de imagen van en ingles, asi que la ficha que se le pasa tambien:
+un "pelo_corte" suelto entre texto en ingles se lee peor que "Hair cut and
+style", y aqui lo que se juega es que salga la persona que se pidio."""
 
 
 def _proponer(studio, universe_id: str, tarea: str, cuantos: int, brief: str, modelo: str | None):

@@ -8,7 +8,7 @@ import { JobWatcher } from '../components/JobWatcher'
 import { Empty, ErrorNote, Field, Loading, Sheet, StatusBadge, TopBar, DeleteButton } from '../components/ui'
 import { Proponer } from '../components/Proponer'
 import { ElegirGenero } from '../components/Genero'
-import { Rasgos } from '../components/Rasgos'
+import { Rasgos, cuantosElegidos } from '../components/Rasgos'
 
 export function CharactersScreen() {
   const { universeId = '' } = useParams()
@@ -225,7 +225,7 @@ function CharacterSheet({
   }
 
   const rasgos = character.rasgos ?? {}
-  const elegidos = Object.values(rasgos).filter(Boolean).length
+  const elegidos = cuantosElegidos(rasgos)
 
   return (
     <Sheet title={character.name || 'Personaje'} onClose={onClose}>
