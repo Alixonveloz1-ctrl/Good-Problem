@@ -40,62 +40,94 @@ export function CharactersScreen() {
   // Si el personaje se borro mientras estaba abierto, la ficha desaparece sola.
   const abierto = (data ?? []).find((c) => c.id === abiertoId) ?? null
 
+  // El artista es SOLO el protagonista. Antes iban todos revueltos en la misma
+  // lista, asi que un acompañante inventado parecia estar al mismo nivel que el
+  // artista, y de ahi el "no se de donde salen estos personajes".
+  const artista = (data ?? []).find((c) => c.role === 'lead') ?? null
+  const secundarios = (data ?? []).filter((c) => c.role !== 'lead')
+
+  const fila = (character: Character) => (
+    <div key={character.id} className="card fila-borrable">
+      <button
+        type="button"
+        className="grow destapado"
+        onClick={() => setAbiertoId(character.id)}
+      >
+        <div className="row between">
+          <strong>{character.name || 'Sin nombre'}</strong>
+          <StatusBadge status={character.status} />
+        </div>
+        <div className="sub">{character.appearance || 'Todavía sin descripción'}</div>
+        <div className="row between muted">
+          <span>{character.gender || 'sin decir quién es'}</span>
+          <span>
+            {character.master_shots.filter((shot) => shot.storage_path).length}/
+            {character.master_shots.length} tomas
+          </span>
+        </div>
+      </button>
+      <DeleteButton
+        busy={borrado.busy}
+        onDelete={async () => {
+          await borrado.run(() =>
+            api.del(`/api/universes/${universeId}/characters/${character.id}`),
+          )
+          await reload()
+        }}
+      />
+    </div>
+  )
+
   return (
     <>
       <TopBar title="Personajes" back />
       <main className="screen">
         {loading && !data && <Loading />}
         <ErrorNote error={error} />
-        <p className="muted" style={{ margin: 0 }}>
-          El artista está el primero. Los demás son quienes salen con él en los
-          videos, y su cara aprobada viaja como referencia en todo lo que se
-          genere después: es lo que hace que sea siempre la misma persona.
-        </p>
-
-        <Proponer
-          universeId={universeId}
-          ruta="characters"
-          cuantos={3}
-          etiqueta="Que el estudio proponga quién le acompaña"
-          onListo={reload}
-        />
-
-        {data && data.length === 0 && (
+        <div className="section-title">El artista</div>
+        {artista ? (
+          <div className="list">{fila(artista)}</div>
+        ) : (
           <Empty
-            title="Sin personajes todavía"
-            hint="El Director de casting los escribe a partir de quién es el artista."
+            title="Todavía no hay artista"
+            hint="Vuelve a su pantalla: ahí hay un botón para crearlo con el nombre que le pusiste."
           />
         )}
 
-        <div className="list">
-          {(data ?? []).map((character) => (
-            <div key={character.id} className="card fila-borrable">
-              <button type="button" className="grow destapado" onClick={() => setAbiertoId(character.id)}>
-                <div className="row between">
-                  <strong>{character.name || 'Sin nombre'}</strong>
-                  <StatusBadge status={character.status} />
-                </div>
-                <div className="sub">{character.appearance || 'Sin descripcion'}</div>
-                <div className="row between muted">
-                  <span>{character.role === 'lead' ? 'Protagonista' : 'Secundario'}</span>
-                  <span>
-                    {character.master_shots.filter((shot) => shot.storage_path).length}/
-                    {character.master_shots.length} tomas
-                  </span>
-                </div>
-              </button>
-              <DeleteButton
-                busy={borrado.busy}
-                onDelete={async () => {
-                  await borrado.run(() =>
-                    api.del(`/api/universes/${universeId}/characters/${character.id}`),
-                  )
-                  await reload()
-                }}
+        {/* Los acompañantes se proponen a partir de quién es el artista, así
+            que sin artista no hay de dónde sacarlos: era eso lo que llenaba la
+            lista de gente inventada que no venía de ninguna parte. */}
+        {artista && (
+          <>
+            <div className="section-title">Quien le acompaña</div>
+            <p className="muted" style={{ margin: 0 }}>
+              Los que salen con {artista.name || 'él'} en los videos. Su cara
+              aprobada viaja como referencia en todo lo que se genere después:
+              es lo que hace que sea siempre la misma persona.
+            </p>
+
+            <Proponer
+              universeId={universeId}
+              ruta="characters"
+              cuantos={3}
+              etiqueta={
+                secundarios.length > 0
+                  ? 'Que el estudio proponga más'
+                  : 'Que el estudio proponga quién le acompaña'
+              }
+              onListo={reload}
+            />
+
+            {secundarios.length === 0 && (
+              <Empty
+                title="Todavía va solo"
+                hint="El Director de casting los escribe a partir de quién es el artista."
               />
-            </div>
-          ))}
-        </div>
+            )}
+          </>
+        )}
+
+        <div className="list">{secundarios.map(fila)}</div>
       </main>
 
       <button className="btn small ghost block a-mano" onClick={() => setCreating(true)}>

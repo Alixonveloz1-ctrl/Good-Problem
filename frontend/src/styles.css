@@ -1209,3 +1209,50 @@ video {
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* --- Qué toca ahora ------------------------------------------------------
+ *
+ * "No sé ni por dónde empezar ni qué crear ni qué ver."
+ *
+ * Una sola cosa, y que se vea que es la que manda: fondo oscuro en una pantalla
+ * clara. Todo lo demás de esa pantalla es una lista de sitios a los que ir; esto
+ * es lo único que dice qué hacer. */
+
+.ahora {
+  background: var(--text);
+  color: #ffffff;
+  border-radius: var(--radius);
+  padding: 18px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ahora-etiqueta {
+  font-size: 11px;
+  letter-spacing: var(--tracking);
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.ahora-titulo {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.ahora-porque {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+/* El botón, al revés que fuera: blanco sobre el bloque oscuro. */
+.ahora .btn.primary {
+  margin-top: 6px;
+  background: #ffffff;
+  border-color: #ffffff;
+  color: var(--text);
+}

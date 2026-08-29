@@ -7,27 +7,35 @@ import { DeleteButton, ErrorNote, Loading, StatusBadge, TopBar } from '../compon
 /**
  * La pantalla del artista.
  *
- * Antes era una lista de once filas iguales con nombres de manual —Artist
- * Bible, Canon, Jobs, Export— y ningún orden entre ellas. Al crear un artista
- * se aterrizaba ahí sin saber por dónde empezar, y sin ver al artista por
- * ninguna parte.
+ * "No sé ni por dónde empezar ni qué crear ni qué ver. No puedo hacer nada
+ * porque no se entiende nada."
  *
- * Ahora manda la cara. Lo primero que hay que decidir es quién es, y eso se ve:
- * mientras no haya un retrato aprobado, la pantalla tiene una sola cosa que
- * hacer. Con retrato, la cara preside y debajo va el trabajo en el orden en que
- * ocurre: música, videoclips, contenido. Lo de mantener —el vestuario, las
- * locaciones, la voz— queda debajo, y lo técnico al final y en pequeño.
+ * Era un índice de once puertas —Música, Videoclips, Contenido, Personajes,
+ * Vestuario, Locaciones, Voz, Identidad, Aprobado, En marcha, Descargas— sin
+ * ningún orden entre ellas. Un índice no dice qué hacer: eso lo dice quien ya
+ * se sabe el camino.
+ *
+ * Ahora manda una sola cosa: qué toca AHORA, con su porqué y su botón. El
+ * camino no cambia nunca —quién es, su cara, su música, su videoclip— y cada
+ * paso necesita el anterior de verdad, así que enseñar los cuatro a la vez es
+ * enseñar tres callejones sin salida.
+ *
+ * Lo demás sigue estando, debajo y en pequeño, para cuando ya se sabe adónde
+ * se va.
  */
 
-type Seccion = { to: string; label: string; hint: string }
+type Paso = {
+  clave: string
+  titulo: string
+  porque: string
+  ir_a: string
+  accion: string
+  boton: string
+}
 
-const PRODUCCION: Seccion[] = [
-  { to: 'songs', label: 'Música', hint: 'Concepto, letra y canción' },
-  { to: 'projects', label: 'Videoclips', hint: 'Historia, planos y montaje' },
-  { to: 'content', label: 'Contenido', hint: 'Shorts, detrás de cámara, entrevistas' },
-]
+type UniverseConPaso = Universe & { siguiente?: Paso }
 
-const BIBLIOTECA: Seccion[] = [
+const MUNDO = [
   { to: 'characters', label: 'Personajes', hint: 'El artista y quien le acompaña' },
   { to: 'wardrobe', label: 'Vestuario', hint: 'Cómo va vestido en cada cosa' },
   { to: 'locations', label: 'Locaciones', hint: 'Dónde ocurre' },
@@ -35,19 +43,25 @@ const BIBLIOTECA: Seccion[] = [
   { to: 'bible', label: 'Identidad', hint: 'Cómo es, cómo suena, de qué habla' },
 ]
 
-const TECNICO: Seccion[] = [
-  { to: 'jobs', label: 'En marcha', hint: '' },
-  { to: 'canon', label: 'Aprobado', hint: '' },
-  { to: 'exports', label: 'Descargas', hint: '' },
+const PRODUCCION = [
+  { to: 'songs', label: 'Música', hint: 'Concepto, letra y canción' },
+  { to: 'projects', label: 'Videoclips', hint: 'Historia, planos y montaje' },
+  { to: 'content', label: 'Contenido', hint: 'Shorts, detrás de cámara, entrevistas' },
 ]
 
-function Fila({ base, seccion }: { base: string; seccion: Seccion }) {
+const TECNICO = [
+  { to: 'jobs', label: 'En marcha' },
+  { to: 'canon', label: 'Aprobado' },
+  { to: 'exports', label: 'Descargas' },
+]
+
+function Fila({ base, to, label, hint }: { base: string; to: string; label: string; hint: string }) {
   return (
-    <Link to={`${base}/${seccion.to}`} className="card tappable">
+    <Link to={`${base}/${to}`} className="card tappable">
       <div className="row">
         <div className="grow">
-          <strong>{seccion.label}</strong>
-          {seccion.hint && <div className="sub">{seccion.hint}</div>}
+          <strong>{label}</strong>
+          <div className="sub">{hint}</div>
         </div>
         <span className="muted">›</span>
       </div>
@@ -55,45 +69,51 @@ function Fila({ base, seccion }: { base: string; seccion: Seccion }) {
   )
 }
 
-/** El retrato del artista, o la única cosa que hacer si todavía no hay. */
-function Retrato({ base, artista }: { base: string; artista: Character | null }) {
+/** El artista: su cara y su nombre. Nunca un secundario haciendo de artista. */
+function Retrato({ artista, nombre }: { artista: Character | null; nombre: string }) {
   const foto = artista?.master_shots.find((toma) => toma.storage_path)
-
-  if (!artista) {
-    return (
-      <div className="card presenta">
-        <h2>¿Quién es tu artista?</h2>
-        <p className="muted">
-          Es lo primero. Su cara manda en todo lo demás: las canciones se le
-          escriben a alguien, y en los videos sale él.
-        </p>
-        <Link to={`${base}/characters`} className="btn primary block">
-          Crear a tu artista
-        </Link>
-      </div>
-    )
-  }
-
   return (
-    <Link to={`${base}/characters`} className="card presenta tappable">
+    <div className="card presenta">
       {foto ? (
-        <img className="presenta-foto" src={mediaUrl(foto.storage_path) ?? ''} alt={artista.name} />
+        <img className="presenta-foto" src={mediaUrl(foto.storage_path) ?? ''} alt={nombre} />
       ) : (
-        // Sin retrato, la inicial del nombre. Un dibujo de persona generico
-        // seria un adorno donde tiene que haber una cara.
-        <div className="presenta-hueco">{(artista.name.trim()[0] ?? '·').toUpperCase()}</div>
+        <div className="presenta-hueco">{(nombre || '?').trim().charAt(0).toUpperCase()}</div>
       )}
       <div className="row between" style={{ width: '100%' }}>
-        <h2 style={{ margin: 0 }}>{artista.name || 'Sin nombre'}</h2>
-        <StatusBadge status={artista.status} />
+        <h2 style={{ margin: 0 }}>{artista?.name || nombre}</h2>
+        {artista && <StatusBadge status={artista.status} />}
       </div>
-      {!foto && (
-        <p className="muted" style={{ margin: 0 }}>
-          Todavía no tiene cara. Tócalo y genérale el retrato: sin eso, los
-          videos no saben a quién están grabando.
-        </p>
+    </div>
+  )
+}
+
+/** Qué toca ahora: una sola cosa, con su porqué y su botón. */
+function AhoraToca({
+  base,
+  paso,
+  onCrearArtista,
+  ocupado,
+}: {
+  base: string
+  paso: Paso
+  onCrearArtista: () => void
+  ocupado: boolean
+}) {
+  return (
+    <div className="ahora">
+      <div className="ahora-etiqueta">Ahora toca</div>
+      <h3 className="ahora-titulo">{paso.titulo}</h3>
+      <p className="ahora-porque">{paso.porque}</p>
+      {paso.accion === 'crear_artista' ? (
+        <button className="btn primary block" onClick={onCrearArtista} disabled={ocupado}>
+          {ocupado ? 'Creando…' : paso.boton}
+        </button>
+      ) : (
+        <Link to={`${base}/${paso.ir_a}`} className="btn primary block">
+          {paso.boton}
+        </Link>
       )}
-    </Link>
+    </div>
   )
 }
 
@@ -101,19 +121,28 @@ export function UniverseScreen() {
   const { universeId = '' } = useParams()
   const base = `/u/${universeId}`
   const navegar = useNavigate()
-  const universo = useResource<Universe>(`/api/universes/${universeId}`)
+  const universo = useResource<UniverseConPaso>(`/api/universes/${universeId}`)
   const personajes = useResource<Character[]>(`/api/universes/${universeId}/characters`)
   const accion = useAction()
 
-  const lista = personajes.data ?? []
-  // El protagonista si lo hay; si no, el primero que exista. Un universo con
-  // personajes pero sin protagonista marcado no puede quedarse sin cara.
-  const artista = lista.find((p) => p.role === 'lead') ?? lista[0] ?? null
-  const listo = Boolean(artista?.master_shots.some((toma) => toma.storage_path))
+  // Solo el protagonista es el artista. Antes, si no lo habia, se cogia el
+  // primer personaje de la lista: por eso un acompañante inventado aparecia
+  // presidiendo la pantalla como si fuera el artista.
+  const artista = (personajes.data ?? []).find((p) => p.role === 'lead') ?? null
+  const paso = universo.data?.siguiente
+  const nombre = universo.data?.name ?? 'Artista'
+
+  const crearArtista = async () => {
+    const hecho = await accion.run(() => api.post(`/api/universes/${universeId}/artista`))
+    if (hecho) {
+      await universo.reload()
+      await personajes.reload()
+    }
+  }
 
   return (
     <>
-      <TopBar title={universo.data?.name ?? 'Artista'} back />
+      <TopBar title={nombre} back />
       <main className="screen">
         {universo.loading && !universo.data && <Loading />}
         <ErrorNote error={universo.error} />
@@ -122,26 +151,29 @@ export function UniverseScreen() {
 
         {universo.data && (
           <>
+            <Retrato artista={artista} nombre={nombre} />
             {universo.data.tagline && <p className="muted lema">{universo.data.tagline}</p>}
 
-            <Retrato base={base} artista={artista} />
+            {paso && (
+              <AhoraToca
+                base={base}
+                paso={paso}
+                onCrearArtista={crearArtista}
+                ocupado={accion.busy}
+              />
+            )}
 
-            {/* Sin cara aprobada, producir no lleva a ningún sitio: cada video
-                necesita una imagen del artista de la que partir. Se enseña,
-                pero apagado, para que se vea que existe y por qué no toca. */}
-            <div className={listo ? '' : 'apagado'}>
-              <div className="section-title">Producir</div>
-              <div className="list">
-                {PRODUCCION.map((s) => (
-                  <Fila key={s.to} base={base} seccion={s} />
-                ))}
-              </div>
+            <div className="section-title">Producir</div>
+            <div className="list">
+              {PRODUCCION.map((s) => (
+                <Fila key={s.to} base={base} {...s} />
+              ))}
             </div>
 
             <div className="section-title">Su mundo</div>
             <div className="list">
-              {BIBLIOTECA.map((s) => (
-                <Fila key={s.to} base={base} seccion={s} />
+              {MUNDO.map((s) => (
+                <Fila key={s.to} base={base} {...s} />
               ))}
             </div>
 

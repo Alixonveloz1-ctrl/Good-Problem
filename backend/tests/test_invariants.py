@@ -260,6 +260,106 @@ def test_el_director_no_puede_cambiarle_el_nombre_ni_el_sexo(client, studio):
     assert personaje["master_shots"][0]["prompt"] == "portrait of a man"
 
 
+def test_la_pantalla_del_artista_dice_que_toca_ahora(client, studio):
+    """El camino entero, paso a paso, sin adelantarse ni saltarse ninguno.
+
+    "No se ni por donde empezar ni que crear ni que ver. No puedo hacer nada
+    porque no se entiende nada." La pantalla era un indice de once puertas sin
+    orden entre ellas, y un indice no dice que hacer.
+
+    Cada paso necesita el anterior de verdad: un video sin cara aprobada no
+    sabe a quien esta grabando, y un videoclip sin cancion no tiene sobre que
+    montarse. Esta prueba recorre el camino y comprueba que en cada estado la
+    aplicacion pide UNA cosa, y la que toca.
+    """
+    from app.domain.enums import CanonStatus
+
+    def toca(uid: str) -> str:
+        return client.get(f"/api/universes/{uid}").json()["siguiente"]["clave"]
+
+    creado = client.post("/api/universes", json={"name": "Feri", "gender": "mujer"}).json()
+    uid, char_id = creado["id"], creado["lead_character_id"]
+    studio.jobs.wait_for_idle(20)
+    ficha = f"universes/{uid}/characters/{char_id}"
+
+    # 1. Con artista y sin cara, lo que toca es la cara.
+    assert toca(uid) == "cara"
+
+    # 2. Con cara sin aprobar, lo que toca es aprobarla.
+    tomas = studio.db.get(ficha)["master_shots"]
+    tomas[0]["storage_path"] = "universes/x/character/retrato.png"
+    studio.db.update(ficha, {"master_shots": tomas})
+    assert toca(uid) == "aprobar_cara"
+
+    # 3. Aprobada, lo que toca es la primera cancion.
+    studio.db.update(ficha, {"status": CanonStatus.APPROVED.value})
+    assert toca(uid) == "cancion"
+
+    # 4. Con cancion sin aprobar, terminarla.
+    cancion = client.post(f"/api/universes/{uid}/songs", json={"title": "La primera"}).json()
+    assert toca(uid) == "aprobar_cancion"
+
+    # 5. Aprobada, el videoclip. Y no antes: es el paso que no se puede saltar.
+    studio.db.update(
+        f"universes/{uid}/songs/{cancion['id']}", {"status": CanonStatus.APPROVED.value}
+    )
+    assert toca(uid) == "videoclip"
+
+
+def test_un_estudio_sin_artista_lo_dice_y_lo_arregla(client, studio):
+    """Y NO enseña a un acompañante haciendo de artista.
+
+    Los estudios creados antes de que el artista se creara solo se quedaron sin
+    protagonista. La pantalla cogia entonces el primer personaje de la lista, y
+    como los acompañantes si se pueden proponer, acababa presidiendo la
+    pantalla una tal Luna Ferrer que no venia de ninguna parte.
+    """
+    uid = client.post("/api/universes", json={"name": "Feri"}).json()["id"]
+    studio.jobs.wait_for_idle(20)
+
+    # Se borra el protagonista, como si el estudio fuera de los viejos.
+    for personaje in client.get(f"/api/universes/{uid}/characters").json():
+        client.delete(f"/api/universes/{uid}/characters/{personaje['id']}")
+
+    # Y se le añaden acompañantes, que es lo que llenaba la lista.
+    client.post(
+        f"/api/universes/{uid}/characters", json={"name": "Luna Ferrer", "role": "supporting"}
+    )
+
+    paso = client.get(f"/api/universes/{uid}").json()["siguiente"]
+    assert paso["clave"] == "artista", "con acompañantes pero sin artista, pide el artista"
+    assert "Feri" in paso["titulo"]
+    assert paso["accion"] == "crear_artista"
+
+    # Y se arregla de un toque, con el nombre del estudio.
+    creado = client.post(f"/api/universes/{uid}/artista").json()
+    assert creado["name"] == "Feri"
+    assert creado["role"] == "lead"
+    assert client.get(f"/api/universes/{uid}").json()["siguiente"]["clave"] == "genero"
+
+    # Y no crea dos si se toca dos veces.
+    client.post(f"/api/universes/{uid}/artista")
+    lideres = [
+        c for c in client.get(f"/api/universes/{uid}/characters").json() if c["role"] == "lead"
+    ]
+    assert len(lideres) == 1
+
+
+def test_la_pantalla_nunca_asciende_a_un_secundario_a_artista():
+    """La otra mitad: en el codigo de la pantalla, tampoco.
+
+    El fallo estaba en un `?? lista[0]` puesto para que "un universo con
+    personajes pero sin protagonista no se quede sin cara". Lo que conseguia era
+    peor que quedarse sin cara: enseñaba a otro en su lugar.
+    """
+    import pathlib as rutas
+
+    pantallas = rutas.Path(__file__).resolve().parents[2] / "frontend" / "src" / "screens"
+    codigo = "\n".join(f.read_text() for f in pantallas.glob("*.tsx"))
+    assert "'lead') ?? lista[0]" not in codigo
+    assert "=== 'lead') ?? null" in codigo, "el artista tiene que salir solo del protagonista"
+
+
 def test_se_le_puede_decir_quien_es_a_un_artista_que_ya_existe(client, studio):
     """Y esa decision viaja hasta el Director.
 

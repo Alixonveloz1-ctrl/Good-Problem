@@ -8,7 +8,16 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from ..db.repositories import CANON, CHARACTERS, UNIVERSES, Repository, universe_path
+from ..container import Studio
+from ..db.repositories import (
+    CANON,
+    CHARACTERS,
+    SONGS,
+    UNIVERSES,
+    VIDEO_PROJECTS,
+    Repository,
+    universe_path,
+)
 from ..domain.enums import CanonStatus, CharacterRole, CreativeRole
 from ..domain.schemas import MASTER_SHOTS, ArtistBible, Universe
 from ..errors import NotFound
@@ -63,25 +72,10 @@ def create_universe(owner: OwnerDep, studio: StudioDep, body: UniverseIn) -> dic
     # to read (PRD 42.4).
     save_bible(studio.db, universe_id, ArtistBible(id="current", universe_id=universe_id))
 
-    # Y el artista, que ES el universo. El nombre y el sexo quedan puestos desde
+    # Y el artista, que ES el estudio. El nombre y el sexo quedan puestos desde
     # aqui: son lo unico que el Director tiene prohibido cambiar.
     protagonista = Repository(studio.db, universe_id, CHARACTERS).create(
-        new_id("char"),
-        {
-            "name": body.name,
-            "role": CharacterRole.LEAD.value,
-            "gender": body.gender,
-            "apparent_age": "",
-            "appearance": "",
-            "personality": "",
-            "master_shots": [
-                {"key": key, "label": label, "storage_path": None,
-                 "status": CanonStatus.DRAFT.value, "prompt": ""}
-                for key, label in MASTER_SHOTS
-            ],
-            "reference_image_paths": [],
-            "status": CanonStatus.DRAFT.value,
-        },
+        new_id("char"), _ficha_en_blanco(body.name, body.gender)
     )
 
     # Y se pone a trabajar solo. Nadie tiene que acordarse de pedirselo: sin el
@@ -112,6 +106,25 @@ def create_universe(owner: OwnerDep, studio: StudioDep, body: UniverseIn) -> dic
     return {**universe.model_dump(), "lead_character_id": protagonista["id"], "job": encargo}
 
 
+def _ficha_en_blanco(nombre: str, genero: str = "") -> dict[str, Any]:
+    """El protagonista recien creado: su nombre, quien es, y nada mas."""
+    return {
+        "name": nombre,
+        "role": CharacterRole.LEAD.value,
+        "gender": genero,
+        "apparent_age": "",
+        "appearance": "",
+        "personality": "",
+        "master_shots": [
+            {"key": key, "label": label, "storage_path": None,
+             "status": CanonStatus.DRAFT.value, "prompt": ""}
+            for key, label in MASTER_SHOTS
+        ],
+        "reference_image_paths": [],
+        "status": CanonStatus.DRAFT.value,
+    }
+
+
 def _quien_es(body: UniverseIn) -> str:
     """Lo que el usuario conto del artista, en una sola nota para el Director."""
     partes = [f"Artist stage name: {body.name}."]
@@ -134,7 +147,142 @@ def get_universe(owner: OwnerDep, studio: StudioDep, universe_id: str) -> dict[s
     universe = studio.db.get(universe_path(universe_id))
     if universe is None:
         raise NotFound(f"El universe {universe_id} no existe.")
-    return universe
+    return {**universe, "siguiente": siguiente_paso(studio, universe)}
+
+
+def siguiente_paso(studio: Studio, universe: dict[str, Any]) -> dict[str, Any]:
+    """Que toca ahora, una sola cosa.
+
+    "No se ni por donde empezar ni que crear ni que ver." La pantalla del
+    artista era un indice de once puertas sin ningun orden entre ellas, y un
+    indice no dice que hacer: lo dice quien ya sabe el camino.
+
+    El camino es este y no cambia: primero se sabe quien es el artista, luego
+    se le ve la cara, luego tiene una cancion, y con la cancion se monta el
+    videoclip. Cada paso necesita el anterior de verdad -un video sin cara
+    aprobada no sabe a quien esta grabando- asi que ensenar los cuatro a la vez
+    es ensenar tres callejones.
+    """
+    uid = universe["id"]
+    nombre = universe.get("name") or "tu artista"
+    personajes = Repository(studio.db, uid, CHARACTERS).list(limit=50)
+    artista = next((p for p in personajes if p.get("role") == CharacterRole.LEAD.value), None)
+
+    if artista is None:
+        # Pasa en los universos creados antes de que crear al artista fuera un
+        # solo paso. Sin protagonista, la pantalla acababa ensenando a un
+        # secundario como si fuera el artista.
+        return _paso(
+            "artista",
+            f"Falta {nombre}",
+            "Este es su estudio, pero el artista todavía no existe dentro. "
+            "Se crea con el nombre que le pusiste.",
+            accion="crear_artista",
+            boton=f"Crear a {nombre}",
+        )
+
+    if not artista.get("gender"):
+        return _paso(
+            "genero",
+            f"Di quién es {artista.get('name') or nombre}",
+            "Si no lo dices, lo elige el Director, y de un nombre de mujer puede "
+            "sacar un hombre.",
+            ir_a="characters",
+            boton="Decirlo",
+        )
+
+    tomas = artista.get("master_shots") or []
+    if not any(t.get("storage_path") for t in tomas):
+        return _paso(
+            "cara",
+            f"Genérale la cara a {artista.get('name') or nombre}",
+            "Es lo primero de todo. Cada video parte de una imagen suya: sin "
+            "ella, no saben a quién están grabando.",
+            ir_a="characters",
+            boton="Generar su retrato",
+        )
+
+    if artista.get("status") != CanonStatus.APPROVED.value:
+        return _paso(
+            "aprobar_cara",
+            "Aprueba su cara",
+            "Al aprobarla queda fijada, y a partir de ahí viaja como referencia "
+            "en todo lo que se genere: es lo que hace que siempre sea la misma persona.",
+            ir_a="characters",
+            boton="Ir a aprobarla",
+        )
+
+    canciones = Repository(studio.db, uid, SONGS).list(limit=50)
+    if not canciones:
+        return _paso(
+            "cancion",
+            "Su primera canción",
+            "Un videoclip se monta sobre una canción aprobada, así que la "
+            "música va antes que el video.",
+            ir_a="songs",
+            boton="Empezar una canción",
+        )
+
+    if not any(c.get("status") == CanonStatus.APPROVED.value for c in canciones):
+        return _paso(
+            "aprobar_cancion",
+            "Termina su canción",
+            "Cuando esté aprobada se puede montar el videoclip encima.",
+            ir_a="songs",
+            boton="Ir a la canción",
+        )
+
+    proyectos = Repository(studio.db, uid, VIDEO_PROJECTS).list(limit=50)
+    if not proyectos:
+        return _paso(
+            "videoclip",
+            "Su primer videoclip",
+            "Ya hay cara aprobada y canción aprobada: es justo lo que hace falta "
+            "para empezar a rodar.",
+            ir_a="projects",
+            boton="Montar el videoclip",
+        )
+
+    return _paso(
+        "seguir",
+        "Sigue produciendo",
+        "Lo básico está: tiene cara, tiene música y tiene video. Desde aquí, "
+        "más canciones, más videoclips y contenido para redes.",
+        ir_a="projects",
+        boton="Ver sus videoclips",
+    )
+
+
+def _paso(
+    clave: str,
+    titulo: str,
+    porque: str,
+    *,
+    ir_a: str = "",
+    accion: str = "",
+    boton: str = "",
+) -> dict[str, str]:
+    return {"clave": clave, "titulo": titulo, "porque": porque,
+            "ir_a": ir_a, "accion": accion, "boton": boton}
+
+
+@router.post("/{universe_id}/artista")
+def crear_artista(owner: OwnerDep, studio: StudioDep, universe_id: str) -> dict[str, Any]:
+    """Crea el protagonista que falta, con el nombre del estudio.
+
+    Solo hace falta en los estudios creados antes de que el artista se creara
+    solo. Si ya hay uno, no toca nada.
+    """
+    universe = studio.db.get(universe_path(universe_id))
+    if universe is None:
+        raise NotFound(f"El universe {universe_id} no existe.")
+    repo = Repository(studio.db, universe_id, CHARACTERS)
+    existente = next(
+        (p for p in repo.list(limit=50) if p.get("role") == CharacterRole.LEAD.value), None
+    )
+    if existente is not None:
+        return existente
+    return repo.create(new_id("char"), _ficha_en_blanco(universe.get("name", "")))
 
 
 @router.patch("/{universe_id}")
