@@ -18,11 +18,13 @@ from ..db.repositories import (
     Repository,
     universe_path,
 )
+from ..domain import artist as artist_domain
 from ..domain.enums import CanonStatus, CharacterRole, CreativeRole
-from ..domain.schemas import MASTER_SHOTS, ArtistBible, Universe
-from ..errors import NotFound
+from ..domain.schemas import MASTER_SHOTS, ArtistBible, Inspiration, SingingVoice, Universe
+from ..errors import InvalidGenerationRequest, NotFound
 from ..ids import new_id
 from ..orchestrator.orchestrator import GenerationRequest
+from ..services import inspiration as inspiration_service
 from ..services.approvals import ApprovalService
 from ..services.context import load_bible, save_bible, summarize_bible
 from .deps import OwnerDep, StudioDep
@@ -45,6 +47,12 @@ class UniverseIn(BaseModel):
     gender: str = ""
     genre: str = ""
     notes: str = ""
+    visual_style: str = ""
+    """Clave de estilo de domain.artist.VISUAL_STYLES. Fijo para el artista."""
+    music_genres: list[str] = Field(default_factory=list)
+    """Hasta tres generos principales, combinables."""
+    inspiration_urls: list[str] = Field(default_factory=list)
+    """Enlaces de YouTube de referencia: la app los analiza sola."""
 
 
 class UniversePatch(BaseModel):
@@ -69,8 +77,25 @@ def create_universe(owner: OwnerDep, studio: StudioDep, body: UniverseIn) -> dic
     )
     studio.db.set(universe_path(universe_id), universe.model_dump())
     # A universe starts with an empty Bible so every later call has something
-    # to read (PRD 42.4).
-    save_bible(studio.db, universe_id, ArtistBible(id="current", universe_id=universe_id))
+    # to read (PRD 42.4). What the form already decided goes in now: the
+    # visual style, the genre combination and the analysed inspirations.
+    bible = ArtistBible(id="current", universe_id=universe_id)
+    if body.visual_style in artist_domain.VISUAL_STYLE_KEYS:
+        bible.visual.style_key = body.visual_style
+        bible.visual.style_label = artist_domain.visual_style_label(body.visual_style)
+    bible.music_genres = [
+        g for g in body.music_genres if g in artist_domain.MUSIC_GENRE_KEYS
+    ][: artist_domain.MAX_MAIN_GENRES]
+    if body.genre and not bible.music_genres:
+        bible.musical.genre = body.genre
+    for enlace in body.inspiration_urls:
+        try:
+            bible.inspirations.append(inspiration_service.analyse_youtube(studio, enlace))
+        except Exception:
+            # Un enlace que no se puede analizar no puede tumbar la creacion
+            # del artista: se puede volver a pegar desde su ficha.
+            logger.exception("no se pudo analizar la inspiracion %s", enlace)
+    save_bible(studio.db, universe_id, bible)
 
     # Y el artista, que ES el estudio. El nombre y el sexo quedan puestos desde
     # aqui: son lo unico que el Director tiene prohibido cambiar.
@@ -191,6 +216,28 @@ def siguiente_paso(studio: Studio, universe: dict[str, Any]) -> dict[str, Any]:
             boton="Decirlo",
         )
 
+    bible = load_bible(studio.db, uid)
+    if not bible.visual.style_key:
+        return _paso(
+            "estilo",
+            f"Elige cómo se ve {artista.get('name') or nombre}",
+            "Su estilo visual queda fijo: realista, un anime, óleo... Todas "
+            "sus fotos y todos sus videos salen con ese mismo estilo.",
+            ir_a="bible",
+            boton="Elegir su estilo",
+        )
+
+    if artista.get("master_stale") or bible.visual.master_stale:
+        return _paso(
+            "rehacer_cara",
+            "Su estilo cambió: hay que rehacer su cara",
+            "Cambiaste su estilo visual después de aprobar su cara, así que "
+            "esa cara ya no es su estilo. Se genera otra con el estilo nuevo "
+            "y se aprueba, y a partir de ahí todo sale en el estilo nuevo.",
+            ir_a="characters",
+            boton="Rehacer su cara",
+        )
+
     tomas = artista.get("master_shots") or []
     if not any(t.get("storage_path") for t in tomas):
         return _paso(
@@ -247,7 +294,7 @@ def siguiente_paso(studio: Studio, universe: dict[str, Any]) -> dict[str, Any]:
         "seguir",
         "Sigue produciendo",
         "Lo básico está: tiene cara, tiene música y tiene video. Desde aquí, "
-        "más canciones, más videoclips y contenido para redes.",
+        "más canciones y más videoclips.",
         ir_a="projects",
         boton="Ver sus videoclips",
     )
@@ -367,22 +414,146 @@ def approve_bible(owner: OwnerDep, studio: StudioDep, universe_id: str) -> dict[
     return bible.model_dump()
 
 
-class VoiceProfileIn(BaseModel):
-    lines: list[str]
-    speaking_voice_secret: str | None = None
+class SingingVoiceIn(BaseModel):
+    sex: str = ""
+    apparent_age: str = ""
+    pitch: str = ""
+    timbre: str = ""
+    language_accent: str = ""
+    singing_style: str = ""
 
 
-@router.put("/{universe_id}/bible/voice-profile")
-def put_voice_profile(
-    owner: OwnerDep, studio: StudioDep, universe_id: str, body: VoiceProfileIn
+@router.put("/{universe_id}/bible/singing-voice")
+def put_singing_voice(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, body: SingingVoiceIn
 ) -> dict[str, Any]:
-    """The Voice Profile travels verbatim in every music prompt (PRD 10)."""
+    """La voz cantada del artista, como UN texto fijo.
+
+    Las partes se componen en un solo texto y ese texto es el que viaja
+    palabra por palabra en cada letra y en cada encargo a Lyria de este
+    artista. Editarla solo cambia las canciones futuras: las ya generadas
+    conservan la voz con la que salieron.
+    """
+    studio.orchestrator.require_universe(universe_id)
     bible = load_bible(studio.db, universe_id)
-    bible.voice_profile.lines = body.lines
-    if body.speaking_voice_secret is not None:
-        bible.voice_profile.speaking_voice_secret = body.speaking_voice_secret
+    voz = SingingVoice(**body.model_dump())
+    voz.text = artist_domain.compose_singing_voice(body.model_dump())
+    bible.singing_voice = voz
+    bible.voice_profile.lines = [linea for linea in voz.text.split("\n") if linea.strip()]
     save_bible(studio.db, universe_id, bible)
-    return bible.voice_profile.model_dump()
+    return bible.singing_voice.model_dump()
+
+
+class VisualStyleIn(BaseModel):
+    style_key: str
+    photo_style_description: str = ""
+
+
+@router.put("/{universe_id}/bible/visual-style")
+def put_visual_style(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, body: VisualStyleIn
+) -> dict[str, Any]:
+    """El estilo visual fijo del artista.
+
+    Si cambia despues de aprobada la cara, la cara queda marcada como
+    desactualizada: sigue ahi, pero hay que rehacerla en el estilo nuevo
+    antes de rodar videos nuevos.
+    """
+    studio.orchestrator.require_universe(universe_id)
+    if body.style_key not in artist_domain.VISUAL_STYLE_KEYS:
+        raise InvalidGenerationRequest(
+            "Ese estilo no esta en la lista. Elige uno de los estilos del artista."
+        )
+    bible = load_bible(studio.db, universe_id)
+    cambio = bible.visual.style_key != body.style_key
+    bible.visual.style_key = body.style_key
+    bible.visual.style_label = artist_domain.visual_style_label(body.style_key)
+    if body.photo_style_description:
+        bible.visual.photo_style_description = body.photo_style_description
+    repo = Repository(studio.db, universe_id, CHARACTERS)
+    artista = next(
+        (c for c in repo.list(limit=50) if c.get("role") == CharacterRole.LEAD.value), None
+    )
+    if cambio and artista is not None and artista.get("status") == CanonStatus.APPROVED.value:
+        bible.visual.master_stale = True
+        repo.update(artista["id"], {"master_stale": True})
+    save_bible(studio.db, universe_id, bible)
+    return bible.visual.model_dump()
+
+
+class GenresIn(BaseModel):
+    music_genres: list[str] = Field(default_factory=list)
+    music_genre_free: str = ""
+
+
+@router.put("/{universe_id}/bible/genres")
+def put_genres(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, body: GenresIn
+) -> dict[str, Any]:
+    """La combinacion de generos del artista: hasta tres principales mas su
+    mezcla escrita. Cada cancion la hereda y puede ajustarla solo para ella."""
+    studio.orchestrator.require_universe(universe_id)
+    bible = load_bible(studio.db, universe_id)
+    bible.music_genres = [
+        g for g in body.music_genres if g in artist_domain.MUSIC_GENRE_KEYS
+    ][: artist_domain.MAX_MAIN_GENRES]
+    bible.music_genre_free = body.music_genre_free
+    if bible.music_genres:
+        bible.musical.genre = artist_domain.genres_text(bible.music_genres)
+    save_bible(studio.db, universe_id, bible)
+    return {
+        "music_genres": bible.music_genres,
+        "music_genre_free": bible.music_genre_free,
+        "genres_text": artist_domain.genres_text(bible.music_genres, bible.music_genre_free),
+    }
+
+
+class InspirationIn(BaseModel):
+    url: str
+
+
+class InspirationPatch(BaseModel):
+    inspirations: list[Inspiration]
+
+
+@router.post("/{universe_id}/bible/inspirations")
+def add_inspiration(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, body: InspirationIn
+) -> dict[str, Any]:
+    """Pega un enlace de YouTube y la app lo analiza sola: guarda el resumen
+    de su estilo, no la cancion. Ese resumen alimenta las canciones de este
+    artista como inspiracion, con material siempre original."""
+    studio.orchestrator.require_universe(universe_id)
+    bible = load_bible(studio.db, universe_id)
+    inspiracion = inspiration_service.analyse_youtube(studio, body.url)
+    bible.inspirations.append(inspiracion)
+    save_bible(studio.db, universe_id, bible)
+    return inspiracion.model_dump()
+
+
+@router.put("/{universe_id}/bible/inspirations")
+def put_inspirations(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, body: InspirationPatch
+) -> list[dict[str, Any]]:
+    """El resumen es editable: lo que quede escrito aqui es lo que leen las
+    canciones."""
+    studio.orchestrator.require_universe(universe_id)
+    bible = load_bible(studio.db, universe_id)
+    bible.inspirations = body.inspirations
+    save_bible(studio.db, universe_id, bible)
+    return [i.model_dump() for i in bible.inspirations]
+
+
+@router.delete("/{universe_id}/bible/inspirations/{indice}")
+def delete_inspiration(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, indice: int
+) -> dict[str, Any]:
+    studio.orchestrator.require_universe(universe_id)
+    bible = load_bible(studio.db, universe_id)
+    if 0 <= indice < len(bible.inspirations):
+        bible.inspirations.pop(indice)
+        save_bible(studio.db, universe_id, bible)
+    return {"inspirations": [i.model_dump() for i in bible.inspirations]}
 
 
 class PreferencesIn(BaseModel):

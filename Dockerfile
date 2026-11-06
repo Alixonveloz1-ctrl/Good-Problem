@@ -16,6 +16,13 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
+# FFmpeg va DENTRO de la imagen del servicio: el montaje final se renderiza
+# en este mismo proceso (assembly/engine.py), y sin el binario la app solo
+# podia entregar el plan de montaje (EDL), nunca el MP4. Es el arreglo que
+# hace real el boton de montar en produccion.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 

@@ -148,8 +148,8 @@ paso "Esto tarda un par de minutos la primera vez"
 gcloud services enable \
   cloudresourcemanager.googleapis.com serviceusage.googleapis.com \
   run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com \
-  aiplatform.googleapis.com texttospeech.googleapis.com firestore.googleapis.com \
-  storage.googleapis.com cloudtasks.googleapis.com secretmanager.googleapis.com \
+  aiplatform.googleapis.com firestore.googleapis.com \
+  storage.googleapis.com cloudtasks.googleapis.com \
   iamcredentials.googleapis.com logging.googleapis.com monitoring.googleapis.com \
   iam.googleapis.com sts.googleapis.com \
   firebase.googleapis.com identitytoolkit.googleapis.com apikeys.googleapis.com \
@@ -218,7 +218,7 @@ dar_rol() {
 paso "La identidad con la que corre la aplicación"
 crear_cuenta "aaus-run" "AI Artist Universe Studio"
 for ROL in roles/aiplatform.user roles/datastore.user roles/storage.objectAdmin \
-           roles/serviceusage.serviceUsageConsumer roles/secretmanager.secretAccessor \
+           roles/serviceusage.serviceUsageConsumer \
            roles/cloudtasks.enqueuer roles/run.invoker roles/logging.logWriter; do
   dar_rol "serviceAccount:${SA_APP}" "$ROL"
 done

@@ -1,6 +1,6 @@
 {
-  "schema_version": 3,
-  "note": "Los identificadores son los que Vertex AI reconoce, no los nombres comerciales. Al subir schema_version, la aplicacion reescribe este documento en el arranque siguiente.",
+  "schema_version": 4,
+  "note": "Los identificadores son los que Vertex AI reconoce, no los nombres comerciales. Al subir schema_version, la aplicacion reescribe este documento en el arranque siguiente. Precios revalidados contra la documentacion oficial de Google el 2026-11-05: todos los identificadores siguen existiendo; se corrigieron el precio de texto de Gemini 3.1 Pro (2,00/12,00 por millon) y los de Nano Banana 2 a 512 px y 4K. Chirp salio del registro al eliminar la voz hablada clonada.",
   "currency": "USD",
   "models": [
     {
@@ -14,8 +14,8 @@
           "key": "default",
           "label": "Estandar",
           "unit": "1m_tokens",
-          "price_input": 1.25,
-          "price_output": 10.0
+          "price_input": 2.0,
+          "price_output": 12.0
         }
       ],
       "capabilities": {
@@ -72,7 +72,7 @@
           "key": "512px",
           "label": "512 px",
           "unit": "image",
-          "price": 0.067
+          "price": 0.045
         },
         {
           "key": "1K",
@@ -90,7 +90,7 @@
           "key": "4K",
           "label": "4K",
           "unit": "image",
-          "price": 0.151
+          "price": 0.15
         }
       ],
       "capabilities": {
@@ -227,29 +227,6 @@
           "9:16"
         ],
         "audio": "always_disabled"
-      }
-    },
-    {
-      "id": "chirp-3-instant-custom-voice",
-      "kind": "speech",
-      "label": "Chirp 3 Instant Custom Voice",
-      "status": "active",
-      "default_variant": "default",
-      "variants": [
-        {
-          "key": "default",
-          "label": "Voz clonada",
-          "unit": "1m_characters",
-          "price": 30.0
-        }
-      ],
-      "capabilities": {
-        "requires_voice_cloning_key": true,
-        "sample_seconds": 10,
-        "output_encodings": [
-          "LINEAR16",
-          "MP3"
-        ]
       }
     },
     {

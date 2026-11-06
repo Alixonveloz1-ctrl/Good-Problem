@@ -95,6 +95,27 @@ export const api = {
   put: <T>(path: string, body: unknown) => request<T>('PUT', path, body),
   patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, body),
   del: <T>(path: string) => request<T>('DELETE', path),
+
+  /** Subir un archivo (la foto del artista). Mismo trato de errores que el
+   *  resto: si el estudio contesta mal, se lee el mismo mensaje de siempre. */
+  upload: async <T>(path: string, form: FormData): Promise<T> => {
+    const response = await fetch(path, {
+      method: 'POST',
+      body: form,
+      credentials: 'same-origin',
+    })
+    const text = await response.text()
+    const payload = text ? JSON.parse(text) : null
+    if (!response.ok) {
+      const error: ApiError = payload?.error ?? {
+        code: 'http_error',
+        message: payload?.detail ? String(payload.detail) : `Error ${response.status}`,
+        details: {},
+      }
+      throw new StudioError(response.status, error)
+    }
+    return payload as T
+  },
 }
 
 export function mediaUrl(path: string | null | undefined): string | null {

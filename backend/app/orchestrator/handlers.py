@@ -16,32 +16,23 @@ from typing import Any
 from ..clock import now_iso
 from ..db.repositories import (
     CHARACTERS,
-    CONTENT,
     IMAGES,
-    LOCATIONS,
     SCENES,
     SONGS,
     VIDEO_PROJECTS,
     VIDEOS,
-    WARDROBE,
     Repository,
 )
-from ..domain.enums import CanonStatus, CharacterRole, LyricsAuthor, WardrobeCategory
+from ..domain import artist as artist_domain
+from ..domain.enums import CanonStatus, LyricsAuthor
 from ..domain.guards import resolve_clip_duration
-from ..domain.pricing import estimate_images, estimate_song, estimate_speech, estimate_text
+from ..domain.pricing import estimate_images, estimate_song, estimate_text
 from ..domain.pricing import estimate_video as price_video
 from ..domain.schemas import MASTER_SHOTS
-from ..errors import Conflict, InvalidGenerationRequest, ProviderError
+from ..errors import InvalidGenerationRequest, ProviderError
 from ..ids import new_id
 from ..providers import gemini_image, lyria, veo
-from ..providers.storage import (
-    character_path,
-    content_path,
-    location_path,
-    scene_path,
-    song_path,
-    wardrobe_path,
-)
+from ..providers.storage import character_path, scene_path, song_path
 from ..services import approvals
 from ..services.context import load_bible, save_bible
 from . import director
@@ -114,14 +105,31 @@ def _apply_director_result(
     if task == "artist_bible":
         bible = load_bible(studio.db, universe_id)
         merged = bible.model_dump()
-        for section in ("identity", "musical", "visual", "communication"):
+        for section in ("identity", "musical", "communication"):
             if isinstance(data.get(section), dict):
                 merged[section] = {**merged.get(section, {}), **data[section]}
+        if isinstance(data.get("visual"), dict):
+            # The visual style is the user's choice, not the Director's: a
+            # Bible proposal never overwrites style_key or the photo style.
+            visual = {**merged.get("visual", {}), **data["visual"]}
+            for clave in ("style_key", "style_label", "photo_style_description", "master_stale"):
+                if merged.get("visual", {}).get(clave):
+                    visual[clave] = merged["visual"][clave]
+                elif clave in merged.get("visual", {}):
+                    visual[clave] = merged["visual"][clave]
+            merged["visual"] = visual
         if data.get("voice_profile_lines"):
             merged["voice_profile"] = {
                 **merged.get("voice_profile", {}),
                 "lines": data["voice_profile_lines"],
             }
+            # The Director may propose voice lines only until the user writes
+            # the fixed singing voice; from then on that text is untouchable.
+            if not (merged.get("singing_voice") or {}).get("text"):
+                merged["singing_voice"] = {
+                    **merged.get("singing_voice", {}),
+                    "text": "\n".join(data["voice_profile_lines"]),
+                }
         merged["status"] = CanonStatus.DRAFT.value
         merged["version"] = int(merged.get("version", 1)) + 1
         from ..domain.schemas import ArtistBible
@@ -152,7 +160,9 @@ def _apply_director_result(
             {
                 "title": concept["title"] or song.get("title", ""),
                 "concept": concept,
-                "music_prompt": data.get("music_prompt", song.get("music_prompt", "")),
+                "music_prompt": _impose_music_blocks(
+                    studio, universe_id, song, data.get("music_prompt", "")
+                ),
                 "genre": concept["genre"],
                 "bpm": concept["bpm"],
                 "mood": concept["mood"],
@@ -190,18 +200,15 @@ def _apply_director_result(
                 "video_type": data.get("video_type", "narrative"),
                 "concept": data.get("concept", ""),
                 "story": {**(data.get("story") or {}), "status": CanonStatus.DRAFT.value},
+                # Wardrobe and locations are text inside this proposal now,
+                # approved together with the story. There are no wardrobe or
+                # location sections any more.
+                "wardrobe_notes": data.get("wardrobe_notes", ""),
+                "location_notes": data.get("location_notes", ""),
                 "status": CanonStatus.DRAFT.value,
             },
         )
-        # Characters, locations and wardrobe stay as proposals until the user
-        # says yes; creating them is an explicit action (PRD 17).
-        return {
-            "entity": "video_project",
-            "id": target_id,
-            "proposed_characters": data.get("needed_characters") or [],
-            "proposed_locations": data.get("needed_locations") or [],
-            "proposed_wardrobe": data.get("needed_wardrobe") or [],
-        }
+        return {"entity": "video_project", "id": target_id}
 
     if task == "storyboard":
         return _apply_storyboard(studio, universe_id, target_id, data)
@@ -242,99 +249,7 @@ def _apply_director_result(
             repo.update(target_id, patch)
         return {"entity": "character", "id": target_id}
 
-    if task == "wardrobe_set":
-        repo = _repo(studio, universe_id, WARDROBE)
-        creados = [
-            repo.create(
-                new_id("fit"),
-                {
-                    "name": fit.get("name", "Sin nombre"),
-                    "category": fit.get("category") or WardrobeCategory.SIGNATURE.value,
-                    "description": fit.get("description", ""),
-                    "pieces": fit.get("pieces") or [],
-                    "accessories": fit.get("accessories") or [],
-                    "colors": fit.get("colors") or [],
-                    "usage": fit.get("usage", ""),
-                    "restrictions": [],
-                    "image_path": None,
-                    "status": CanonStatus.DRAFT.value,
-                },
-            )["id"]
-            for fit in (data.get("outfits") or [])
-        ]
-        return {"entity": "wardrobe", "created": creados}
-
-    if task == "location_set":
-        repo = _repo(studio, universe_id, LOCATIONS)
-        creados = [
-            repo.create(
-                new_id("loc"),
-                {
-                    "name": sitio.get("name", "Sin nombre"),
-                    "description": sitio.get("description", ""),
-                    "lighting": sitio.get("lighting", ""),
-                    "time_of_day": sitio.get("time_of_day", ""),
-                    "reference_paths": [],
-                    "status": CanonStatus.DRAFT.value,
-                },
-            )["id"]
-            for sitio in (data.get("locations") or [])
-        ]
-        return {"entity": "locations", "created": creados}
-
-    if task == "cast_set":
-        repo = _repo(studio, universe_id, CHARACTERS)
-        creados = []
-        for persona in data.get("characters") or []:
-            creados.append(
-                repo.create(
-                    new_id("char"),
-                    {
-                        "name": persona.get("name", "Sin nombre"),
-                        "role": CharacterRole.SUPPORTING.value,
-                        "gender": "",
-                        "apparent_age": persona.get("apparent_age", ""),
-                        "appearance": persona.get("appearance", ""),
-                        "personality": persona.get("personality", ""),
-                        # Sin prompts todavia: se piden al disenar cada uno, que
-                        # es cuando hay algo concreto que retratar.
-                        "master_shots": [
-                            {"key": key, "label": label, "storage_path": None,
-                             "status": CanonStatus.DRAFT.value, "prompt": ""}
-                            for key, label in MASTER_SHOTS
-                        ],
-                        "reference_image_paths": [],
-                        "status": CanonStatus.DRAFT.value,
-                    },
-                )["id"]
-            )
-        return {"entity": "characters", "created": creados}
-
-    if task in {"content_script", "interview"}:
-        repo = _repo(studio, universe_id, CONTENT)
-        spoken = data.get("spoken_text") or "\n".join(
-            e.get("answer", "") for e in (data.get("exchanges") or [])
-        )
-        patch = {
-            "title": data.get("title", ""),
-            "script": data.get("script") or _format_interview(data),
-            "spoken_text": spoken,
-            "video_prompt": data.get("video_prompt", ""),
-            "status": CanonStatus.DRAFT.value,
-        }
-        if repo.get(target_id) is None:
-            repo.create(target_id, patch)
-        else:
-            repo.update(target_id, patch)
-        return {"entity": "content", "id": target_id}
-
     return {"entity": None}
-
-
-def _format_interview(data: dict[str, Any]) -> str:
-    return "\n\n".join(
-        f"P: {e.get('question','')}\nR: {e.get('answer','')}" for e in (data.get("exchanges") or [])
-    )
 
 
 def _apply_storyboard(
@@ -342,8 +257,9 @@ def _apply_storyboard(
 ) -> dict[str, Any]:
     project = _repo(studio, universe_id, VIDEO_PROJECTS).require(project_id)
     characters = {c["name"]: c["id"] for c in _repo(studio, universe_id, CHARACTERS).list()}
-    locations = {loc["name"]: loc["id"] for loc in _repo(studio, universe_id, LOCATIONS).list()}
-    outfits = {o["name"]: o["id"] for o in _repo(studio, universe_id, WARDROBE).list()}
+    # The only character a storyboard can name is the artist. Anyone else the
+    # Director mentions stays out of the cast: one Universe, one artist.
+    lead_id = (project.get("character_ids") or [None])[0]
 
     scenes_repo = _repo(studio, universe_id, SCENES)
     for old in scenes_repo.list(where={"project_id": project_id}):
@@ -371,12 +287,12 @@ def _apply_storyboard(
                 "character_ids": [
                     characters[name]
                     for name in raw.get("character_names", [])
-                    if name in characters
-                ],
-                "location_id": locations.get(raw.get("location_name", "")),
-                "wardrobe_ids": [
-                    outfits[name] for name in raw.get("wardrobe_names", []) if name in outfits
-                ],
+                    if name in characters and characters[name] == lead_id
+                ]
+                or ([lead_id] if lead_id else []),
+                "location_description": raw.get("location_description", ""),
+                "wardrobe_description": raw.get("wardrobe_description", ""),
+                "planos": raw.get("planos") or [],
                 "action": raw.get("action", ""),
                 "emotion": raw.get("emotion", ""),
                 "camera": raw.get("camera", ""),
@@ -423,6 +339,14 @@ def handle_image(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
     prompt = payload.get("prompt", "").strip()
     if not prompt:
         raise InvalidGenerationRequest("Falta el prompt de imagen.")
+
+    if purpose in {"scene", "character_master"}:
+        # The artist's visual style is fixed and travels inside every image
+        # prompt, master and shots alike. If a stored prompt already carries
+        # it (the Bible summary feeds the Director), nothing is added twice.
+        bloque = artist_domain.style_block(load_bible(studio.db, universe_id))
+        if bloque and bloque not in prompt:
+            prompt = f"{prompt}\n\n{bloque}"
 
     reference_paths: list[str] = list(payload.get("reference_paths") or [])
     references = _load_references(studio, reference_paths, kind="character")
@@ -525,32 +449,6 @@ def _store_image(studio, universe_id, job, purpose, payload, result, reference_p
         repo.update(target_id, {"master_shots": shots})
         return stored, {"id": None}
 
-    if purpose == "wardrobe":
-        path = wardrobe_path(universe_id, f"{target_id}.{suffix}")
-        stored = studio.storage.write_bytes(path, result.data, result.mime_type)
-        _repo(studio, universe_id, WARDROBE).update(
-            target_id, {"image_path": stored.path, "status": CanonStatus.DRAFT.value}
-        )
-        return stored, {"id": None}
-
-    if purpose == "location":
-        path = location_path(universe_id, f"{target_id}_{new_id('ref')}.{suffix}")
-        stored = studio.storage.write_bytes(path, result.data, result.mime_type)
-        repo = _repo(studio, universe_id, LOCATIONS)
-        location = repo.require(target_id)
-        refs = list(location.get("reference_paths") or [])
-        refs.append(stored.path)
-        repo.update(target_id, {"reference_paths": refs[-6:], "status": CanonStatus.DRAFT.value})
-        return stored, {"id": None}
-
-    if purpose == "content":
-        path = content_path(universe_id, f"{target_id}_still.{suffix}")
-        stored = studio.storage.write_bytes(path, result.data, result.mime_type)
-        _repo(studio, universe_id, CONTENT).update(
-            target_id, {"source_image_path": stored.path}
-        )
-        return stored, {"id": target_id}
-
     if purpose == "cover":
         path = song_path(universe_id, target_id, f"cover.{suffix}")
         stored = studio.storage.write_bytes(path, result.data, result.mime_type)
@@ -579,7 +477,7 @@ def handle_music(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
 
     bible = load_bible(studio.db, universe_id)
     voice_lines = song.get("voice_profile", {}).get("lines") or bible.voice_profile.lines
-    prompt = _compose_music_prompt(song, voice_lines, payload)
+    prompt = _compose_music_prompt(song, voice_lines, payload, bible)
     duration = int(payload.get("duration_seconds") or song.get("requested_duration_seconds") or 150)
 
     result = lyria.generate_song(
@@ -638,8 +536,53 @@ def handle_music(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
     )
 
 
-def _compose_music_prompt(song: dict[str, Any], voice_lines: list[str], payload) -> str:
-    """US English, Voice Profile verbatim (PRD 10, 14)."""
+def _fixed_music_texts(studio, universe_id: str, song: dict[str, Any]) -> dict[str, str]:
+    """The texts that are FIXED for this artist and this song.
+
+    The singing voice, the genre combination and the inspiration summaries.
+    They are imposed on whatever the Director or a hand-edited prompt says:
+    a prompt is a request, this is the guarantee.
+    """
+    bible = load_bible(studio.db, universe_id)
+    voz = (bible.singing_voice.text or "").strip() or bible.voice_profile.as_prompt()
+    generos = artist_domain.genres_text(
+        song.get("genres") or bible.music_genres,
+        song.get("genre_free") or bible.music_genre_free,
+    )
+    inspiraciones: list[str] = []
+    for inspiracion in bible.inspirations:
+        if inspiracion.summary_text:
+            inspiraciones.append(inspiracion.summary_text)
+    if (song.get("inspiration_summary") or "").strip():
+        inspiraciones.append(song["inspiration_summary"].strip())
+    return {
+        "voz": voz,
+        "generos": generos,
+        "inspiracion": "\n\n".join(inspiraciones),
+    }
+
+
+def _impose_music_blocks(studio, universe_id: str, song: dict[str, Any], base: str) -> str:
+    """Append the fixed blocks to a Director-written music prompt, verbatim,
+    when they are not already in it word for word."""
+    fijos = _fixed_music_texts(studio, universe_id, song)
+    partes = [base.strip()] if (base or "").strip() else []
+    if fijos["generos"] and fijos["generos"] not in base:
+        partes.append(f"Genres: {fijos['generos']}")
+    if fijos["voz"] and fijos["voz"] not in base:
+        partes.append("Lead vocal (fixed description, keep verbatim):\n" + fijos["voz"])
+    if fijos["inspiracion"] and fijos["inspiracion"] not in base:
+        partes.append(
+            "Reference inspiration (style only; original material, never copy "
+            f"lyrics or melody):\n{fijos['inspiracion']}"
+        )
+    return "\n\n".join(partes).strip()
+
+
+def _compose_music_prompt(
+    song: dict[str, Any], voice_lines: list[str], payload, bible=None
+) -> str:
+    """US English, fixed singing voice verbatim (PRD 10, 14)."""
     if payload.get("prompt"):
         base = payload["prompt"]
     else:
@@ -654,8 +597,30 @@ def _compose_music_prompt(song: dict[str, Any], voice_lines: list[str], payload)
         f"Structure: {', '.join(song.get('structure') or concept.get('structure') or [])}",
     ]
     parts.extend(d for d in descriptors if not d.endswith(": "))
-    if voice_lines:
-        parts.append("Lead vocal:\n" + "\n".join(voice_lines))
+    # The artist's genre combination, fixed on the Bible and adjustable per
+    # song, goes in as its own line so Lyria hears the mix, not one genre.
+    generos = artist_domain.genres_text(
+        song.get("genres"),
+        song.get("genre_free")
+        or (bible.music_genre_free if bible is not None else ""),
+    )
+    if generos and generos not in "\n".join(parts):
+        parts.append(f"Genres: {generos}")
+    # The singing voice: the fixed text of the Bible, word for word. The
+    # per-song lines snapshot only survives as a fallback for songs created
+    # before the fixed text existed.
+    voz = ""
+    if bible is not None:
+        voz = (bible.singing_voice.text or "").strip()
+    if not voz and voice_lines:
+        voz = "\n".join(voice_lines)
+    if voz and voz not in "\n".join(parts):
+        parts.append("Lead vocal:\n" + voz)
+    inspiracion = (song.get("inspiration_summary") or "").strip()
+    if inspiracion and inspiracion not in "\n".join(parts):
+        parts.append(
+            "Reference inspiration (style only; original material):\n" + inspiracion
+        )
     return "\n".join(parts).strip()
 
 
@@ -663,8 +628,6 @@ def _compose_music_prompt(song: dict[str, Any], voice_lines: list[str], payload)
 
 
 def handle_video(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
-    if job.get("target_type") == "content":
-        return _handle_content_video(studio, universe_id, job)
     payload = _payload(job)
     scene_id = job.get("target_id") or ""
     scenes = _repo(studio, universe_id, SCENES)
@@ -695,6 +658,11 @@ def handle_video(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
     )
     aspect_ratio = payload.get("aspect_ratio", "16:9")
     prompt = payload.get("prompt") or scene.get("video_prompt") or _scene_prompt(scene)
+    # Veo prompts carry the artist's fixed visual style too, so the look of a
+    # clip matches the look of its first frame.
+    bloque = artist_domain.style_block(load_bible(studio.db, universe_id))
+    if bloque and bloque not in prompt:
+        prompt = f"{prompt}\n\n{bloque}"
 
     operation = veo.start_generation(
         studio.vertex,
@@ -773,83 +741,26 @@ def handle_video(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
     )
 
 
-def _handle_content_video(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
-    """Footage for a BTS clip, an interview or an announcement.
-
-    Same rules as a scene: a still first, then Veo, always without audio. The
-    voice is laid over it afterwards (PRD 34, 35).
-    """
-    payload = _payload(job)
-    content_id = job.get("target_id") or ""
-    repo = _repo(studio, universe_id, CONTENT)
-    piece = repo.require(content_id)
-
-    still_path = piece.get("source_image_path")
-    if not still_path:
-        raise Conflict(
-            "Genera primero la imagen de esta pieza. El video parte siempre de una imagen."
-        )
-
-    spec = studio.registry.require_active(job["model"], "video")
-    variant = job.get("variant") or spec.default_variant
-    aspect_ratio = payload.get("aspect_ratio") or piece.get("aspect_ratio", "9:16")
-    duration = resolve_clip_duration(
-        payload.get("duration_seconds"), resolution=variant, reference_image_count=1
-    )
-    prompt = payload.get("prompt") or piece.get("video_prompt") or piece.get("script", "")[:500]
-
-    operation = veo.start_generation(
-        studio.vertex,
-        spec,
-        prompt=prompt,
-        variant=variant,
-        source_image=veo.SourceImage(data=studio.storage.read_bytes(still_path)),
-        duration_seconds=duration,
-        aspect_ratio=aspect_ratio,
-    )
-    video = _await_video(studio, operation)
-    data = video.data if video and video.data else _placeholder_clip(spec.id, duration)
-    stored = studio.storage.write_bytes(
-        content_path(universe_id, f"{content_id}.mp4"), data, "video/mp4"
-    )
-    cost = price_video(studio.registry, spec.id, variant, seconds=duration, clips=1)
-    repo.update(
-        content_id,
-        {
-            "storage_path": stored.path,
-            "cost_usd": round(float(piece.get("cost_usd", 0.0)) + cost.amount_usd, 4),
-            "provenance": {
-                "parent_id": content_id,
-                "model": spec.id,
-                "variant": variant,
-                "prompt": prompt,
-                "parameters": operation.parameters,
-                "timestamp": now_iso(),
-                "cost_usd": round(cost.amount_usd, 4),
-            },
-        },
-    )
-    return Outcome(
-        result={
-            "content_id": content_id,
-            "storage_path": stored.path,
-            "duration_seconds": duration,
-            "model": spec.id,
-            "variant": variant,
-            "generate_audio": False,
-        },
-        cost=cost,
-    )
-
-
 def _scene_prompt(scene: dict[str, Any]) -> str:
     bits = [
         scene.get("action", ""),
+        f"Location: {scene.get('location_description','')}"
+        if scene.get("location_description")
+        else "",
+        f"Wardrobe: {scene.get('wardrobe_description','')}"
+        if scene.get("wardrobe_description")
+        else "",
         f"Camera: {scene.get('camera','')}" if scene.get("camera") else "",
         f"Lighting: {scene.get('lighting','')}" if scene.get("lighting") else "",
         f"Environment: {scene.get('environment','')}" if scene.get("environment") else "",
         f"Emotion: {scene.get('emotion','')}" if scene.get("emotion") else "",
     ]
+    planos = scene.get("planos") or []
+    if planos:
+        bits.append(
+            "Cut inside this clip, in this order: "
+            + " THEN CUT TO ".join(str(p) for p in planos)
+        )
     return "\n".join(b for b in bits if b)
 
 
@@ -875,46 +786,6 @@ def _placeholder_clip(model: str, seconds: int) -> bytes:
     ).encode()
 
 
-# --- speech ----------------------------------------------------------------
-
-
-def handle_speech(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
-    payload = _payload(job)
-    text = (payload.get("text") or "").strip()
-    if not text:
-        raise InvalidGenerationRequest("No hay texto que sintetizar.")
-
-    bible = load_bible(studio.db, universe_id)
-    secret_name = bible.voice_profile.speaking_voice_secret
-    if not secret_name and not studio.settings.dry_run:
-        raise Conflict(
-            "Este artista no tiene voz hablada clonada. Crea la clave de Chirp 3 antes de "
-            "generar contenido hablado."
-        )
-    key = studio.secrets.read(secret_name) if secret_name else "DRY_RUN_VOICE_CLONING_KEY"
-
-    result = studio.chirp.synthesize(
-        text=text,
-        voice_cloning_key=key,
-        language_code=payload.get("language_code", "es-ES"),
-    )
-    target_id = job.get("target_id") or new_id("speech")
-    stored = studio.storage.write_bytes(
-        content_path(universe_id, f"{target_id}_voice.wav"), result.data, result.mime_type
-    )
-    if _repo(studio, universe_id, CONTENT).get(target_id):
-        _repo(studio, universe_id, CONTENT).update(target_id, {"spoken_audio_path": stored.path})
-
-    cost = estimate_speech(studio.registry, "chirp-3-instant-custom-voice", characters=len(text))
-    return Outcome(
-        result={
-            "storage_path": stored.path,
-            "characters": len(text),
-        },
-        cost=cost,
-    )
-
-
 # --- assembly --------------------------------------------------------------
 
 
@@ -935,48 +806,10 @@ def handle_assembly(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
     return Outcome(result=result, cost=coste)
 
 
-def handle_cut(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
-    """A Short, Reel or TikTok taken out of the approved master. Derived, so it
-    costs nothing to generate (PRD 32, 33)."""
-    from ..assembly.engine import cut_short
-
-    payload = _payload(job)
-    content_id = job.get("target_id") or ""
-    repo = _repo(studio, universe_id, CONTENT)
-    piece = repo.require(content_id)
-    project_id = payload.get("project_id") or piece.get("project_id")
-    if not project_id:
-        raise Conflict("Esta pieza no esta asociada a ningun videoclip del que recortar.")
-
-    vertical = piece.get("aspect_ratio", "9:16") == "9:16"
-    result = cut_short(
-        studio,
-        universe_id,
-        project_id,
-        start=float(payload.get("start", 0.0)),
-        duration=float(payload.get("duration", 15.0)),
-        vertical=vertical,
-        name=f"{content_id}.mp4",
-    )
-    if result.get("storage_path"):
-        repo.update(content_id, {"storage_path": result["storage_path"]})
-    return Outcome(result=result, cost=None)
-
-
-def handle_mix(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
-    """Chirp voice over footage generated without audio (PRD 34, 35)."""
-    from ..assembly.engine import mix_content
-
-    return Outcome(result=mix_content(studio, universe_id, job.get("target_id") or ""), cost=None)
-
-
 HANDLERS: dict[str, Callable[..., Outcome]] = {
     "text": handle_text,
     "image": handle_image,
     "music": handle_music,
     "video": handle_video,
-    "speech": handle_speech,
     "assembly": handle_assembly,
-    "cut": handle_cut,
-    "mix": handle_mix,
 }

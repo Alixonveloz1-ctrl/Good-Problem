@@ -35,13 +35,18 @@ def test_full_production_from_a_phone(client, studio):
         json={"brief": "Cantante de synth pop nocturno"},
     )
     assert job["result"]["applied"]["entity"] == "artist_bible"
-    _run(client, studio, "put", f"/api/universes/{uid}/bible/voice-profile",
-         json={"lines": ["Female", "Warm mezzo-soprano", "Breathy but clear"]})
+    # La voz cantada fija del artista: un solo texto que viajara palabra por
+    # palabra en cada encargo a Lyria.
+    _run(client, studio, "put", f"/api/universes/{uid}/bible/singing-voice",
+         json={"sex": "Mujer", "apparent_age": "25", "pitch": "Media",
+               "timbre": "Calida, con aire", "language_accent": "Espanol neutro",
+               "singing_style": "Intima"})
     _run(client, studio, "post", f"/api/universes/{uid}/bible/approve")
 
-    # 4-5. Character Master y aprobacion.
-    character = _run(client, studio, "post", f"/api/universes/{uid}/characters",
-                     json={"name": "Nova", "role": "lead", "appearance": "Pelo azul"})
+    # 4-5. Character Master y aprobacion. El artista ya existe: nacio con el
+    # universo, y es el unico personaje posible.
+    character = client.get(f"/api/universes/{uid}/characters").json()[0]
+    assert character["id"] == universe["lead_character_id"]
     _run(client, studio, "post",
          f"/api/universes/{uid}/characters/{character['id']}/master/portrait",
          json={"prompt": "portrait of Nova"})
@@ -49,16 +54,6 @@ def test_full_production_from_a_phone(client, studio):
                     f"/api/universes/{uid}/characters/{character['id']}/approve")
     assert approved["status"] == CanonStatus.APPROVED.value
     assert approved["reference_image_paths"], "el master aprobado alimenta las referencias"
-
-    # 6. Crear atuendo.
-    outfit = _run(client, studio, "post", f"/api/universes/{uid}/wardrobe",
-                  json={"name": "Signature", "description": "Abrigo negro"})
-    _run(client, studio, "post", f"/api/universes/{uid}/wardrobe/{outfit['id']}/approve")
-
-    # 7. Crear locacion.
-    location = _run(client, studio, "post", f"/api/universes/{uid}/locations",
-                    json={"name": "Rooftop", "description": "Azotea de noche"})
-    _run(client, studio, "post", f"/api/universes/{uid}/locations/{location['id']}/approve")
 
     # 8. Concepto musical.
     song = _run(client, studio, "post", f"/api/universes/{uid}/songs",
@@ -108,13 +103,12 @@ def test_full_production_from_a_phone(client, studio):
     )
     _run(client, studio, "post", f"/api/universes/{uid}/video-projects/{pid}/story/approve")
 
-    # 18-19. Personajes secundarios ya aprobados arriba; se asignan al proyecto.
-    _run(client, studio, "put", f"/api/universes/{uid}/video-projects/{pid}/cast",
-         json={"character_ids": [character["id"]], "location_ids": [location["id"]],
-               "wardrobe_ids": [outfit["id"]]})
+    # 18-19. No hay paso de reparto: el proyecto nace con el artista dentro,
+    # y el vestuario y los sitios van escritos en las escenas del storyboard.
+    assert project["character_ids"] == [character["id"]]
 
     # 20. Storyboard con tomas reutilizadas.
-    _seed_storyboard(studio, uid, pid, character["id"], location["id"], outfit["id"])
+    _seed_storyboard(studio, uid, pid)
     _run(client, studio, "post", f"/api/universes/{uid}/video-projects/{pid}/storyboard/approve")
 
     scenes = client.get(f"/api/universes/{uid}/video-projects/{pid}").json()["scenes"]
@@ -156,13 +150,11 @@ def test_full_production_from_a_phone(client, studio):
     assert assembly["result"]["clips"] == 3
     assert assembly["result"]["reused"] == 1
 
-    # 33-34. Contenido y aprobacion.
-    piece = _run(client, studio, "post", f"/api/universes/{uid}/content",
-                 json={"kind": "interview", "title": "Primera entrevista", "song_id": sid})
-    _run(client, studio, "post", f"/api/universes/{uid}/content/{piece['id']}/script", json={})
-    _run(client, studio, "post", f"/api/universes/{uid}/content/{piece['id']}/voice",
-         json={"text": "Hola, soy Nova."})
-    _run(client, studio, "post", f"/api/universes/{uid}/content/{piece['id']}/approve")
+    # 33. Sin MP4 renderizado no hay proyecto que aprobar: en seco el montaje
+    # solo produce el plan (EDL), y un plan no es un videoclip terminado.
+    sin_render = client.post(f"/api/universes/{uid}/video-projects/{pid}/approve")
+    assert sin_render.status_code == 409
+    assert "MP4" in sin_render.json()["error"]["message"]
 
     # 35. El estudio no lleva cuentas: el gasto se mira en Google Cloud. Lo que
     # si queda es lo que costo cada pieza, como parte de su procedencia (PRD 46).
@@ -181,7 +173,7 @@ def test_full_production_from_a_phone(client, studio):
     assert export["archive_url"], "el paquete se descarga como un solo archivo desde el iPhone"
 
 
-def _seed_storyboard(studio, uid, pid, character_id, location_id, outfit_id):
+def _seed_storyboard(studio, uid, pid):
     """The Director's dry run cannot invent scenes, so the storyboard is written
     directly here in the shape its handler produces."""
     from app.orchestrator.handlers import _apply_storyboard
@@ -195,61 +187,32 @@ def _seed_storyboard(studio, uid, pid, character_id, location_id, outfit_id):
             "scenes": [
                 {
                     "index": 0, "action": "Nova mira la ciudad", "camera": "wide",
-                    "character_names": ["Nova"], "location_name": "Rooftop",
-                    "wardrobe_names": ["Signature"],
+                    "character_names": ["Nova"],
+                    "location_description": "Azotea de noche, luces de la ciudad",
+                    "wardrobe_description": "Abrigo negro de firma",
+                    "planos": ["Plano general: Nova entra cantando",
+                               "Primer plano a los 4 segundos"],
                     "image_prompt": "Nova on a rooftop at night",
                     "video_prompt": "slow push in", "reuses_scene_index": -1,
                 },
                 {
                     "index": 1, "action": "Primer plano", "camera": "close up",
-                    "character_names": ["Nova"], "location_name": "Rooftop",
+                    "character_names": ["Nova"],
+                    "location_description": "La misma azotea",
+                    "wardrobe_description": "Abrigo negro de firma",
+                    "planos": ["Primer plano cantando"],
                     "image_prompt": "close up of Nova", "video_prompt": "handheld",
                     "reuses_scene_index": -1,
                 },
                 {
                     "index": 2, "action": "Repite el plano del estribillo", "camera": "wide",
-                    "character_names": ["Nova"], "location_name": "Rooftop",
+                    "character_names": ["Nova"],
+                    "location_description": "Azotea de noche",
+                    "wardrobe_description": "Abrigo negro de firma",
+                    "planos": ["Plano general del estribillo"],
                     "image_prompt": "", "video_prompt": "", "reuses_scene_index": 0,
                     "reuse_note": "Mismo encuadre que la escena 0",
                 },
             ],
         },
     )
-
-
-def test_content_studio_makes_a_bts_clip(client, studio):
-    """PRD 33-35: the picture is generated without audio and the cloned voice is
-    laid over it afterwards."""
-    uid = client.post("/api/universes", json={"name": "Nova"}).json()["id"]
-    piece = _run(client, studio, "post", f"/api/universes/{uid}/content",
-                 json={"kind": "bts", "bts_kind": "recording_session", "title": "En el estudio"})
-    cid = piece["id"]
-
-    _run(client, studio, "post", f"/api/universes/{uid}/content/{cid}/script", json={})
-    _run(client, studio, "post", f"/api/universes/{uid}/content/{cid}/still",
-         json={"prompt": "Nova at the mixing desk", "model": "gemini-3.1-flash-image"})
-
-    clip = _run(client, studio, "post", f"/api/universes/{uid}/content/{cid}/clip",
-                json={"model": "veo-3.1-lite-generate-001", "variant": "720p"})
-    assert clip["result"]["generate_audio"] is False
-    assert clip["model"] == "veo-3.1-lite-generate-001"
-
-    _run(client, studio, "post", f"/api/universes/{uid}/content/{cid}/voice",
-         json={"text": "Llevamos tres dias con esta cancion."})
-
-    mixed = _run(client, studio, "post", f"/api/universes/{uid}/content/{cid}/mix", json={})
-    assert mixed["result"]["voice"], "la voz entra en la mezcla"
-    assert mixed["actual_cost_usd"] == 0.0, "la mezcla no llama a ningun modelo"
-
-    for call in studio.calls.for_model_prefix("veo"):
-        if call.method == "predictLongRunning":
-            assert call.payload["parameters"]["generateAudio"] is False
-
-
-def test_a_clip_needs_an_image_first(client, studio):
-    uid = client.post("/api/universes", json={"name": "Nova"}).json()["id"]
-    piece = client.post(f"/api/universes/{uid}/content",
-                        json={"kind": "interview", "title": "Sin imagen"}).json()
-    response = client.post(f"/api/universes/{uid}/content/{piece['id']}/clip", json={})
-    assert response.status_code == 409
-    assert "imagen" in response.json()["error"]["message"]

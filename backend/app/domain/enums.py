@@ -115,48 +115,11 @@ class AspectRatio(StrEnum):
     VERTICAL = "9:16"
 
 
-class WardrobeCategory(StrEnum):
-    """PRD 19."""
-
-    SIGNATURE = "signature"
-    CASUAL = "casual"
-    PERFORMANCE = "performance"
-    INTERVIEW = "interview"
-    MUSIC_VIDEO = "music_video"
-    NIGHT = "night"
-    SPECIAL = "special"
-
-
 class CharacterRole(StrEnum):
     LEAD = "lead"
     SUPPORTING = "supporting"
-
-
-class ContentKind(StrEnum):
-    """PRD 33."""
-
-    SHORT = "short"
-    REEL = "reel"
-    TIKTOK = "tiktok"
-    TEASER = "teaser"
-    BTS = "bts"
-    INTERVIEW = "interview"
-    ANNOUNCEMENT = "announcement"
-    PHOTOSHOOT = "photoshoot"
-    PROMO_IMAGE = "promo_image"
-    LYRIC_CLIP = "lyric_clip"
-
-
-class BtsKind(StrEnum):
-    """PRD 34."""
-
-    RECORDING_SESSION = "recording_session"
-    MUSIC_VIDEO_SET = "music_video_set"
-    REHEARSAL = "rehearsal"
-    DRESSING_ROOM = "dressing_room"
-    ARTIST_DIARY = "artist_diary"
-    PREPARATION = "preparation"
-    PERFORMANCE_PREPARATION = "performance_preparation"
+    """Kept for reading old documents. The simplified studio creates only the
+    lead: one Universe, one artist."""
 
 
 class UserAction(StrEnum):

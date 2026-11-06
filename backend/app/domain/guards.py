@@ -50,8 +50,8 @@ BANNED_REASONS: dict[str, str] = {
 # --- 2. Video audio --------------------------------------------------------
 
 VIDEO_AUDIO_ALWAYS_DISABLED = True
-"""The pista comes from Lyria and the spoken voice from Chirp. Generating audio
-in Veo would double the price per second for something the edit throws away."""
+"""The pista comes from Lyria. Generating audio in Veo would double the price
+per second for something the edit throws away."""
 
 # --- 3. Video durations ----------------------------------------------------
 
@@ -86,7 +86,7 @@ def enforce_video_audio_disabled(parameters: dict) -> dict:
     requested = parameters.get("generateAudio", parameters.get("generate_audio", False))
     if requested:
         raise InvalidGenerationRequest(
-            "Veo se llama siempre sin audio. La pista sale de Lyria y la voz de Chirp."
+            "Veo se llama siempre sin audio. La pista sale de Lyria."
         )
     cleaned = {k: v for k, v in parameters.items() if k not in {"generate_audio"}}
     cleaned["generateAudio"] = False

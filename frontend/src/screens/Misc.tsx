@@ -142,7 +142,7 @@ function ComprobacionAudio() {
         </button>
       </div>
       <p className="muted" style={{ margin: 0 }}>
-        La musica sale de Lyria y la voz de Chirp, asi que Veo se llama siempre
+        La musica sale de Lyria, asi que Veo se llama siempre
         con el audio apagado y el montaje lo tiraria igual. Aqui se comprueba
         que asi ha sido.
       </p>

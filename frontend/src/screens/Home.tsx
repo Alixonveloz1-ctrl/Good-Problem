@@ -5,6 +5,7 @@ import { useAction, useResource } from '../hooks/useApi'
 import type { Home as HomeData, RecentProject, UniverseCard } from '../api/types'
 import { ErrorNote, Field, Loading, Sheet } from '../components/ui'
 import { ElegirGenero } from '../components/Genero'
+import { ElegirEstilo, ElegirGeneros } from '../components/Seleccion'
 
 /**
  * La portada de la aplicación.
@@ -27,6 +28,9 @@ export function HomeScreen() {
   const [nombre, setNombre] = useState('')
   const [sexo, setSexo] = useState('')
   const [genero, setGenero] = useState('')
+  const [generos, setGeneros] = useState<string[]>([])
+  const [estilo, setEstilo] = useState('')
+  const [enlaces, setEnlaces] = useState('')
   const [notas, setNotas] = useState('')
   const navegarA = useNavigate()
   const accion = useAction()
@@ -41,6 +45,12 @@ export function HomeScreen() {
         gender: sexo,
         genre: genero.trim(),
         notes: notas.trim(),
+        visual_style: estilo,
+        music_genres: generos,
+        inspiration_urls: enlaces
+          .split('\n')
+          .map((linea) => linea.trim())
+          .filter(Boolean),
       }),
     )
     if (creado) {
@@ -48,6 +58,9 @@ export function HomeScreen() {
       setNombre('')
       setSexo('')
       setGenero('')
+      setGeneros([])
+      setEstilo('')
+      setEnlaces('')
       setNotas('')
       await reload()
       // Directo a su pantalla: el estudio ya esta diseñandolo.
@@ -134,11 +147,26 @@ export function HomeScreen() {
             placeholder="Feri"
           />
           <ElegirGenero value={sexo} onChange={setSexo} />
+          <div className="field">
+            <label>Su estilo visual (fijo)</label>
+            <ElegirEstilo valor={estilo} alCambiar={setEstilo} />
+          </div>
+          <div className="field">
+            <label>Sus generos (combinables)</label>
+            <ElegirGeneros valor={generos} alCambiar={setGeneros} />
+          </div>
           <Field
-            label="Estilo musical"
+            label="O su estilo musical, en tus palabras"
             value={genero}
             onChange={setGenero}
             placeholder="Reggaetón triste"
+          />
+          <Field
+            label="Canciones de referencia en YouTube (opcional, una por linea)"
+            value={enlaces}
+            onChange={setEnlaces}
+            placeholder="https://www.youtube.com/watch?v=…"
+            multiline
           />
           <Field
             label="Algo más (opcional)"

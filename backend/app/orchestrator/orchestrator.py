@@ -43,7 +43,6 @@ from ..domain.pricing import (
     CostEstimate,
     estimate_images,
     estimate_song,
-    estimate_speech,
     estimate_text,
     estimate_video,
 )
@@ -66,7 +65,7 @@ TEXT_ESTIMATE_OUTPUT_TOKENS = 2_500
 class GenerationRequest:
     universe_id: str
     kind: str
-    """One of: text, image, music, video, speech, assembly."""
+    """One of: text, image, music, video, assembly."""
     target_type: str = ""
     target_id: str = ""
     model: str | None = None
@@ -95,7 +94,7 @@ class ResolvedModel:
     """Where the choice came from: 'user', 'bible' or 'registry'."""
 
 
-LOCAL_KINDS: frozenset[str] = frozenset({"assembly", "mix", "cut"})
+LOCAL_KINDS: frozenset[str] = frozenset({"assembly"})
 """Kinds handled by our own FFmpeg component rather than by a model."""
 
 _KIND_TO_MODEL_KIND: dict[str, ModelKind] = {
@@ -103,7 +102,6 @@ _KIND_TO_MODEL_KIND: dict[str, ModelKind] = {
     "image": ModelKind.IMAGE,
     "music": ModelKind.MUSIC,
     "video": ModelKind.VIDEO,
-    "speech": ModelKind.SPEECH,
 }
 
 
@@ -173,10 +171,6 @@ class Orchestrator:
             )
         if request.kind == "music":
             return estimate_song(registry, attempts=1)
-        if request.kind == "speech":
-            return estimate_speech(
-                registry, resolved.spec.id, characters=len(payload.get("text") or "")
-            )
         return estimate_text(
             registry,
             resolved.spec.id,

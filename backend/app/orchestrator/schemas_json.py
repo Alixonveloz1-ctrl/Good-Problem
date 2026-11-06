@@ -80,42 +80,13 @@ VIDEO_CONCEPT_SCHEMA: dict[str, Any] = {
                 "resolution": _str(),
             },
         },
-        "needed_characters": _arr(
-            {
-                "type": "OBJECT",
-                "properties": {
-                    "name": _str(),
-                    "apparent_age": _str(),
-                    "appearance": _str(),
-                    "personality": _str(),
-                    "why": _str("Por que la produccion lo necesita"),
-                },
-                "required": ["name", "appearance"],
-            }
+        "wardrobe_notes": _str(
+            "El vestuario del artista en este video, en espanol: que lleva en "
+            "cada tramo y por que. Es texto de la propuesta, no una seccion aparte."
         ),
-        "needed_locations": _arr(
-            {
-                "type": "OBJECT",
-                "properties": {
-                    "name": _str(),
-                    "description": _str(),
-                    "lighting": _str(),
-                    "time_of_day": _str(),
-                    "mood": _str(),
-                },
-                "required": ["name", "description"],
-            }
-        ),
-        "needed_wardrobe": _arr(
-            {
-                "type": "OBJECT",
-                "properties": {
-                    "name": _str(),
-                    "category": _str(),
-                    "description": _str(),
-                },
-                "required": ["name"],
-            }
+        "location_notes": _str(
+            "Donde ocurre este video, en espanol: los sitios, su luz y su "
+            "momento del dia. Es texto de la propuesta, no una seccion aparte."
         ),
     },
     "required": ["title", "video_type", "concept", "story"],
@@ -132,8 +103,18 @@ STORYBOARD_SCHEMA: dict[str, Any] = {
                     "duration_seconds": {"type": "INTEGER", "enum": [8]},
                     "song_timestamp": _str("mm:ss-mm:ss"),
                     "character_names": _arr(_str()),
-                    "location_name": _str(),
-                    "wardrobe_names": _arr(_str()),
+                    "location_description": _str(
+                        "Donde ocurre el plano, en espanol, con su luz"
+                    ),
+                    "wardrobe_description": _str(
+                        "Que lleva puesto el artista en este plano, en espanol"
+                    ),
+                    "planos": _arr(
+                        _str(
+                            "Un plano corto dentro del bloque, en espanol: "
+                            "encuadre y accion. Dos o tres por bloque."
+                        )
+                    ),
                     "action": _str("En espanol"),
                     "emotion": _str(),
                     "camera": _str(),
@@ -251,17 +232,6 @@ ARTIST_BIBLE_SCHEMA: dict[str, Any] = {
     "required": ["identity", "musical", "visual"],
 }
 
-CONTENT_SCHEMA: dict[str, Any] = {
-    "type": "OBJECT",
-    "properties": {
-        "title": _str(),
-        "script": _str("Lo que se dice o se lee en pantalla, en espanol"),
-        "spoken_text": _str("Texto exacto para Chirp, en espanol"),
-        "shot_notes": _arr(_str()),
-        "video_prompt": _str("En ingles de Estados Unidos"),
-    },
-    "required": ["title", "script"],
-}
 
 EDIT_PLAN_SCHEMA: dict[str, Any] = {
     "type": "OBJECT",
@@ -296,101 +266,39 @@ EDIT_PLAN_SCHEMA: dict[str, Any] = {
     "required": ["cuts"],
 }
 
-INTERVIEW_SCHEMA: dict[str, Any] = {
+
+
+
+
+
+# --- Inspiration and photo style (simplified studio) ------------------------
+
+INSPIRATION_SCHEMA: dict[str, Any] = {
     "type": "OBJECT",
     "properties": {
-        "title": _str(),
-        "exchanges": _arr(
-            {
-                "type": "OBJECT",
-                "properties": {"question": _str(), "answer": _str()},
-                "required": ["question", "answer"],
-            }
+        "title": _str("Titulo del video analizado"),
+        "genres": _str("Generos y mezcla que se oyen, en espanol"),
+        "rhythm": _str("Ritmo, velocidad y sensacion, en espanol"),
+        "instruments": _arr(_str("Un instrumento dominante por elemento")),
+        "structure": _str("Estructura: verso, coro, puente..., en espanol"),
+        "mood": _str("Ambiente, en espanol"),
+        "lyric_themes": _arr(_str("Un tema de la letra por elemento")),
+        "lyric_style": _str("Manera de escribir la letra, en espanol"),
+    },
+    "required": ["genres", "rhythm", "structure"],
+}
+
+PHOTO_STYLE_SCHEMA: dict[str, Any] = {
+    "type": "OBJECT",
+    "properties": {
+        "style_description": _str(
+            "The visual style of the photo as one prompt-ready description in "
+            "US English: medium (photograph, anime, oil painting...), rendering, "
+            "lighting, palette and finish. No mention of who the person is."
         ),
-        "spoken_text": _str("Las respuestas encadenadas, listas para Chirp"),
+        "medium": _str("photograph, anime, oil painting, 3D render..."),
+        "palette": _str("Dominant colours, in US English"),
+        "lighting": _str("Lighting, in US English"),
     },
-    "required": ["title", "exchanges"],
-}
-
-
-# --- Lo que los departamentos proponen solos (PRD 19, 20) -------------------
-#
-# El estudio tiene un Director de casting y un Director creativo, y hasta ahora
-# solo rellenaban fichas vacias que habia que crear a mano, con su nombre y su
-# descripcion escritos a dedo. Eso no es dirigir: es tomar dictado.
-#
-# Con estos esquemas proponen la tanda entera —el vestuario, las locaciones, el
-# reparto— a partir de quien es el artista. Lo que sobra se borra de un toque,
-# que es mucho menos trabajo que escribirlo.
-
-WARDROBE_SET_SCHEMA: dict[str, Any] = {
-    "type": "OBJECT",
-    "properties": {
-        "outfits": _arr(
-            {
-                "type": "OBJECT",
-                "properties": {
-                    "name": _str("Nombre corto y reconocible, en espanol"),
-                    "category": {
-                        "type": "STRING",
-                        "enum": [
-                            "signature",
-                            "casual",
-                            "performance",
-                            "interview",
-                            "music_video",
-                            "night",
-                            "special",
-                        ],
-                    },
-                    "description": _str("Como es, en espanol"),
-                    "pieces": _arr(_str()),
-                    "accessories": _arr(_str()),
-                    "colors": _arr(_str()),
-                    "usage": _str("Cuando lo lleva, en espanol"),
-                },
-                "required": ["name", "category", "description"],
-            }
-        )
-    },
-    "required": ["outfits"],
-}
-
-LOCATION_SET_SCHEMA: dict[str, Any] = {
-    "type": "OBJECT",
-    "properties": {
-        "locations": _arr(
-            {
-                "type": "OBJECT",
-                "properties": {
-                    "name": _str("Nombre corto, en espanol"),
-                    "description": _str("Que se ve, en espanol"),
-                    "lighting": _str("La luz, en espanol"),
-                    "time_of_day": _str("Momento del dia, en espanol"),
-                },
-                "required": ["name", "description"],
-            }
-        )
-    },
-    "required": ["locations"],
-}
-
-CAST_SET_SCHEMA: dict[str, Any] = {
-    "type": "OBJECT",
-    "properties": {
-        "characters": _arr(
-            {
-                "type": "OBJECT",
-                "properties": {
-                    "name": _str("Nombre del personaje"),
-                    "apparent_age": _str(),
-                    "appearance": _str("Descripcion fisica detallada, en espanol"),
-                    "personality": _str("En espanol"),
-                    "relation": _str("Que es del artista, en espanol"),
-                },
-                "required": ["name", "appearance"],
-            }
-        )
-    },
-    "required": ["characters"],
+    "required": ["style_description"],
 }

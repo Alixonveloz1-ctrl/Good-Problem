@@ -9,8 +9,6 @@ from fastapi.testclient import TestClient
 
 from app.container import Studio, set_studio
 from app.db.client import MemoryDatabase
-from app.providers.chirp import ChirpClient
-from app.providers.secrets import SecretStore
 from app.providers.storage import LocalStorage
 from app.providers.vertex import VertexClient
 from app.settings import Settings
@@ -41,8 +39,6 @@ def studio(settings, tmp_root) -> Studio:
         db=MemoryDatabase(),
         storage=LocalStorage(str(tmp_root / "media")),
         vertex=VertexClient("test-project", dry_run=True),
-        chirp=ChirpClient("test-project", dry_run=True),
-        secrets=SecretStore("test-project", dry_run=True),
     )
     instance.vertex.calls = instance.calls
     instance.ensure_registry_seeded()

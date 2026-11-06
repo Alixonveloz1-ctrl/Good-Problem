@@ -272,9 +272,11 @@ con el motivo.
 
 ## 9. Ensamblaje pesado
 
-El servicio ensambla en proceso cuando el proyecto es pequeño. Para un
-videoclip largo conviene lanzar el Cloud Run Job, que tiene FFmpeg, más CPU y
-una hora de límite:
+El servicio ensambla en proceso, y su imagen lleva FFmpeg instalado (ver el
+Dockerfile): es lo que hace que el MP4 final se renderice de verdad en
+producción y no quede solo el plan de montaje. Para un videoclip muy largo
+sigue existiendo la vía pesada, el Cloud Run Job, con más CPU y una hora de
+límite:
 
 ```bash
 gcloud run jobs execute aaus-assembly --region us-central1 \

@@ -20,8 +20,8 @@ from pathlib import Path
 from typing import Any
 
 from ..clock import now_iso
-from ..db.repositories import CONTENT, EXPORTS, SONGS, VIDEO_PROJECTS, Repository
-from ..domain.enums import CanonStatus, ContentKind
+from ..db.repositories import EXPORTS, SONGS, VIDEO_PROJECTS, Repository
+from ..domain.enums import CanonStatus
 from ..errors import Conflict
 from ..ids import new_id, slugify
 from ..providers.storage import export_path, song_path
@@ -46,10 +46,6 @@ def build_package(studio, universe_id: str, song_id: str) -> dict[str, Any]:
         if song.get("video_project_id")
         else None
     )
-    content = Repository(studio.db, universe_id, CONTENT).list(
-        where={"song_id": song_id}, limit=200
-    )
-
     files: list[dict[str, Any]] = []
 
     def add(folder: str, name: str, source_path: str | None) -> None:
@@ -73,15 +69,6 @@ def build_package(studio, universe_id: str, song_id: str) -> dict[str, Any]:
     if project:
         add("MUSIC_VIDEO", "youtube_16x9.mp4", project.get("master_16x9_path"))
         add("MUSIC_VIDEO", "vertical_9x16.mp4", project.get("master_9x16_path"))
-
-    counters: dict[str, int] = {}
-    for piece in content:
-        if piece.get("status") != CanonStatus.APPROVED.value:
-            continue
-        folder = _folder_for(piece.get("kind", ""))
-        counters[folder] = counters.get(folder, 0) + 1
-        prefix = folder.lower().rstrip("s") or "clip"
-        add(folder, f"{prefix}_{counters[folder]:02d}.mp4", piece.get("storage_path"))
 
     metadata = {
         "artist": universe.get("name"),
@@ -202,17 +189,6 @@ def _audio_masters(studio, universe_id: str, song: dict[str, Any]) -> dict[str, 
     return salida
 
 
-def _folder_for(kind: str) -> str:
-    if kind in {ContentKind.SHORT.value, ContentKind.REEL.value, ContentKind.TIKTOK.value,
-                ContentKind.TEASER.value, ContentKind.LYRIC_CLIP.value}:
-        return "SHORTS"
-    if kind == ContentKind.BTS.value:
-        return "BTS"
-    if kind == ContentKind.INTERVIEW.value:
-        return "INTERVIEWS"
-    return "EXTRAS"
-
-
 def _song_info(song: dict[str, Any], universe: dict[str, Any]) -> str:
     concept = song.get("concept") or {}
     return "\n".join(
@@ -263,8 +239,7 @@ def render_tree(root: str, files: list[dict[str, Any]]) -> str:
     by_folder: dict[str, list[str]] = {}
     for entry in files:
         by_folder.setdefault(entry["folder"], []).append(entry["name"])
-    for folder in ["AUDIO", "COVER", "MUSIC_VIDEO", "SHORTS", "BTS", "INTERVIEWS", "EXTRAS",
-                   "METADATA"]:
+    for folder in ["AUDIO", "COVER", "MUSIC_VIDEO", "METADATA"]:
         names = by_folder.get(folder)
         if not names:
             continue

@@ -28,11 +28,6 @@ TASK_ROLES: dict[str, CreativeRole] = {
     "video_concept": CreativeRole.DIRECTOR,
     "storyboard": CreativeRole.CINEMATOGRAPHER,
     "character": CreativeRole.CASTING_DIRECTOR,
-    "wardrobe_set": CreativeRole.CREATIVE_DIRECTOR,
-    "location_set": CreativeRole.CREATIVE_DIRECTOR,
-    "cast_set": CreativeRole.CASTING_DIRECTOR,
-    "content_script": CreativeRole.DIRECTOR,
-    "interview": CreativeRole.DIRECTOR,
     "edit_plan": CreativeRole.EDITOR,
 }
 
@@ -44,11 +39,6 @@ TASK_SCHEMAS: dict[str, dict[str, Any]] = {
     "video_concept": S.VIDEO_CONCEPT_SCHEMA,
     "storyboard": S.STORYBOARD_SCHEMA,
     "character": S.CHARACTER_SCHEMA,
-    "wardrobe_set": S.WARDROBE_SET_SCHEMA,
-    "location_set": S.LOCATION_SET_SCHEMA,
-    "cast_set": S.CAST_SET_SCHEMA,
-    "content_script": S.CONTENT_SCHEMA,
-    "interview": S.INTERVIEW_SCHEMA,
     "edit_plan": S.EDIT_PLAN_SCHEMA,
 }
 
@@ -64,6 +54,31 @@ def _overrides_block(overrides: dict[str, Any]) -> str:
         "USER OVERRIDES. The user changed these by hand. Rebuild the proposal from them; "
         "do not argue them back.\n" + "\n".join(lines)
     )
+
+
+def _fixed_music_blocks(payload: dict[str, Any]) -> list[str]:
+    """What is fixed for this artist and this song, handed to the Director as
+    given: the singing voice text, the genre combination and the inspiration
+    summaries. The handlers impose them again on the result, so a Director
+    that paraphrases them has not changed anything that reaches Lyria."""
+    blocks: list[str] = []
+    voz = (payload.get("singing_voice_text") or "").strip()
+    if voz:
+        blocks.append(
+            "SINGING VOICE OF THIS ARTIST (fixed, include verbatim in the "
+            f"music prompt, never reword it):\n{voz}"
+        )
+    generos = (payload.get("genres_text") or "").strip()
+    if generos:
+        blocks.append(f"GENRE COMBINATION (fixed): {generos}")
+    inspiracion = (payload.get("inspiration_text") or "").strip()
+    if inspiracion:
+        blocks.append(
+            "REFERENCE INSPIRATION. Take the style, the kind of music and the "
+            "way the lyrics are written. Create ORIGINAL lyrics and melody: "
+            f"never copy the reference's lyrics or melody.\n{inspiracion}"
+        )
+    return blocks
 
 
 def build_prompt(task: str, payload: dict[str, Any]) -> str:
@@ -84,9 +99,10 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
         sections.append(
             "Develop a song concept for this artist: title, concept, hook, genre, BPM, mood, "
             "structure, production and vocal interpretation. Then write the prompt that will be "
-            "sent to Lyria 3 Pro in US English, including the artist's Voice Profile verbatim and "
-            "the requested duration."
+            "sent to Lyria 3 Pro in US English, including the artist's singing voice "
+            "description verbatim and the requested duration."
         )
+        sections.extend(_fixed_music_blocks(payload))
         if brief:
             sections.append(f"USER IDEA\n{brief}")
         duration = payload.get("duration_seconds")
@@ -98,6 +114,7 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
             "Write the full lyrics for this song. Mark sections in square brackets, "
             "e.g. [Verse 1], [Chorus]. Keep the hook intact."
         )
+        sections.extend(_fixed_music_blocks(payload))
         concept = payload.get("concept") or {}
         if concept:
             sections.append(f"APPROVED CONCEPT\n{_kv(concept)}")
@@ -109,15 +126,24 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
         sections.append(
             "The user supplied these lyrics. Analyse theme and structure, detect the hooks, and "
             "propose genre, BPM, vocal interpretation and production. Do NOT rewrite the lyrics. "
-            "Then write the Lyria 3 Pro prompt in US English including the Voice Profile verbatim."
+            "Then write the Lyria 3 Pro prompt in US English including the artist's singing "
+            "voice description verbatim."
         )
+        sections.extend(_fixed_music_blocks(payload))
         sections.append(f"USER LYRICS\n{lyrics}")
 
     elif task == "video_concept":
         sections.append(
             "Propose the music video for this approved song: type, concept and story arc. "
-            "List the characters, locations and wardrobe the production actually needs, and only "
-            "those. Reuse what already exists in the Canon before asking for anything new."
+            "The only character is the artist. Also write, as text inside this same proposal, "
+            "the wardrobe the artist wears in the video (wardrobe_notes) and where it happens "
+            "(location_notes): they are part of this proposal and are approved with the story, "
+            "not separate sections of the studio."
+        )
+        sections.append(
+            "The music sounds from second 0 and the artist is already on screen in the first "
+            "shot, performing. A silent or empty opening is forbidden: nobody waits through a "
+            "dead intro in a music video."
         )
         song = payload.get("song") or {}
         if song:
@@ -128,6 +154,7 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
     elif task == "storyboard":
         seconds = int(payload.get("song_duration_seconds") or 150)
         blocks = max(1, -(-seconds // 8))
+        planos = max(blocks * 2, -(-seconds // 4))
         sections.append(
             f"Build the storyboard. The song lasts {seconds} seconds, so plan about {blocks} "
             "scenes of exactly 8 seconds each. Veo only generates 4, 6 or 8 second clips and 8 is "
@@ -135,12 +162,31 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
             "here, so every scene lasts 8 seconds."
         )
         sections.append(
+            "Cut rhythm: the finished video must cut every 3 to 5 seconds, like a professional "
+            f"music video, so plan about {planos} short shots (planos) in total. Each 8 second "
+            "scene carries two or three planos: list them in the scene's planos field, and write "
+            "the scene's video_prompt so it asks for those internal cuts explicitly, in order, "
+            "with their framing (wide, medium, close-up, detail). A scene that sits in a single "
+            "static framing for 8 seconds is a failed scene."
+        )
+        sections.append(
+            "Second 0 rule: the music sounds from the first frame and the artist is already on "
+            "screen in the first plano, performing the first line. No empty landscapes, no "
+            "silent build-up, no titles before the artist appears."
+        )
+        sections.append(
+            "The artist is the only character. Keep the same face, the same hair and the base "
+            "wardrobe in every scene; each scene states its location (location_description) and "
+            "what the artist wears in it (wardrobe_description) as text, following the "
+            "wardrobe and location notes of the approved story."
+        )
+        sections.append(
             "Before proposing a new shot, look for one you can reuse: a repeated chorus, a "
             "location already on screen, a framing that works again. Set reuses_scene_index to "
             "the index of the scene being reused, or -1 when the shot has to be generated. "
             "Explain the reuse plan in notes, in Spanish."
         )
-        for key in ("story", "characters", "locations", "wardrobe", "lyrics"):
+        for key in ("story", "characters", "wardrobe_notes", "location_notes", "lyrics"):
             value = payload.get(key)
             if value:
                 sections.append(f"{key.upper()}\n{_kv(value)}")
@@ -169,53 +215,6 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
         if brief:
             sections.append(f"WHAT THE PRODUCTION NEEDS\n{brief}")
 
-    elif task == "wardrobe_set":
-        cuantos = int(payload.get("count") or 4)
-        sections.append(
-            f"Propose {cuantos} outfits that this artist would actually wear, as their stylist "
-            "would build a wardrobe: one signature look that reads as theirs on sight, and the "
-            "rest covering what the year needs -stage, video, interview, off duty. Each one "
-            "coherent with the artist's identity, era and genre, and distinct from the others. "
-            "Name them the way a wardrobe department does, short and recognisable."
-        )
-        if brief:
-            sections.append(f"USER DIRECTION\n{brief}")
-
-    elif task == "location_set":
-        cuantos = int(payload.get("count") or 4)
-        sections.append(
-            f"Propose {cuantos} locations where this artist's videos happen. Places that belong "
-            "to this artist's world, not a stock list: somewhere intimate, somewhere with scale, "
-            "somewhere that says where they are from. Say what is seen, the light and the time "
-            "of day, concretely enough to shoot."
-        )
-        if brief:
-            sections.append(f"USER DIRECTION\n{brief}")
-
-    elif task == "cast_set":
-        cuantos = int(payload.get("count") or 3)
-        sections.append(
-            f"Propose {cuantos} secondary characters around this artist -the people who appear "
-            "in their videos and their story. Not extras: each one with a reason to be there and "
-            "a relation to the artist. Describe each face precisely enough that two separate "
-            "generations look like the same person."
-        )
-        principal = payload.get("lead") or {}
-        if principal:
-            sections.append(f"THE ARTIST THEY ORBIT\n{_kv(principal)}")
-        if brief:
-            sections.append(f"USER DIRECTION\n{brief}")
-
-    elif task == "content_script":
-        kind = payload.get("content_kind", "short")
-        sections.append(
-            f"Write a {kind} for this artist. Give the on screen script and the exact spoken text "
-            "for the cloned voice, in Spanish, plus one video prompt in US English. "
-            "The video is generated without audio; the voice is added in the edit."
-        )
-        if brief:
-            sections.append(f"USER DIRECTION\n{brief}")
-
     elif task == "edit_plan":
         escenas = payload.get("scenes") or []
         sections.append(
@@ -240,15 +239,6 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
                 sections.append(f"{key.upper()}\n{_kv(value)}")
         if escenas:
             sections.append("SHOTS\n" + _kv(escenas))
-
-    elif task == "interview":
-        sections.append(
-            "Write a short interview with this artist. The personality comes from the Artist "
-            "Bible. Questions and answers in Spanish. Then join the answers into spoken_text, "
-            "ready for the cloned voice."
-        )
-        if brief:
-            sections.append(f"ANGLE\n{brief}")
 
     else:
         raise InvalidGenerationRequest(f"Tarea de Director desconocida: '{task}'.")

@@ -13,7 +13,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..db.client import Database
-from ..db.repositories import CANON, CHARACTERS, LOCATIONS, WARDROBE, Repository, doc_path
+from ..db.repositories import CANON, CHARACTERS, Repository, doc_path
+from ..domain import artist as artist_domain
 from ..domain.enums import CanonStatus
 from ..domain.schemas import ArtistBible
 
@@ -51,7 +52,9 @@ def summarize_bible(bible: ArtistBible) -> str:
         f"Audience: {identity.target_audience}",
         f"Recurring themes: {', '.join(identity.recurring_themes)}",
         "",
-        f"Genre: {musical.genre} / {', '.join(musical.subgenres)}",
+        f"Genres (fixed combination): "
+        f"{artist_domain.genres_text(bible.music_genres, bible.music_genre_free) or musical.genre}"
+        f" / {', '.join(musical.subgenres)}",
         f"BPM range: {musical.bpm_range}",
         f"Instrumentation: {', '.join(musical.instrumentation)}",
         f"Production: {musical.production}",
@@ -61,6 +64,8 @@ def summarize_bible(bible: ArtistBible) -> str:
         f"Mood: {musical.mood}",
         f"Vocal characteristics: {musical.vocal_characteristics}",
         "",
+        f"Visual style (fixed): {visual.style_label or visual.style_key or '(sin elegir)'}",
+        artist_domain.style_block(bible),
         f"Appearance: {visual.appearance}",
         f"Aesthetic: {visual.aesthetic}",
         f"Palette: {', '.join(visual.palette)}",
@@ -73,11 +78,17 @@ def summarize_bible(bible: ArtistBible) -> str:
         "",
         f"Speech style: {comms.speech_style}",
         f"Humour: {comms.humour}",
-        f"Interview style: {comms.interview_style}",
         "",
-        "VOICE PROFILE (include verbatim in every music prompt):",
-        bible.voice_profile.as_prompt() or "(sin definir)",
+        "SINGING VOICE (fixed text, include verbatim in every music prompt):",
+        bible.singing_voice.text or bible.voice_profile.as_prompt() or "(sin definir)",
     ]
+    for inspiracion in bible.inspirations:
+        if inspiracion.summary_text:
+            lines.append("")
+            lines.append(
+                "REFERENCE INSPIRATION (style only; create original material, "
+                f"never copy lyrics or melody):\n{inspiracion.summary_text}"
+            )
     return "\n".join(line for line in lines if line is not None)
 
 
@@ -94,13 +105,18 @@ def summarize_canon(db: Database, universe_id: str, *, limit: int = 40) -> str:
 
 @dataclass
 class SceneContext:
-    """Everything a scene generation needs, already resolved."""
+    """Everything a scene generation needs, already resolved.
+
+    Simplified studio: the only character is the artist. Location and
+    wardrobe are text inside the scene itself (proposed in the storyboard),
+    so the context is the artist's approved Master references plus the
+    artist's fixed visual style.
+    """
 
     characters: list[dict[str, Any]] = field(default_factory=list)
-    location: dict[str, Any] | None = None
-    outfits: list[dict[str, Any]] = field(default_factory=list)
     reference_paths: list[str] = field(default_factory=list)
     unapproved_characters: list[str] = field(default_factory=list)
+    style_prompt: str = ""
 
     def describe(self) -> str:
         parts = []
@@ -109,13 +125,8 @@ class SceneContext:
                 f"CHARACTER {char.get('name')}: {char.get('appearance')} "
                 f"({char.get('apparent_age')})"
             )
-        if self.location:
-            parts.append(
-                f"LOCATION {self.location.get('name')}: {self.location.get('description')}; "
-                f"lighting {self.location.get('lighting')}; {self.location.get('time_of_day')}"
-            )
-        for outfit in self.outfits:
-            parts.append(f"WARDROBE {outfit.get('name')}: {outfit.get('description')}")
+        if self.style_prompt:
+            parts.append(f"VISUAL STYLE (fixed for this artist): {self.style_prompt}")
         return "\n".join(parts)
 
 
@@ -124,8 +135,6 @@ def load_scene_context(
     universe_id: str,
     *,
     character_ids: list[str],
-    location_id: str | None,
-    wardrobe_ids: list[str],
     max_references: int = 3,
 ) -> SceneContext:
     ctx = SceneContext()
@@ -138,17 +147,6 @@ def load_scene_context(
             ctx.reference_paths.extend(doc.get("reference_image_paths") or [])
         else:
             ctx.unapproved_characters.append(doc.get("name") or char_id)
-    if location_id:
-        ctx.location = db.get(doc_path(universe_id, LOCATIONS, location_id))
-        if ctx.location and ctx.location.get("status") == CanonStatus.APPROVED.value:
-            ctx.reference_paths.extend((ctx.location.get("reference_paths") or [])[:1])
-    for outfit_id in wardrobe_ids:
-        doc = db.get(doc_path(universe_id, WARDROBE, outfit_id))
-        if doc is None:
-            continue
-        ctx.outfits.append(doc)
-        if doc.get("status") == CanonStatus.APPROVED.value and doc.get("image_path"):
-            ctx.reference_paths.append(doc["image_path"])
-    # Keep the most identity-bearing references first: characters, then place.
+    ctx.style_prompt = artist_domain.visual_style_prompt(load_bible(db, universe_id))
     ctx.reference_paths = list(dict.fromkeys(ctx.reference_paths))[:max_references]
     return ctx

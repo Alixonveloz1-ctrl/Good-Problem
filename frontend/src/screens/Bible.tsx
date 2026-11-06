@@ -2,15 +2,26 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { api, newIdempotencyKey } from '../api/client'
 import { useAction, useResource } from '../hooks/useApi'
-import type { ArtistBible, Registry } from '../api/types'
+import type { ArtistBible, Inspiration, Registry, SingingVoice } from '../api/types'
 import { JobWatcher } from '../components/JobWatcher'
+import { ElegirEstilo, ElegirGeneros } from '../components/Seleccion'
+import { textoGeneros } from '../lib/catalogo'
 import { Card, ErrorNote, Field, Loading, StatusBadge, TopBar } from '../components/ui'
 
 const SECTION_LABELS: Record<string, string> = {
   identity: 'Identidad',
   musical: 'Identidad musical',
-  visual: 'Identidad visual',
   communication: 'Comunicacion',
+}
+
+const VOZ_VACIA: SingingVoice = {
+  sex: '',
+  apparent_age: '',
+  pitch: '',
+  timbre: '',
+  language_accent: '',
+  singing_style: '',
+  text: '',
 }
 
 export function BibleScreen() {
@@ -22,10 +33,21 @@ export function BibleScreen() {
   const action = useAction()
   const [brief, setBrief] = useState('')
   const [jobId, setJobId] = useState<string | null>(null)
-  const [voiceLines, setVoiceLines] = useState('')
+
+  const [estilo, setEstilo] = useState('')
+  const [voz, setVoz] = useState<SingingVoice>(VOZ_VACIA)
+  const [generos, setGeneros] = useState<string[]>([])
+  const [mezcla, setMezcla] = useState('')
+  const [inspiraciones, setInspiraciones] = useState<Inspiration[]>([])
+  const [enlace, setEnlace] = useState('')
 
   useEffect(() => {
-    if (data) setVoiceLines((data.voice_profile.lines ?? []).join('\n'))
+    if (!data) return
+    setEstilo(data.visual.style_key ?? '')
+    setVoz({ ...VOZ_VACIA, ...(data.singing_voice ?? {}) })
+    setGeneros(data.music_genres ?? [])
+    setMezcla(data.music_genre_free ?? '')
+    setInspiraciones(data.inspirations ?? [])
   }, [data])
 
   const generate = async () => {
@@ -38,11 +60,57 @@ export function BibleScreen() {
     if (job) setJobId(job.id)
   }
 
-  const saveVoice = async () => {
+  const guardarEstilo = async () => {
     await action.run(() =>
-      api.put(`/api/universes/${universeId}/bible/voice-profile`, {
-        lines: voiceLines.split('\n').map((line) => line.trim()).filter(Boolean),
+      api.put(`/api/universes/${universeId}/bible/visual-style`, { style_key: estilo }),
+    )
+    await reload()
+  }
+
+  const guardarVoz = async () => {
+    await action.run(() =>
+      api.put(`/api/universes/${universeId}/bible/singing-voice`, {
+        sex: voz.sex,
+        apparent_age: voz.apparent_age,
+        pitch: voz.pitch,
+        timbre: voz.timbre,
+        language_accent: voz.language_accent,
+        singing_style: voz.singing_style,
       }),
+    )
+    await reload()
+  }
+
+  const guardarGeneros = async () => {
+    await action.run(() =>
+      api.put(`/api/universes/${universeId}/bible/genres`, {
+        music_genres: generos,
+        music_genre_free: mezcla,
+      }),
+    )
+    await reload()
+  }
+
+  const analizarEnlace = async () => {
+    const creada = await action.run(() =>
+      api.post<Inspiration>(`/api/universes/${universeId}/bible/inspirations`, { url: enlace }),
+    )
+    if (creada) setEnlace('')
+    await reload()
+  }
+
+  const guardarInspiraciones = async () => {
+    await action.run(() =>
+      api.put(`/api/universes/${universeId}/bible/inspirations`, {
+        inspirations: inspiraciones,
+      }),
+    )
+    await reload()
+  }
+
+  const quitarInspiracion = async (indice: number) => {
+    await action.run(() =>
+      api.del(`/api/universes/${universeId}/bible/inspirations/${indice}`),
     )
     await reload()
   }
@@ -91,28 +159,129 @@ export function BibleScreen() {
         {data && (
           <>
             <Card>
-              <h3>Voice Profile</h3>
+              <h3>Su estilo visual</h3>
               <p className="muted" style={{ margin: 0 }}>
-                Se incluye tal cual en cada prompt de Lyria. No garantiza una voz identica entre
-                canciones: Lyria no acepta audio de referencia, y esa es una limitacion asumida del
-                MVP.
+                Queda fijo: su cara, las fotos de cada plano y los videos salen todos con este
+                estilo. Si lo cambias despues de aprobar su cara, habra que rehacerla.
+              </p>
+              <ElegirEstilo valor={estilo} alCambiar={setEstilo} />
+              {estilo === 'photo' && (
+                <p className="muted">
+                  {data.visual.photo_style_description
+                    ? `Estilo leido de tu foto: ${data.visual.photo_style_description}`
+                    : 'Sube una foto desde su ficha y elige «Copiar el estilo de mi foto» para leerlo.'}
+                </p>
+              )}
+              {data.visual.master_stale && (
+                <p className="error">
+                  Su estilo cambio despues de aprobar su cara: esa cara esta desactualizada y hay
+                  que rehacerla desde su ficha.
+                </p>
+              )}
+              <button className="btn block" onClick={guardarEstilo} disabled={action.busy}>
+                Guardar su estilo
+              </button>
+            </Card>
+
+            <Card>
+              <h3>Su voz cantada</h3>
+              <p className="muted" style={{ margin: 0 }}>
+                Esta descripcion se guarda como un solo texto y viaja palabra por palabra en cada
+                letra y en cada encargo a Lyria de este artista, para que su voz salga lo mas
+                parecida posible de cancion en cancion. Lyria no puede garantizar la misma voz
+                exacta: esta descripcion fija es lo mas cerca que se puede llegar. Cambiarla solo
+                afecta a las canciones futuras.
+              </p>
+              <Field label="Sexo de la voz" value={voz.sex} onChange={(v) => setVoz({ ...voz, sex: v })} placeholder="Mujer" />
+              <Field label="Edad que se oye" value={voz.apparent_age} onChange={(v) => setVoz({ ...voz, apparent_age: v })} placeholder="Unos 25 anos" />
+              <Field label="Grave o aguda" value={voz.pitch} onChange={(v) => setVoz({ ...voz, pitch: v })} placeholder="Media, mas bien grave" />
+              <Field label="Timbre" value={voz.timbre} onChange={(v) => setVoz({ ...voz, timbre: v })} placeholder="Calida, con un poco de aire" />
+              <Field label="Idioma y acento" value={voz.language_accent} onChange={(v) => setVoz({ ...voz, language_accent: v })} placeholder="Espanol neutro" />
+              <Field label="Estilo de cantar" value={voz.singing_style} onChange={(v) => setVoz({ ...voz, singing_style: v })} placeholder="Intima en los versos, con fuerza en el coro" />
+              {data.singing_voice.text && (
+                <div>
+                  <div className="muted">El texto que viaja a Lyria, tal cual:</div>
+                  <pre className="prompt">{data.singing_voice.text}</pre>
+                </div>
+              )}
+              <button className="btn block" onClick={guardarVoz} disabled={action.busy}>
+                Guardar su voz
+              </button>
+            </Card>
+
+            <Card>
+              <h3>Sus generos</h3>
+              <p className="muted" style={{ margin: 0 }}>
+                Su combinacion fija. Cada cancion la hereda y puede ajustarla solo para ella.
+              </p>
+              <ElegirGeneros valor={generos} alCambiar={setGeneros} />
+              <Field
+                label="O escribe tu mezcla"
+                value={mezcla}
+                onChange={setMezcla}
+                placeholder="Balada con guitarra de corrido y bateria de trap…"
+              />
+              {textoGeneros(generos, mezcla) && (
+                <p className="muted">Suena a: {textoGeneros(generos, mezcla)}</p>
+              )}
+              <button className="btn block" onClick={guardarGeneros} disabled={action.busy}>
+                Guardar sus generos
+              </button>
+            </Card>
+
+            <Card>
+              <h3>Sus referencias</h3>
+              <p className="muted" style={{ margin: 0 }}>
+                Pega enlaces de YouTube de canciones que te gusten. La app los escucha y guarda un
+                resumen de su estilo —generos, ritmo, instrumentos, como esta escrita la letra— y
+                ese resumen alimenta sus canciones. Siempre material original: no se copia ni la
+                letra ni la melodia, y Lyria no puede oir el enlace ni clonar la voz de nadie.
               </p>
               <Field
-                label="Una caracteristica por linea"
-                value={voiceLines}
-                onChange={setVoiceLines}
-                multiline
-                placeholder={'Female\nWarm mezzo-soprano\nBreathy but clear'}
+                label="Enlace de YouTube"
+                value={enlace}
+                onChange={setEnlace}
+                placeholder="https://www.youtube.com/watch?v=…"
               />
-              <button className="btn block" onClick={saveVoice} disabled={action.busy}>
-                Guardar
+              <button
+                className="btn block"
+                onClick={analizarEnlace}
+                disabled={action.busy || !enlace.trim()}
+              >
+                {action.busy ? 'Escuchandola…' : 'Analizar esta cancion'}
               </button>
-              <div className="muted">
-                Voz hablada:{' '}
-                {data.voice_profile.speaking_voice_secret
-                  ? 'clonada con Chirp 3'
-                  : 'sin clonar todavia'}
-              </div>
+              {inspiraciones.map((inspiracion, indice) => (
+                <div key={`${inspiracion.url}-${indice}`} className="card">
+                  <div className="row between">
+                    <strong>{inspiracion.title || 'Cancion de referencia'}</strong>
+                    <button
+                      className="btn small ghost"
+                      onClick={() => quitarInspiracion(indice)}
+                      disabled={action.busy}
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                  <div className="sub">{inspiracion.url}</div>
+                  <Field
+                    label="Resumen de su estilo (editable: esto es lo que leen sus canciones)"
+                    value={inspiracion.summary_text}
+                    multiline
+                    onChange={(v) =>
+                      setInspiraciones(
+                        inspiraciones.map((otra, i) =>
+                          i === indice ? { ...otra, summary_text: v } : otra,
+                        ),
+                      )
+                    }
+                  />
+                </div>
+              ))}
+              {inspiraciones.length > 0 && (
+                <button className="btn block" onClick={guardarInspiraciones} disabled={action.busy}>
+                  Guardar los resumenes
+                </button>
+              )}
             </Card>
 
             <Card>
@@ -177,7 +346,11 @@ export function BibleScreen() {
 
 function BibleSection({ values }: { values: Record<string, unknown> }) {
   const entries = Object.entries(values ?? {}).filter(
-    ([, value]) => value !== null && value !== '' && !(Array.isArray(value) && value.length === 0),
+    ([key, value]) =>
+      !['style_key', 'style_label', 'photo_style_description', 'master_stale'].includes(key) &&
+      value !== null &&
+      value !== '' &&
+      !(Array.isArray(value) && value.length === 0),
   )
   if (entries.length === 0) return <div className="muted">Sin definir todavia.</div>
   return (

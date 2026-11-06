@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { api, mediaUrl, newIdempotencyKey } from '../api/client'
 import { useAction, useResource } from '../hooks/useApi'
@@ -6,151 +6,76 @@ import type { Character } from '../api/types'
 import { ModelPicker, type ModelChoice } from '../components/ModelPicker'
 import { JobWatcher } from '../components/JobWatcher'
 import { Empty, ErrorNote, Field, Loading, Sheet, StatusBadge, TopBar, DeleteButton } from '../components/ui'
-import { Proponer } from '../components/Proponer'
 import { ElegirGenero } from '../components/Genero'
 import { Rasgos, cuantosElegidos } from '../components/Rasgos'
 
+/**
+ * La ficha del artista. Solo hay uno por universo: no hay reparto ni lista de
+ * acompañantes, porque cada universo ES un artista. Aqui se decide como es,
+ * se genera o se sube su cara (el Master) y se aprueba; esa cara aprobada es
+ * la referencia que viaja en cada plano de cada videoclip.
+ */
 export function CharactersScreen() {
   const { universeId = '' } = useParams()
   const { data, loading, error, reload } = useResource<Character[]>(
     `/api/universes/${universeId}/characters`,
   )
   const borrado = useAction()
-  const [creating, setCreating] = useState(false)
   const [abiertoId, setAbiertoId] = useState<string | null>(null)
-  const [name, setName] = useState('')
-  const [appearance, setAppearance] = useState('')
-  const action = useAction()
 
-  const create = async () => {
-    const created = await action.run(() =>
-      api.post<Character>(`/api/universes/${universeId}/characters`, {
-        name: name.trim(),
-        appearance,
-        role: (data ?? []).length === 0 ? 'lead' : 'supporting',
-      }),
-    )
-    if (created) {
-      setCreating(false)
-      setName('')
-      setAppearance('')
-      await reload()
-    }
-  }
-
-  // Si el personaje se borro mientras estaba abierto, la ficha desaparece sola.
   const abierto = (data ?? []).find((c) => c.id === abiertoId) ?? null
-
-  // El artista es SOLO el protagonista. Antes iban todos revueltos en la misma
-  // lista, asi que un acompañante inventado parecia estar al mismo nivel que el
-  // artista, y de ahi el "no se de donde salen estos personajes".
   const artista = (data ?? []).find((c) => c.role === 'lead') ?? null
-  const secundarios = (data ?? []).filter((c) => c.role !== 'lead')
-
-  const fila = (character: Character) => (
-    <div key={character.id} className="card fila-borrable">
-      <button
-        type="button"
-        className="grow destapado"
-        onClick={() => setAbiertoId(character.id)}
-      >
-        <div className="row between">
-          <strong>{character.name || 'Sin nombre'}</strong>
-          <StatusBadge status={character.status} />
-        </div>
-        <div className="sub">{character.appearance || 'Todavía sin descripción'}</div>
-        <div className="row between muted">
-          <span>{character.gender || 'sin decir quién es'}</span>
-          <span>
-            {character.master_shots.filter((shot) => shot.storage_path).length}/
-            {character.master_shots.length} tomas
-          </span>
-        </div>
-      </button>
-      <DeleteButton
-        busy={borrado.busy}
-        onDelete={async () => {
-          await borrado.run(() =>
-            api.del(`/api/universes/${universeId}/characters/${character.id}`),
-          )
-          await reload()
-        }}
-      />
-    </div>
-  )
 
   return (
     <>
-      <TopBar title="Personajes" back />
+      <TopBar title="El artista" back />
       <main className="screen">
         {loading && !data && <Loading />}
         <ErrorNote error={error} />
-        <div className="section-title">El artista</div>
         {artista ? (
-          <div className="list">{fila(artista)}</div>
+          <div className="list">
+            <div className="card fila-borrable">
+              <button
+                type="button"
+                className="grow destapado"
+                onClick={() => setAbiertoId(artista.id)}
+              >
+                <div className="row between">
+                  <strong>{artista.name || 'Sin nombre'}</strong>
+                  <StatusBadge status={artista.status} />
+                </div>
+                <div className="sub">{artista.appearance || 'Todavía sin descripción'}</div>
+                <div className="row between muted">
+                  <span>{artista.gender || 'sin decir quién es'}</span>
+                  <span>
+                    {artista.master_shots.filter((shot) => shot.storage_path).length}/
+                    {artista.master_shots.length} tomas
+                  </span>
+                </div>
+                {artista.master_stale && (
+                  <div className="error">
+                    Su estilo visual cambio: esta cara esta desactualizada y hay que rehacerla.
+                  </div>
+                )}
+              </button>
+              <DeleteButton
+                busy={borrado.busy}
+                onDelete={async () => {
+                  await borrado.run(() =>
+                    api.del(`/api/universes/${universeId}/characters/${artista.id}`),
+                  )
+                  await reload()
+                }}
+              />
+            </div>
+          </div>
         ) : (
           <Empty
             title="Todavía no hay artista"
             hint="Vuelve a su pantalla: ahí hay un botón para crearlo con el nombre que le pusiste."
           />
         )}
-
-        {/* Los acompañantes se proponen a partir de quién es el artista, así
-            que sin artista no hay de dónde sacarlos: era eso lo que llenaba la
-            lista de gente inventada que no venía de ninguna parte. */}
-        {artista && (
-          <>
-            <div className="section-title">Quien le acompaña</div>
-            <p className="muted" style={{ margin: 0 }}>
-              Los que salen con {artista.name || 'él'} en los videos. Su cara
-              aprobada viaja como referencia en todo lo que se genere después:
-              es lo que hace que sea siempre la misma persona.
-            </p>
-
-            <Proponer
-              universeId={universeId}
-              ruta="characters"
-              cuantos={3}
-              etiqueta={
-                secundarios.length > 0
-                  ? 'Que el estudio proponga más'
-                  : 'Que el estudio proponga quién le acompaña'
-              }
-              onListo={reload}
-            />
-
-            {secundarios.length === 0 && (
-              <Empty
-                title="Todavía va solo"
-                hint="El Director de casting los escribe a partir de quién es el artista."
-              />
-            )}
-          </>
-        )}
-
-        <div className="list">{secundarios.map(fila)}</div>
       </main>
-
-      <button className="btn small ghost block a-mano" onClick={() => setCreating(true)}>
-        …o escribir uno a mano
-      </button>
-
-      {creating && (
-        <Sheet title="Nuevo personaje" onClose={() => setCreating(false)}>
-          <Field label="Nombre" value={name} onChange={setName} placeholder="Nova" />
-          <Field
-            label="Apariencia"
-            value={appearance}
-            onChange={setAppearance}
-            multiline
-            placeholder="Pelo azul corto, ojos oscuros, complexion delgada…"
-          />
-          <ErrorNote error={action.error} onDismiss={action.clearError} />
-          <button className="btn primary block" disabled={!name.trim()} onClick={create}>
-            Crear
-          </button>
-        </Sheet>
-      )}
 
       {abierto && (
         <CharacterSheet
@@ -181,6 +106,8 @@ function CharacterSheet({
   const [shotKey, setShotKey] = useState('portrait')
   // Lo que no cabe en un boton: una cicatriz, un tatuaje, unas gafas.
   const [extra, setExtra] = useState('')
+  const [modoFoto, setModoFoto] = useState('use_as_master')
+  const entradaFoto = useRef<HTMLInputElement>(null)
 
   const design = async () => {
     const job = await action.run(() =>
@@ -215,6 +142,21 @@ function CharacterSheet({
     await onChanged()
   }
 
+  const subirFoto = async (archivo: File) => {
+    const form = new FormData()
+    form.append('file', archivo)
+    form.append('mode', modoFoto)
+    if (choice?.model) form.append('model', choice.model)
+    const resultado = await action.run(() =>
+      api.upload<{ job?: { id: string } }>(
+        `/api/universes/${universeId}/characters/${character.id}/photo`,
+        form,
+      ),
+    )
+    if (resultado?.job) setJobId(resultado.job.id)
+    await onChanged()
+  }
+
   // Como es, decidido aqui. Lo que se elija manda sobre el Director; lo que se
   // deje en blanco lo decide el, que para eso esta.
   const guardar = async (patch: Record<string, unknown>) => {
@@ -228,7 +170,7 @@ function CharacterSheet({
   const elegidos = cuantosElegidos(rasgos)
 
   return (
-    <Sheet title={character.name || 'Personaje'} onClose={onClose}>
+    <Sheet title={character.name || 'El artista'} onClose={onClose}>
       <ErrorNote error={action.error} onDismiss={action.clearError} />
 
       <ElegirGenero
@@ -270,6 +212,46 @@ function CharacterSheet({
           ? `Que el Director lo termine (${elegidos} elegidos)`
           : 'Que lo diseñe entero el Director'}
       </button>
+
+      <div className="section-title">Su foto</div>
+      <p className="muted" style={{ margin: 0 }}>
+        Si ya tienes una imagen suya, subela y elige que hacer con ella. Ojo: si la foto parece
+        una persona real fotografiada, el filtro de Google a veces bloquea los clips de video;
+        en ese caso, generar el retrato desde la foto es la salida.
+      </p>
+      <div className="field">
+        <label>Qué hacer con la foto</label>
+        <select value={modoFoto} onChange={(event) => setModoFoto(event.target.value)}>
+          <option value="use_as_master">Usarla tal cual como su cara</option>
+          <option value="base_for_master">Generar su cara desde la foto, en su estilo</option>
+          <option value="copy_style">Copiar el estilo de la foto como su estilo visual</option>
+        </select>
+      </div>
+      <input
+        ref={entradaFoto}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={(event) => {
+          const archivo = event.target.files?.[0]
+          if (archivo) void subirFoto(archivo)
+          event.target.value = ''
+        }}
+      />
+      <button
+        className="btn block"
+        onClick={() => entradaFoto.current?.click()}
+        disabled={action.busy}
+      >
+        {action.busy ? 'Subiendo…' : 'Subir una foto'}
+      </button>
+      {character.source_photo_path && (
+        <img
+          className="media square"
+          src={mediaUrl(character.source_photo_path) ?? ''}
+          alt="Foto subida"
+        />
+      )}
 
       <ModelPicker kind="image" value={choice} onChange={setChoice} label="Modelo de imagen" />
       <p className="muted" style={{ margin: 0 }}>

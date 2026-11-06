@@ -44,10 +44,14 @@ def generate(
     prompt: str,
     schema: dict[str, Any] | None = None,
     references: list[tuple[bytes, str]] | None = None,
+    extra_parts: list[dict[str, Any]] | None = None,
     temperature: float = 0.9,
     max_output_tokens: int = 8192,
 ) -> TextResult:
     parts: list[dict[str, Any]] = [{"text": prompt}]
+    # Raw parts the caller built itself: the YouTube inspiration analysis
+    # sends the video link as a fileData part, for example.
+    parts.extend(extra_parts or [])
     parts.extend(_parts_from_references(references or []))
 
     generation_config: dict[str, Any] = {

@@ -10,10 +10,10 @@ import { DeleteButton, ErrorNote, Loading, StatusBadge, TopBar } from '../compon
  * "No sé ni por dónde empezar ni qué crear ni qué ver. No puedo hacer nada
  * porque no se entiende nada."
  *
- * Era un índice de once puertas —Música, Videoclips, Contenido, Personajes,
- * Vestuario, Locaciones, Voz, Identidad, Aprobado, En marcha, Descargas— sin
- * ningún orden entre ellas. Un índice no dice qué hacer: eso lo dice quien ya
- * se sabe el camino.
+ * Era un índice de once puertas sin ningún orden entre ellas. Un índice no
+ * dice qué hacer: eso lo dice quien ya sabe el camino. En la versión
+ * simplificada el estudio es solo esto: el artista, su identidad, su música
+ * y sus videoclips.
  *
  * Ahora manda una sola cosa: qué toca AHORA, con su porqué y su botón. El
  * camino no cambia nunca —quién es, su cara, su música, su videoclip— y cada
@@ -36,17 +36,13 @@ type Paso = {
 type UniverseConPaso = Universe & { siguiente?: Paso }
 
 const MUNDO = [
-  { to: 'characters', label: 'Personajes', hint: 'El artista y quien le acompaña' },
-  { to: 'wardrobe', label: 'Vestuario', hint: 'Cómo va vestido en cada cosa' },
-  { to: 'locations', label: 'Locaciones', hint: 'Dónde ocurre' },
-  { to: 'voz', label: 'Su voz', hint: 'Grabar la voz con la que habla' },
-  { to: 'bible', label: 'Identidad', hint: 'Cómo es, cómo suena, de qué habla' },
+  { to: 'characters', label: 'El artista', hint: 'Su cara, su foto y su ficha' },
+  { to: 'bible', label: 'Identidad', hint: 'Su estilo, su voz cantada, sus géneros y sus referencias' },
 ]
 
 const PRODUCCION = [
   { to: 'songs', label: 'Música', hint: 'Concepto, letra y canción' },
   { to: 'projects', label: 'Videoclips', hint: 'Historia, planos y montaje' },
-  { to: 'content', label: 'Contenido', hint: 'Shorts, detrás de cámara, entrevistas' },
 ]
 
 const TECNICO = [

@@ -57,9 +57,25 @@ export function SceneScreen() {
                 <span className="muted">{data.duration_seconds}s · {data.song_timestamp}</span>
               </div>
               <div>{data.action}</div>
+              {data.location_description && (
+                <div className="muted">Donde: {data.location_description}</div>
+              )}
+              {data.wardrobe_description && (
+                <div className="muted">Vestuario: {data.wardrobe_description}</div>
+              )}
               {data.camera && <div className="muted">Camara: {data.camera}</div>}
               {data.lighting && <div className="muted">Luz: {data.lighting}</div>}
               {data.dialogue && <div className="muted">Dialogo: {data.dialogue}</div>}
+              {(data.planos ?? []).length > 0 && (
+                <div>
+                  <div className="muted">Planos de esta escena (cortes dentro del clip):</div>
+                  <ol style={{ margin: '4px 0', paddingLeft: 20 }}>
+                    {(data.planos ?? []).map((plano, i) => (
+                      <li key={i}>{plano}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
               {data.reuses_scene_id && (
                 <div className="notice">
                   El Director propuso reutilizar una toma ya aprobada. {data.reuse_note}
@@ -160,8 +176,8 @@ export function SceneScreen() {
                 label="Modelo de video"
               />
               <div className="notice">
-                El audio de Veo va siempre desactivado. La pista sale de Lyria y la voz hablada de
-                Chirp, asi que generarlo costaria el doble por segundo para tirarlo en el montaje.
+                El audio de Veo va siempre desactivado. La pista sale de Lyria, asi que generarlo
+                costaria el doble por segundo para tirarlo en el montaje.
               </div>
               <div className="btn-grid">
                 <button

@@ -14,17 +14,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..clock import now_iso
 from .enums import (
     AspectRatio,
-    BtsKind,
     CanonStatus,
     CharacterRole,
-    ContentKind,
     JobState,
     LyricsAuthor,
     StageKey,
     StageStatus,
     UserAction,
     VideoType,
-    WardrobeCategory,
 )
 
 
@@ -97,6 +94,16 @@ class MusicalIdentity(Base):
 
 
 class VisualIdentity(Base):
+    style_key: str = ""
+    """Chosen from domain.artist.VISUAL_STYLES. Fixed for this artist: the
+    Master and every shot of every video are generated in this style."""
+    style_label: str = ""
+    photo_style_description: str = ""
+    """When style_key is 'photo': the style read from the uploaded photo, in
+    English, ready to travel inside image and video prompts."""
+    master_stale: bool = False
+    """The style changed after the Master was approved: the Master no longer
+    represents the artist and has to be redone before new videos."""
     appearance: str = ""
     aesthetic: str = ""
     palette: list[str] = Field(default_factory=list)
@@ -113,7 +120,6 @@ class Communication(Base):
     speech_style: str = ""
     humour: str = ""
     catchphrases: list[str] = Field(default_factory=list)
-    interview_style: str = ""
     recurring_topics: list[str] = Field(default_factory=list)
 
 
@@ -131,11 +137,50 @@ class VoiceProfile(Base):
     """PRD 10. Free text lines, reused in every music generation."""
 
     lines: list[str] = Field(default_factory=list)
-    speaking_voice_secret: str | None = None
-    """Secret Manager resource holding the Chirp 3 voice cloning key."""
 
     def as_prompt(self) -> str:
         return "\n".join(line.strip() for line in self.lines if line.strip())
+
+
+class SingingVoice(Base):
+    """The artist's singing voice, as ONE fixed text.
+
+    Lyria takes no reference audio, so a voice cannot be pinned; what can be
+    pinned is the description. The parts are composed into ``text`` by
+    domain.artist.compose_singing_voice, and that text is inserted verbatim
+    into every lyric brief and every Lyria prompt of this artist, enforced by
+    code after the Director answers. Editing it only affects future songs.
+    """
+
+    sex: str = ""
+    apparent_age: str = ""
+    """The age the voice sounds like, not the artist's age."""
+    pitch: str = ""
+    """Grave, media, aguda... as the user words it."""
+    timbre: str = ""
+    language_accent: str = ""
+    singing_style: str = ""
+    text: str = ""
+    """The composed description, exactly as it travels to Lyria."""
+
+
+class Inspiration(Base):
+    """One YouTube reference, analysed by the app itself into an editable
+    summary. Inspiration only: the instruction to the Director and to Lyria
+    is to create original material, never to copy lyrics or melody."""
+
+    url: str = ""
+    title: str = ""
+    genres: str = ""
+    rhythm: str = ""
+    instruments: list[str] = Field(default_factory=list)
+    structure: str = ""
+    mood: str = ""
+    lyric_themes: list[str] = Field(default_factory=list)
+    lyric_style: str = ""
+    summary_text: str = ""
+    """The whole summary as one editable text: this is what feeds the songs."""
+    created_at: str = Field(default_factory=now_iso)
 
 
 class ArtistBible(Entity):
@@ -145,6 +190,13 @@ class ArtistBible(Entity):
     communication: Communication = Field(default_factory=Communication)
     preferences: GenerationPreferences = Field(default_factory=GenerationPreferences)
     voice_profile: VoiceProfile = Field(default_factory=VoiceProfile)
+    singing_voice: SingingVoice = Field(default_factory=SingingVoice)
+    music_genres: list[str] = Field(default_factory=list)
+    """Up to three main genres from domain.artist.MUSIC_GENRES. They define
+    the artist; each song inherits them and may adjust them for itself."""
+    music_genre_free: str = ""
+    """The user's own mix in their own words, on top of the picked genres."""
+    inspirations: list[Inspiration] = Field(default_factory=list)
     status: CanonStatus = CanonStatus.DRAFT
     version: int = 1
 
@@ -197,41 +249,22 @@ class Character(Entity):
     appearance: str = ""
     personality: str = ""
     wardrobe_ids: list[str] = Field(default_factory=list)
+    """Legacy field from when wardrobe was its own section. Unused: wardrobe
+    is now proposed inside each video's storyboard, as text."""
     master_shots: list[MasterShot] = Field(default_factory=list)
     reference_image_paths: list[str] = Field(default_factory=list)
     """Approved master shots, attached to every later generation (PRD 18)."""
+    source_photo_path: str | None = None
+    """A photo the user uploaded: used as the Master itself, or as the base
+    a new Master was generated from, or as the source of the visual style."""
+    master_stale: bool = False
+    """The artist's visual style changed after this Master was approved."""
     status: CanonStatus = CanonStatus.DRAFT
     provenance: Provenance | None = None
 
     @property
     def is_master_approved(self) -> bool:
         return self.status == CanonStatus.APPROVED and bool(self.reference_image_paths)
-
-
-class Outfit(Entity):
-    name: str
-    category: WardrobeCategory = WardrobeCategory.SIGNATURE
-    description: str = ""
-    image_path: str | None = None
-    pieces: list[str] = Field(default_factory=list)
-    accessories: list[str] = Field(default_factory=list)
-    colors: list[str] = Field(default_factory=list)
-    usage: str = ""
-    restrictions: list[str] = Field(default_factory=list)
-    status: CanonStatus = CanonStatus.DRAFT
-    provenance: Provenance | None = None
-
-
-class Location(Entity):
-    name: str
-    description: str = ""
-    reference_paths: list[str] = Field(default_factory=list)
-    lighting: str = ""
-    time_of_day: str = ""
-    architecture: str = ""
-    mood: str = ""
-    status: CanonStatus = CanonStatus.DRAFT
-    provenance: Provenance | None = None
 
 
 # --- Music (PRD 14, 15) ----------------------------------------------------
@@ -271,6 +304,14 @@ class Song(Entity):
     lyrics_status: CanonStatus = CanonStatus.DRAFT
     music_prompt: str = ""
     voice_profile: VoiceProfile = Field(default_factory=VoiceProfile)
+    genres: list[str] = Field(default_factory=list)
+    """This song's genre combination. Inherited from the artist; adjusting it
+    here changes this song only."""
+    genre_free: str = ""
+    inspiration_url: str = ""
+    """An extra YouTube reference for this song only."""
+    inspiration_summary: str = ""
+    """The editable summary of that reference, fed to lyrics and to Lyria."""
     genre: str = ""
     bpm: int | None = None
     mood: str = ""
@@ -284,7 +325,6 @@ class Song(Entity):
     approved_master_path: str | None = None
     cover_path: str | None = None
     video_project_id: str | None = None
-    content_ids: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
     status: CanonStatus = CanonStatus.DRAFT
     cost_usd: float = 0.0
@@ -324,8 +364,12 @@ class VideoProject(Entity):
     concept: str = ""
     story: Story = Field(default_factory=Story)
     character_ids: list[str] = Field(default_factory=list)
-    location_ids: list[str] = Field(default_factory=list)
-    wardrobe_ids: list[str] = Field(default_factory=list)
+    """The artist, and only the artist: set when the project is created."""
+    wardrobe_notes: str = ""
+    """Wardrobe for this video, proposed by the Director inside the video
+    concept and approved with the story. Text, not a separate section."""
+    location_notes: str = ""
+    """Locations for this video, same treatment as the wardrobe."""
     storyboard_status: CanonStatus = CanonStatus.DRAFT
     stages: list[StageState] = Field(default_factory=list)
     production_plan: dict[str, Any] | None = None
@@ -344,8 +388,15 @@ class Scene(Entity):
     duration_seconds: int = 8
     song_timestamp: str = ""
     character_ids: list[str] = Field(default_factory=list)
-    location_id: str | None = None
-    wardrobe_ids: list[str] = Field(default_factory=list)
+    location_description: str = ""
+    """Where this shot happens, as text proposed inside the storyboard.
+    Locations are no longer entities with their own section."""
+    wardrobe_description: str = ""
+    """What the artist wears in this shot, as text from the storyboard."""
+    planos: list[str] = Field(default_factory=list)
+    """The short shots inside this 8 second block. The montage target is a
+    cut every 3-5 seconds, so each block is planned as two or three planos
+    and its video prompt asks for those internal cuts explicitly."""
     action: str = ""
     emotion: str = ""
     camera: str = ""
@@ -405,29 +456,6 @@ class SceneClip(Entity):
     locked: bool = False
     cost_usd: float = 0.0
     job_id: str | None = None
-    provenance: Provenance | None = None
-
-
-# --- Content studio (PRD 33-35) --------------------------------------------
-
-
-class ContentPiece(Entity):
-    kind: ContentKind
-    bts_kind: BtsKind | None = None
-    title: str = ""
-    song_id: str | None = None
-    project_id: str | None = None
-    script: str = ""
-    spoken_text: str = ""
-    video_prompt: str = ""
-    spoken_audio_path: str | None = None
-    source_image_path: str | None = None
-    """The still the clip is generated from, kept apart from the finished video."""
-    storage_path: str | None = None
-    aspect_ratio: AspectRatio = AspectRatio.VERTICAL
-    source_clip_ids: list[str] = Field(default_factory=list)
-    status: CanonStatus = CanonStatus.DRAFT
-    cost_usd: float = 0.0
     provenance: Provenance | None = None
 
 

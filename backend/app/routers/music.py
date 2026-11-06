@@ -15,11 +15,13 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from ..db.repositories import SONGS, Repository
+from ..domain import artist as artist_domain
 from ..domain.enums import CanonStatus, CreativeRole, LyricsAuthor, UserAction
 from ..errors import Conflict, NotFound
 from ..ids import new_id
 from ..orchestrator.orchestrator import GenerationRequest
 from ..services import approvals as approval_rules
+from ..services import inspiration as inspiration_service
 from ..services.approvals import ApprovalService
 from ..services.context import load_bible
 from .deps import OwnerDep, StudioDep
@@ -35,6 +37,10 @@ def _repo(studio, universe_id: str) -> Repository:
 class SongIn(BaseModel):
     title: str = ""
     requested_duration_seconds: int = 150
+    genres: list[str] | None = None
+    """La combinacion de generos de esta cancion. Si no viene, hereda la del
+    artista; ajustarla aqui cambia solo esta cancion."""
+    genre_free: str | None = None
 
 
 class DirectorIn(BaseModel):
@@ -59,18 +65,47 @@ class GenerateIn(BaseModel):
     idempotency_key: str | None = None
 
 
+def _bloques_fijos(studio, universe_id: str, cancion: dict[str, Any]) -> dict[str, str]:
+    """Lo fijo que acompana a cada encargo de esta cancion: la voz cantada
+    del artista palabra por palabra, su combinacion de generos y los
+    resumenes de inspiracion. El handler los vuelve a imponer sobre el
+    resultado, asi que no dependen de que el Director los copie bien."""
+    bible = load_bible(studio.db, universe_id)
+    resumenes = inspiration_service.bible_inspiration_text(bible)
+    if (cancion.get("inspiration_summary") or "").strip():
+        resumenes = (resumenes + "\n\n" + cancion["inspiration_summary"]).strip()
+    return {
+        "singing_voice_text": bible.singing_voice.text or bible.voice_profile.as_prompt(),
+        "genres_text": artist_domain.genres_text(
+            cancion.get("genres") or bible.music_genres,
+            cancion.get("genre_free") or bible.music_genre_free,
+        ),
+        "inspiration_text": resumenes,
+    }
+
+
 @router.post("")
 def create_song(
     owner: OwnerDep, studio: StudioDep, universe_id: str, body: SongIn
 ) -> dict[str, Any]:
     bible = load_bible(studio.db, universe_id)
+    generos = (
+        [g for g in body.genres if g in artist_domain.MUSIC_GENRE_KEYS][
+            : artist_domain.MAX_MAIN_GENRES
+        ]
+        if body.genres is not None
+        else list(bible.music_genres)
+    )
+    libre = body.genre_free if body.genre_free is not None else bible.music_genre_free
     return _repo(studio, universe_id).create(
         new_id("song"),
         {
             "title": body.title,
             "requested_duration_seconds": min(max(body.requested_duration_seconds, 15), 180),
             "voice_profile": bible.voice_profile.model_dump(),
-            "genre": bible.musical.genre,
+            "genres": generos,
+            "genre_free": libre,
+            "genre": artist_domain.genres_text(generos, libre) or bible.musical.genre,
             "status": CanonStatus.DRAFT.value,
             "lyrics_status": CanonStatus.DRAFT.value,
             "versions": [],
@@ -106,9 +141,14 @@ def patch_song(
     allowed = {
         k: v
         for k, v in body.items()
-        if k in {"title", "genre", "bpm", "mood", "structure", "music_prompt",
-                 "requested_duration_seconds", "concept", "metadata"}
+        if k in {"title", "genre", "genres", "genre_free", "bpm", "mood",
+                 "structure", "music_prompt", "requested_duration_seconds",
+                 "concept", "metadata", "inspiration_summary"}
     }
+    if "genres" in allowed:
+        allowed["genres"] = [
+            g for g in allowed["genres"] if g in artist_domain.MUSIC_GENRE_KEYS
+        ][: artist_domain.MAX_MAIN_GENRES]
     updated = repo.update(song_id, allowed)
     ApprovalService(studio.db).record_user_action(universe_id, SONGS, song_id, UserAction.EDIT)
     return updated
@@ -151,6 +191,7 @@ def propose_concept(
                 "brief": body.brief,
                 "overrides": body.overrides,
                 "duration_seconds": song.get("requested_duration_seconds", 150),
+                **_bloques_fijos(studio, universe_id, song),
             },
         )
     )
@@ -186,6 +227,7 @@ def generate_lyrics(
                 "task": "lyrics",
                 "concept": song.get("concept") or {},
                 "overrides": body.overrides,
+                **_bloques_fijos(studio, universe_id, song),
             },
         )
     )
@@ -236,6 +278,7 @@ def analyze_lyrics(
                 "lyrics": song["lyrics"],
                 "overrides": body.overrides,
                 "brief": body.brief,
+                **_bloques_fijos(studio, universe_id, song),
             },
         )
     )
@@ -364,4 +407,27 @@ def generate_cover(
                 "reference_paths": body.get("reference_paths") or [],
             },
         )
+    )
+
+
+class SongInspirationIn(BaseModel):
+    url: str
+
+
+@router.post("/{song_id}/inspiration")
+def song_inspiration(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, song_id: str, body: SongInspirationIn
+) -> dict[str, Any]:
+    """Un enlace de YouTube solo para esta cancion. Se analiza al momento y
+    su resumen queda guardado en la cancion, editable, alimentando su letra
+    y su encargo a Lyria."""
+    repo = _repo(studio, universe_id)
+    repo.require(song_id)
+    inspiracion = inspiration_service.analyse_youtube(studio, body.url)
+    return repo.update(
+        song_id,
+        {
+            "inspiration_url": body.url,
+            "inspiration_summary": inspiracion.summary_text,
+        },
     )

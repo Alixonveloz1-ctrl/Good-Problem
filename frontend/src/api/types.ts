@@ -102,7 +102,41 @@ export interface Home {
 
 export interface VoiceProfile {
   lines: string[]
-  speaking_voice_secret: string | null
+}
+
+/** La voz cantada del artista: un solo texto fijo que viaja palabra por
+ *  palabra en cada encargo a Lyria de este artista. */
+export interface SingingVoice {
+  sex: string
+  apparent_age: string
+  pitch: string
+  timbre: string
+  language_accent: string
+  singing_style: string
+  text: string
+}
+
+/** Un enlace de YouTube analizado por la propia app: el resumen de su estilo. */
+export interface Inspiration {
+  url: string
+  title: string
+  genres: string
+  rhythm: string
+  instruments: string[]
+  structure: string
+  mood: string
+  lyric_themes: string[]
+  lyric_style: string
+  summary_text: string
+  created_at: string
+}
+
+export interface VisualIdentity {
+  style_key: string
+  style_label: string
+  photo_style_description: string
+  master_stale: boolean
+  [key: string]: unknown
 }
 
 export interface ArtistBible {
@@ -112,7 +146,7 @@ export interface ArtistBible {
   version: number
   identity: Record<string, unknown>
   musical: Record<string, unknown>
-  visual: Record<string, unknown>
+  visual: VisualIdentity
   communication: Record<string, unknown>
   preferences: {
     preferred_image_model: string | null
@@ -122,6 +156,10 @@ export interface ArtistBible {
     working_resolution: string
   }
   voice_profile: VoiceProfile
+  singing_voice: SingingVoice
+  music_genres: string[]
+  music_genre_free: string
+  inspirations: Inspiration[]
   summary?: string
 }
 
@@ -144,25 +182,8 @@ export interface Character {
   personality: string
   master_shots: MasterShot[]
   reference_image_paths: string[]
-  status: CanonStatus
-}
-
-export interface Outfit {
-  id: string
-  name: string
-  category: string
-  description: string
-  image_path: string | null
-  status: CanonStatus
-}
-
-export interface Location {
-  id: string
-  name: string
-  description: string
-  lighting: string
-  time_of_day: string
-  reference_paths: string[]
+  source_photo_path?: string | null
+  master_stale?: boolean
   status: CanonStatus
 }
 
@@ -184,6 +205,10 @@ export interface Song {
   lyrics_author: string
   lyrics_status: CanonStatus
   music_prompt: string
+  genres?: string[]
+  genre_free?: string
+  inspiration_url?: string
+  inspiration_summary?: string
   genre: string
   bpm: number | null
   mood: string
@@ -210,6 +235,9 @@ export interface Scene {
   lighting: string
   environment: string
   dialogue: string
+  location_description?: string
+  wardrobe_description?: string
+  planos?: string[]
   image_prompt?: string
   video_prompt?: string
   reuses_scene_id: string | null
@@ -239,8 +267,8 @@ export interface VideoProject {
   concept: string
   story: Record<string, unknown> & { status?: CanonStatus }
   character_ids: string[]
-  location_ids: string[]
-  wardrobe_ids: string[]
+  wardrobe_notes?: string
+  location_notes?: string
   storyboard_status: CanonStatus
   storyboard_notes?: string
   production_plan: ProductionPlan | null
@@ -258,9 +286,7 @@ export interface ProductionPlan {
   project_title: string
   video_type: string
   scenes: number
-  characters: number
-  locations: number
-  wardrobe: number
+  planos: number
   scene_images: { count: number; model: string; variant: string; cost_usd: number }
   video_clips: {
     count: number
@@ -274,20 +300,6 @@ export interface ProductionPlan {
   vertical_derivatives: number
   estimated_generation_cost_usd: number
   text?: string
-}
-
-export interface ContentPiece {
-  id: string
-  kind: string
-  bts_kind: string | null
-  title: string
-  script: string
-  spoken_text?: string
-  spoken_audio_path: string | null
-  storage_path: string | null
-  url: string | null
-  voice_url: string | null
-  status: CanonStatus
 }
 
 export interface ExportPackage {

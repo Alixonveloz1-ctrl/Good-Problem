@@ -12,8 +12,6 @@ from typing import Any
 from .db.client import Database, build_database
 from .db.repositories import CONFIG_MODELS
 from .domain.registry import ModelRegistry, load_seed
-from .providers.chirp import ChirpClient, build_chirp_client
-from .providers.secrets import SecretStore, build_secret_store
 from .providers.storage import Storage, build_storage
 from .providers.vertex import CallLog, VertexClient, build_vertex_client
 from .services.idempotency import IdempotencyStore
@@ -31,16 +29,12 @@ class Studio:
         db: Database | None = None,
         storage: Storage | None = None,
         vertex: VertexClient | None = None,
-        chirp: ChirpClient | None = None,
-        secrets: SecretStore | None = None,
     ):
         self.settings = settings or get_settings()
         self.db = db or build_database(self.settings)
         self.storage = storage or build_storage(self.settings)
         self.calls = CallLog()
         self.vertex = vertex or build_vertex_client(self.settings, self.calls)
-        self.chirp = chirp or build_chirp_client(self.settings)
-        self.secrets = secrets or build_secret_store(self.settings)
 
         self.idempotency = IdempotencyStore(self.db)
         self.jobs = JobService(self.db, self.settings)

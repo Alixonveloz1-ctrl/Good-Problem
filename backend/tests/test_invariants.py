@@ -172,9 +172,12 @@ def test_reference_cost_of_a_three_minute_video(registry):
     assert round(song.amount_usd, 2) == 1.20
     assert round(images.amount_usd, 2) == 2.81
     assert round(video.amount_usd, 2) == 28.80
-    assert director.amount_usd == pytest.approx(2.125)  # el PRD lo redondea a ~$2,00
+    # Revalidado el 2026-11-05 contra la documentacion oficial de Vertex:
+    # Gemini 3.1 Pro cuesta hoy 2,00/12,00 por millon (la semilla de agosto
+    # decia 1,25/10,00), asi que el Director de esta cuenta sale a 3,00.
+    assert director.amount_usd == pytest.approx(3.0)
     total = song.amount_usd + images.amount_usd + video.amount_usd + director.amount_usd + 1.00
-    assert 34.0 < total < 36.5
+    assert 36.0 < total < 37.5
 
 
 def test_video_is_billed_per_second_not_per_clip(registry):
@@ -367,7 +370,13 @@ def test_la_pantalla_del_artista_dice_que_toca_ahora(client, studio):
     studio.jobs.wait_for_idle(20)
     ficha = f"universes/{uid}/characters/{char_id}"
 
-    # 1. Con artista y sin cara, lo que toca es la cara.
+    # 0. Sin estilo visual elegido, lo primero es elegirlo: es fijo y sale en
+    # todas sus fotos y videos, asi que va antes que la cara.
+    assert toca(uid) == "estilo"
+    client.put(f"/api/universes/{uid}/bible/visual-style", json={"style_key": "realista"})
+    assert toca(uid) == "cara"
+
+    # 1. Con artista, estilo y sin cara, lo que toca es la cara.
     assert toca(uid) == "cara"
 
     # 2. Con cara sin aprobar, lo que toca es aprobarla.
@@ -406,9 +415,13 @@ def test_un_estudio_sin_artista_lo_dice_y_lo_arregla(client, studio):
     for personaje in client.get(f"/api/universes/{uid}/characters").json():
         client.delete(f"/api/universes/{uid}/characters/{personaje['id']}")
 
-    # Y se le añaden acompañantes, que es lo que llenaba la lista.
-    client.post(
-        f"/api/universes/{uid}/characters", json={"name": "Luna Ferrer", "role": "supporting"}
+    # Y se le añaden acompañantes, que es lo que llenaba la lista. En la
+    # version simplificada la API ya no crea acompañantes, asi que el dato se
+    # mete como quedaba en los estudios viejos: directamente en la base.
+    from app.db.repositories import CHARACTERS, Repository
+
+    Repository(studio.db, uid, CHARACTERS).create(
+        "char_viejo", {"name": "Luna Ferrer", "role": "supporting", "status": "draft"}
     )
 
     paso = client.get(f"/api/universes/{uid}").json()["siguiente"]
@@ -489,43 +502,44 @@ def test_hay_donde_decir_quien_es_en_la_pantalla():
     assert "{ gender: valor }" in codigo, "el selector no guarda nada"
 
 
-def test_el_estudio_propone_el_vestuario_y_las_locaciones(client, studio):
-    """Sin escribir un nombre ni una descripcion.
+def test_el_vestuario_y_las_locaciones_viven_dentro_del_videoclip(client, studio):
+    """Ya no son secciones del estudio: los propone el Director dentro de la
+    propuesta del videoclip, como texto, y se aprueban con la historia.
 
-    "Para que estan los directores." Tenia razon: cada atuendo y cada locacion
-    habia que crearlos a mano, con su nombre y su categoria, uno por uno. Eso no
-    es dirigir un estudio, es rellenar un formulario.
+    Antes cada atuendo y cada locacion habia que crearlos en su propia
+    pantalla. En la version simplificada eso desaparece: lo que el video
+    necesita va escrito en su propuesta.
     """
+    from app.db.repositories import VIDEO_PROJECTS, Repository
     from app.orchestrator.handlers import _apply_director_result
 
     uid = client.post("/api/universes", json={"name": "Feri"}).json()["id"]
     studio.jobs.wait_for_idle(20)
 
-    # Las rutas existen, encargan el trabajo, y lo que vuelve se guarda solo:
-    # el vestuario aparece sin que nadie escriba un nombre.
-    for ruta in ("wardrobe", "locations", "characters"):
-        respuesta = client.post(f"/api/universes/{uid}/{ruta}/propose", json={"count": 2})
-        assert respuesta.status_code == 200, respuesta.text
-    studio.jobs.wait_for_idle(20)
-    assert client.get(f"/api/universes/{uid}/wardrobe").json(), "no propuso ningun atuendo"
-    assert client.get(f"/api/universes/{uid}/locations").json(), "no propuso ninguna locacion"
-
-    # Y los campos se guardan donde toca.
-    _apply_director_result(
-        studio, uid, {"request": {"payload": {}}}, "wardrobe_set",
-        {"outfits": [{"name": "Chandal de terciopelo", "category": "signature",
-                      "description": "verde botella"}]},
+    Repository(studio.db, uid, VIDEO_PROJECTS).create(
+        "vp_prueba", {"song_id": "song_x", "status": "draft", "story": {}}
     )
     _apply_director_result(
-        studio, uid, {"request": {"payload": {}}}, "location_set",
-        {"locations": [{"name": "Azotea de Caracas", "description": "de noche"}]},
+        studio, uid, {"target_id": "vp_prueba", "request": {"payload": {}}},
+        "video_concept",
+        {
+            "title": "Su video", "video_type": "performance",
+            "concept": "Ella y la ciudad", "story": {"premise": "Sale a cantar"},
+            "wardrobe_notes": "Chandal de terciopelo verde botella",
+            "location_notes": "Azotea de Caracas, de noche",
+        },
     )
+    proyecto = Repository(studio.db, uid, VIDEO_PROJECTS).require("vp_prueba")
+    assert proyecto["wardrobe_notes"] == "Chandal de terciopelo verde botella"
+    assert proyecto["location_notes"] == "Azotea de Caracas, de noche"
 
-    atuendos = {a["name"]: a for a in client.get(f"/api/universes/{uid}/wardrobe").json()}
-    sitios = {s["name"]: s for s in client.get(f"/api/universes/{uid}/locations").json()}
-    assert atuendos["Chandal de terciopelo"]["category"] == "signature"
-    assert atuendos["Chandal de terciopelo"]["description"] == "verde botella"
-    assert sitios["Azotea de Caracas"]["description"] == "de noche"
+    # Y las secciones viejas ya no existen: ni proponer, ni listar, ni crear.
+    for ruta in ("wardrobe", "locations", "wardrobe/propose", "locations/propose",
+                 "characters/propose"):
+        respuesta = client.post(f"/api/universes/{uid}/{ruta}", json={"count": 2})
+        assert respuesta.status_code in (404, 405), (ruta, respuesta.status_code)
+    assert client.get(f"/api/universes/{uid}/wardrobe").status_code == 404
+    assert client.get(f"/api/universes/{uid}/locations").status_code == 404
 
 
 # --- Idempotency (PRD 42.1) -----------------------------------------------
@@ -585,14 +599,14 @@ def test_the_studio_keeps_no_budget(client):
     assert "budget" not in home
 
 
-def test_la_ruta_de_voz_no_la_tapa_la_de_contenido(client, universe):
-    """FastAPI resuelve las rutas en orden. Si /voice-clone queda despues de
-    /{content_id}, la app pide la voz y recibe un 404 sin sentido."""
-    respuesta = client.get(f"/api/universes/{universe}/content/voice-clone")
-    assert respuesta.status_code == 200
-    cuerpo = respuesta.json()
-    assert cuerpo["ready"] is False
-    assert "consent" in cuerpo["consent_script"].lower()
+def test_ya_no_hay_estudio_de_contenido_ni_voz_clonada(client, universe):
+    """La version simplificada no tiene Content Studio ni voz hablada clonada:
+    sus rutas no existen, y pedirlas es un 404 limpio, no una pantalla rota."""
+    assert client.get(f"/api/universes/{universe}/content").status_code == 404
+    assert client.get(f"/api/universes/{universe}/content/voice-clone").status_code == 404
+    assert client.post(
+        f"/api/universes/{universe}/content", json={"kind": "interview"}
+    ).status_code == 404
 
 
 def test_la_cola_de_trabajos_lleva_su_propia_identidad(settings, studio):
@@ -652,7 +666,6 @@ COMPROBADOS = {
     "veo-3.1-generate-001",
     "veo-3.1-fast-generate-001",
     "veo-3.1-lite-generate-001",
-    "chirp-3-instant-custom-voice",
 }
 """Los modelos que existen de verdad, uno por uno.
 
@@ -1215,10 +1228,13 @@ def test_todo_lo_que_se_crea_se_puede_borrar(client, universe):
     import pathlib
     import re
 
+    # El artista ya existe (se crea con el universo): se borra el que hay
+    # para poder crear otro, porque cada universo tiene UNO solo.
+    for personaje in client.get(f"/api/universes/{universe}/characters").json():
+        client.delete(f"/api/universes/{universe}/characters/{personaje['id']}")
+
     creables = {
-        "characters": {"name": "Nova", "role": "lead"},
-        "wardrobe": {"name": "Chaqueta", "category": "signature"},
-        "locations": {"name": "Azotea"},
+        "characters": {"name": "Nova"},
         "songs": {"title": "Neon"},
     }
     for coleccion, cuerpo in creables.items():
@@ -1236,7 +1252,7 @@ def test_todo_lo_que_se_crea_se_puede_borrar(client, universe):
     # La otra mitad: que el boton exista de verdad en alguna pantalla.
     pantallas = pathlib.Path(__file__).resolve().parents[2] / "frontend" / "src" / "screens"
     codigo = "\n".join(p.read_text() for p in pantallas.glob("*.tsx"))
-    for ruta in ("/characters/", "/wardrobe/", "/locations/", "/songs/", "/video-projects/"):
+    for ruta in ("/characters/", "/songs/", "/video-projects/"):
         assert f"api.del(`/api/universes/${{universeId}}{ruta}" in codigo, f"sin boton: {ruta}"
     # El artista entero. La expresion exacta cambia si el boton se muda de
     # pantalla —y se mudo, de la portada a la pantalla del propio artista— asi
@@ -1248,23 +1264,17 @@ def test_todo_lo_que_se_crea_se_puede_borrar(client, universe):
 
 
 def test_ninguna_pantalla_obliga_a_escribir_un_nombre():
-    """Las dos mitades: que la ruta exista y que el boton este puesto.
-
-    "Para que estan los directores. Mi intencion es automatizar; si no, mejor lo
-    hago yo a mano desde el principio." Tenia razon: cada atuendo, cada locacion
-    y cada personaje habia que crearlos escribiendo un nombre y una descripcion.
-
-    Se comprueba lo mismo que con los botones de borrar, y por la misma razon:
-    una ruta sin boton no existe para quien usa la app, y un boton sin ruta es
-    un error rojo.
-    """
+    """En la version simplificada ya no hay departamentos que proponer:
+    vestuario y locaciones no se crean en ninguna pantalla, van escritos
+    dentro del storyboard del videoclip. Lo que se comprueba es que no queda
+    ningun boton de proponer secciones en la interfaz."""
     import pathlib as rutas
 
     fuente = rutas.Path(__file__).resolve().parents[2] / "frontend" / "src"
     codigo = "\n".join(f.read_text() for f in fuente.rglob("*.tsx"))
-    for ruta in ("wardrobe", "locations", "characters"):
-        assert f'ruta="{ruta}"' in codigo, f"sin boton de proponer: {ruta}"
-    assert "/${ruta}/propose" in codigo, "el boton no llama a ninguna ruta"
+    assert "/propose" not in codigo, "quedo un boton de proponer secciones"
+    for ruta in ("wardrobe", "locations"):
+        assert f'ruta="{ruta}"' not in codigo, f"quedo la seccion {ruta}"
 
 
 def test_los_enlaces_se_firman_pidiendoselo_a_google():
@@ -1371,9 +1381,7 @@ def test_el_bucle_entero_de_la_cola(client, studio, universe):
     """
     from app.services.jobs import JobService
 
-    personaje = client.post(
-        f"/api/universes/{universe}/characters", json={"name": "Nova", "role": "lead"}
-    ).json()
+    personaje = client.get(f"/api/universes/{universe}/characters").json()[0]
 
     # Y ahora la puerta, cerrada de verdad: sin el pase esto seria un 403.
     studio.settings.owner_email = "dueno@gmail.com"

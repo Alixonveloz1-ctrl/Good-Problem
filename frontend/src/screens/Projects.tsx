@@ -145,6 +145,18 @@ export function ProjectScreen() {
                     <div>{String(value)}</div>
                   </div>
                 ))}
+              {data.wardrobe_notes && (
+                <div>
+                  <div className="muted">Vestuario de este video</div>
+                  <div>{data.wardrobe_notes}</div>
+                </div>
+              )}
+              {data.location_notes && (
+                <div>
+                  <div className="muted">Donde ocurre</div>
+                  <div>{data.location_notes}</div>
+                </div>
+              )}
               <button
                 className="btn ok block"
                 disabled={action.busy || storyApproved}
@@ -160,8 +172,11 @@ export function ProjectScreen() {
             <Card>
               <h3>Storyboard</h3>
               <p className="muted" style={{ margin: 0 }}>
-                Escenas de 8 segundos. El Director busca primero que tomas puede reaprovechar antes
-                de proponer generar nuevas.
+                Escenas de 8 segundos, cada una con dos o tres planos cortos dentro: el montaje
+                corta cada 3 a 5 segundos, como un videoclip profesional. La musica suena desde el
+                segundo 0 con el artista ya en pantalla. El Director busca primero que tomas puede
+                reaprovechar —los coros que se repiten— antes de proponer generar nuevas, y el
+                vestuario y los sitios van escritos dentro de cada escena.
               </p>
               <button
                 className="btn block"
@@ -240,7 +255,8 @@ export function ProjectScreen() {
               )}
               {!data.master_16x9_url && data.edl_path && (
                 <div className="notice">
-                  Lista de montaje construida. El render final corre en un Cloud Run Job con FFmpeg.
+                  El plan de montaje esta listo, pero el video todavia no se ha renderizado.
+                  Vuelve a tocar Ensamblar para producir el MP4 final.
                 </div>
               )}
             </Card>

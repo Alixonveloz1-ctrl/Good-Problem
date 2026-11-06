@@ -42,7 +42,7 @@ desactivar editando la configuración.
 | Regla | Por qué | Dónde se comprueba |
 |---|---|---|
 | La música solo llega a `lyria-3-pro` | `lyria-3` y `lyria-2` hacen clips de 30 s, no canciones. Prohibidos también como respaldo tras un fallo | `assert_music_model` |
-| Veo se llama siempre con el audio desactivado | La pista sale de Lyria y la voz de Chirp. Activarlo costaría el doble por segundo para producir algo que el montaje tira | `enforce_video_audio_disabled` |
+| Veo se llama siempre con el audio desactivado | La pista sale de Lyria. Activarlo costaría el doble por segundo para producir algo que el montaje tira | `enforce_video_audio_disabled` |
 | Clips de 4, 6 u 8 s, y 8 obligatorio con 1080p, 4K o imágenes de referencia | Es lo único que Veo acepta, y aquí siempre hay imágenes de referencia | `resolve_clip_duration` |
 | Un reintento usa el modelo que se pidió | El sistema nunca sustituye por otro distinto ni de menor capacidad | `assert_same_model_on_retry` |
 
@@ -84,7 +84,6 @@ ni volver a desplegar.
 | Imagen | `gemini-3-pro-image`, `gemini-3.1-flash-image`, `gemini-3.1-flash-lite-image` | $0,034 – $0,24 por imagen |
 | Música | `lyria-3-pro` | $0,08 por canción |
 | Video | `veo-3.1`, `veo-3.1-fast`, `veo-3.1-lite` | $0,03 – $0,40 **por segundo** |
-| Voz hablada | Chirp 3 Instant Custom Voice | $30 por millón de caracteres |
 
 El usuario elige modelo y variante **en cada generación**, desde un bottom sheet
 con el precio de cada opción a la vista.
@@ -96,10 +95,10 @@ backend/
   app/
     domain/        guards, registro de modelos, precios, entidades
     orchestrator/  el Generation Orchestrator y los handlers por tipo
-    providers/     Vertex AI (REST + ADC), Chirp, Storage, Secret Manager
+    providers/     Vertex AI (REST + ADC) y Storage
     services/      presupuesto, jobs, aprobaciones, contexto, plan, exports
     routers/       la API HTTP
-    assembly/      Media Assembly Engine (FFmpeg, Cloud Run Job)
+    assembly/      Media Assembly Engine (FFmpeg, dentro del servicio)
   seed/            documento inicial del registro de modelos
   tests/           el acceptance test del PRD, extremo a extremo
 frontend/          PWA mobile-first (React + Vite)
@@ -153,9 +152,9 @@ identidades y por qué cada cosa está donde está.
 
 **No se genera, no se descarga y no se almacena ninguna clave JSON de cuenta de
 servicio en ningún punto del sistema.** Cloud Run usa la identidad de su cuenta
-de servicio adjunta; Cloud Build se conecta a GitHub con la app de Google; y
-Secret Manager guarda únicamente la clave de voz clonada de Chirp 3, que es un
-identificador de la API y no una credencial de acceso a la cuenta.
+de servicio adjunta y Cloud Build se conecta a GitHub con la app de Google. La
+versión simplificada no guarda ningún secreto: al quitar la voz hablada clonada
+desapareció el único uso de Secret Manager.
 
 ## Lo que el MVP no resuelve
 
@@ -165,6 +164,22 @@ canciones. El Voice Profile viaja en cada prompt y es lo mejor que se puede
 hacer; es una limitación asumida, no un descuido. La arquitectura permite
 sustituir el Voice Engine más adelante sin rediseñar el resto.
 
-La **voz hablada sí está resuelta**: Chirp 3 clona una voz a partir de una
-muestra de 10 segundos y devuelve una clave reutilizable, de modo que las
-entrevistas, el BTS y el diario del artista suenan siempre igual.
+El **contenido hablado ya no existe**: la versión simplificada quitó el
+Content Studio (entrevistas, BTS, cortos) y con él la voz hablada clonada de
+Chirp 3. El estudio es solo crear el artista, su canción y su videoclip.
+
+## La versión simplificada (2026-11)
+
+Un universo es UN artista. Lo fijo del artista vive en su ficha: su **estilo
+visual** (realista, anime, óleo…), que sale en su cara y en todos los planos;
+su **voz cantada**, un solo texto que viaja palabra por palabra en cada letra
+y en cada encargo a Lyria; sus **géneros combinables** (hasta tres, que cada
+canción hereda y puede ajustar); y sus **referencias de YouTube**, que la
+propia app analiza con Gemini y guarda como resumen de estilo editable. El
+artista puede nacer también de una **foto subida**: tal cual como su cara,
+como base para generarla en su estilo, o como fuente de su estilo visual. El
+vestuario y las locaciones ya no son secciones: van escritos dentro del
+storyboard de cada videoclip, con planos cortos pensados para cortar cada
+3–5 segundos y la música sonando desde el segundo 0. El montaje final se
+renderiza de verdad en el servicio, que lleva FFmpeg en su imagen: sin MP4
+renderizado, un proyecto no se puede aprobar.

@@ -23,7 +23,6 @@ from .errors import DomainError, NotFound
 from .routers import (
     auth,
     characters,
-    content,
     exports,
     jobs,
     music,
@@ -120,7 +119,6 @@ app.include_router(universes.router)
 app.include_router(characters.router)
 app.include_router(music.router)
 app.include_router(video.router)
-app.include_router(content.router)
 app.include_router(exports.router)
 app.include_router(jobs.router)
 app.include_router(jobs.internal_router)

@@ -1,19 +1,33 @@
-"""Character Department, Wardrobe and Locations (PRD 17-20)."""
+"""The artist (PRD 17-18).
+
+Simplified studio: a Universe has ONE character, the artist. There is no cast
+to propose, no wardrobe department and no location department — wardrobe and
+locations are written inside each video's storyboard and approved with it.
+
+What lives here: the artist's file, their design, their Character Master and
+the photo the user can upload as the Master's source.
+"""
 
 from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, File, Form, UploadFile
 from pydantic import BaseModel, Field
 
-from ..db.repositories import CHARACTERS, LOCATIONS, WARDROBE, Repository
-from ..domain.enums import CanonStatus, CharacterRole, CreativeRole, UserAction, WardrobeCategory
+from ..db.repositories import CHARACTERS, Repository
+from ..domain import artist as artist_domain
+from ..domain.enums import CanonStatus, CharacterRole, CreativeRole, UserAction
 from ..domain.schemas import MASTER_SHOTS
-from ..errors import Conflict
+from ..errors import Conflict, InvalidGenerationRequest
 from ..ids import new_id
+from ..orchestrator import schemas_json as director_schemas
 from ..orchestrator.orchestrator import GenerationRequest
+from ..orchestrator.roles import system_instruction
+from ..providers import gemini_text
+from ..providers.storage import character_path
 from ..services.approvals import ApprovalService
+from ..services.context import load_bible, save_bible
 from .deps import OwnerDep, StudioDep
 
 router = APIRouter(prefix="/api/universes/{universe_id}", tags=["characters"])
@@ -24,12 +38,19 @@ def _repo(studio, universe_id: str, collection: str) -> Repository:
     return Repository(studio.db, universe_id, collection)
 
 
-# --- Characters ------------------------------------------------------------
+def _lead(studio, universe_id: str) -> dict[str, Any] | None:
+    repo = _repo(studio, universe_id, CHARACTERS)
+    return next(
+        (c for c in repo.list(limit=50) if c.get("role") == CharacterRole.LEAD.value),
+        None,
+    )
+
+
+# --- The artist ------------------------------------------------------------
 
 
 class CharacterIn(BaseModel):
     name: str
-    role: CharacterRole = CharacterRole.SUPPORTING
     gender: str = ""
     rasgos: dict[str, str] = Field(default_factory=dict)
     apparent_age: str = ""
@@ -44,7 +65,6 @@ class CharacterPatch(BaseModel):
     apparent_age: str | None = None
     appearance: str | None = None
     personality: str | None = None
-    wardrobe_ids: list[str] | None = None
 
 
 class DesignIn(BaseModel):
@@ -68,11 +88,19 @@ class ImageIn(BaseModel):
 def create_character(
     owner: OwnerDep, studio: StudioDep, universe_id: str, body: CharacterIn
 ) -> dict[str, Any]:
+    """Creates THE artist. A Universe has exactly one: asking for a second
+    one is a conflict, not a cast."""
     repo = _repo(studio, universe_id, CHARACTERS)
+    if _lead(studio, universe_id) is not None:
+        raise Conflict(
+            "Este estudio ya tiene su artista. Cada universo es un solo artista: "
+            "para otro artista, crea otro universo."
+        )
     return repo.create(
         new_id("char"),
         {
             **body.model_dump(),
+            "role": CharacterRole.LEAD.value,
             "master_shots": [
                 {"key": key, "label": label, "storage_path": None,
                  "status": CanonStatus.DRAFT.value, "prompt": ""}
@@ -112,7 +140,7 @@ def patch_character(
 def design_character(
     owner: OwnerDep, studio: StudioDep, universe_id: str, character_id: str, body: DesignIn
 ) -> dict[str, Any]:
-    """The Casting Director writes the character and the Master shot prompts."""
+    """The Casting Director writes the artist and the Master shot prompts."""
     personaje = _repo(studio, universe_id, CHARACTERS).require(character_id)
     return studio.orchestrator.submit(
         GenerationRequest(
@@ -176,53 +204,7 @@ un "pelo_corte" suelto entre texto en ingles se lee peor que "Hair cut and
 style", y aqui lo que se juega es que salga la persona que se pidio."""
 
 
-def _proponer(studio, universe_id: str, tarea: str, cuantos: int, brief: str, modelo: str | None):
-    """Un departamento entero, propuesto de una vez.
-
-    Antes cada atuendo y cada locacion habia que crearlos a mano: un nombre, una
-    descripcion, una categoria, uno por uno. Para eso no hacen falta directores.
-    """
-    studio.orchestrator.require_universe(universe_id)
-    return studio.orchestrator.submit(
-        GenerationRequest(
-            universe_id=universe_id,
-            kind="text",
-            target_type="universe",
-            target_id=universe_id,
-            model=modelo,
-            payload={"task": tarea, "count": cuantos, "brief": brief},
-        )
-    )
-
-
-class ProponerIn(BaseModel):
-    count: int = Field(4, ge=1, le=8)
-    brief: str = ""
-    model: str | None = None
-
-
-@router.post("/wardrobe/propose")
-def propose_wardrobe(
-    owner: OwnerDep, studio: StudioDep, universe_id: str, body: ProponerIn
-) -> dict[str, Any]:
-    """El Director creativo monta el vestuario del artista."""
-    return _proponer(studio, universe_id, "wardrobe_set", body.count, body.brief, body.model)
-
-
-@router.post("/locations/propose")
-def propose_locations(
-    owner: OwnerDep, studio: StudioDep, universe_id: str, body: ProponerIn
-) -> dict[str, Any]:
-    """El Director creativo elige donde ocurren los videos."""
-    return _proponer(studio, universe_id, "location_set", body.count, body.brief, body.model)
-
-
-@router.post("/characters/propose")
-def propose_cast(
-    owner: OwnerDep, studio: StudioDep, universe_id: str, body: ProponerIn
-) -> dict[str, Any]:
-    """El Director de casting propone quien acompana al artista."""
-    return _proponer(studio, universe_id, "cast_set", body.count, body.brief, body.model)
+# --- Character Master --------------------------------------------------------
 
 
 @router.post("/characters/{character_id}/master/{shot_key}")
@@ -275,12 +257,11 @@ def _shot_prompt(character: dict[str, Any], shot_key: str) -> str:
     return base
 
 
-@router.post("/characters/{character_id}/approve")
-def approve_character(
-    owner: OwnerDep, studio: StudioDep, universe_id: str, character_id: str
-) -> dict[str, Any]:
+def _approve_master(studio, universe_id: str, character_id: str) -> dict[str, Any]:
     """Approving the Master is what turns those images into the references
-    attached to every later generation with this character (PRD 18)."""
+    attached to every later generation with this artist (PRD 18). It also
+    clears the stale flag: a fresh Master is by definition in the current
+    visual style."""
     repo = _repo(studio, universe_id, CHARACTERS)
     character = repo.require(character_id)
     shots = [s for s in (character.get("master_shots") or []) if s.get("storage_path")]
@@ -298,7 +279,12 @@ def approve_character(
         character_id,
         master_shots=character["master_shots"],
         reference_image_paths=[s["storage_path"] for s in shots],
+        master_stale=False,
     )
+    bible = load_bible(studio.db, universe_id)
+    if bible.visual.master_stale:
+        bible.visual.master_stale = False
+        save_bible(studio.db, universe_id, bible)
     approvals.record_user_action(universe_id, CHARACTERS, character_id, UserAction.APPROVE)
     approvals.save_to_canon(
         universe_id,
@@ -310,11 +296,18 @@ def approve_character(
     return updated
 
 
+@router.post("/characters/{character_id}/approve")
+def approve_character(
+    owner: OwnerDep, studio: StudioDep, universe_id: str, character_id: str
+) -> dict[str, Any]:
+    return _approve_master(studio, universe_id, character_id)
+
+
 @router.delete("/characters/{character_id}")
 def delete_character(
     owner: OwnerDep, studio: StudioDep, universe_id: str, character_id: str
 ) -> dict[str, str]:
-    """Borra un personaje.
+    """Borra al artista.
 
     Lo generado se queda en el almacenamiento: borrar los archivos exigiria
     saber quien mas los usa —una toma reutilizada en otra escena, una imagen que
@@ -335,177 +328,121 @@ def reject_character(
     return ApprovalService(studio.db).reject(universe_id, CHARACTERS, character_id)
 
 
-# --- Wardrobe --------------------------------------------------------------
+# --- The uploaded photo ------------------------------------------------------
+
+PHOTO_MODES = {"use_as_master", "base_for_master", "copy_style"}
 
 
-class OutfitIn(BaseModel):
-    name: str
-    category: WardrobeCategory = WardrobeCategory.SIGNATURE
-    description: str = ""
-    pieces: list[str] = Field(default_factory=list)
-    accessories: list[str] = Field(default_factory=list)
-    colors: list[str] = Field(default_factory=list)
-    usage: str = ""
-    restrictions: list[str] = Field(default_factory=list)
-
-
-@router.post("/wardrobe")
-def create_outfit(
-    owner: OwnerDep, studio: StudioDep, universe_id: str, body: OutfitIn
+@router.post("/characters/{character_id}/photo")
+async def upload_artist_photo(
+    owner: OwnerDep,
+    studio: StudioDep,
+    universe_id: str,
+    character_id: str,
+    file: UploadFile = File(...),
+    mode: str = Form("use_as_master"),
+    model: str | None = Form(None),
 ) -> dict[str, Any]:
-    return _repo(studio, universe_id, WARDROBE).create(
-        new_id("fit"), {**body.model_dump(), "status": CanonStatus.DRAFT.value}
+    """Una foto del usuario como origen del Master, con tres caminos:
+
+    - ``use_as_master``: la foto ES el retrato del artista, tal cual, y queda
+      aprobado como Master.
+    - ``base_for_master``: se genera un retrato nuevo desde la foto, en el
+      estilo elegido, conservando la cara. Es tambien la salida cuando una
+      foto de persona real hace que el filtro de Google bloquee los clips.
+    - ``copy_style``: no se usa la cara; se lee el ESTILO de la foto y ese
+      estilo queda como el estilo visual fijo del artista.
+    """
+    if mode not in PHOTO_MODES:
+        raise InvalidGenerationRequest(
+            "Modo de foto no valido: usa la foto tal cual, genera desde ella o copia su estilo."
+        )
+    repo = _repo(studio, universe_id, CHARACTERS)
+    character = repo.require(character_id)
+    data = await file.read()
+    if not data:
+        raise InvalidGenerationRequest("La foto llego vacia.")
+    mime = file.content_type or "image/jpeg"
+    suffix = "png" if "png" in mime else "jpg"
+    stored = studio.storage.write_bytes(
+        character_path(universe_id, f"{character_id}_photo.{suffix}"), data, mime
     )
+    repo.update(character_id, {"source_photo_path": stored.path})
 
+    if mode == "use_as_master":
+        shots = list(character.get("master_shots") or [])
+        for shot in shots:
+            if shot.get("key") == "portrait":
+                shot["storage_path"] = stored.path
+                shot["status"] = CanonStatus.DRAFT.value
+        if not any(s.get("key") == "portrait" for s in shots):
+            shots.append(
+                {"key": "portrait", "label": "Retrato", "image_id": None,
+                 "storage_path": stored.path, "status": CanonStatus.DRAFT.value,
+                 "prompt": ""}
+            )
+        repo.update(character_id, {"master_shots": shots})
+        actualizado = _approve_master(studio, universe_id, character_id)
+        return {**actualizado, "photo_mode": mode, "photo_path": stored.path}
 
-@router.get("/wardrobe")
-def list_wardrobe(owner: OwnerDep, studio: StudioDep, universe_id: str) -> list[dict[str, Any]]:
-    return _repo(studio, universe_id, WARDROBE).list(limit=200)
+    if mode == "copy_style":
+        spec = studio.registry.default_for("text")
+        resultado = gemini_text.generate(
+            studio.vertex,
+            spec.id if spec else "gemini-3.1-pro-preview",
+            system_instruction=system_instruction(CreativeRole.CREATIVE_DIRECTOR),
+            prompt=(
+                "Describe the visual style of this image so it can be applied "
+                "to every future image of one fictional music artist. Style "
+                "only: do not identify or describe the person."
+            ),
+            schema=director_schemas.PHOTO_STYLE_SCHEMA,
+            references=[(data, mime)],
+        )
+        descripcion = (resultado.data or {}).get("style_description", "")
+        bible = load_bible(studio.db, universe_id)
+        bible.visual.style_key = artist_domain.PHOTO_STYLE_KEY
+        bible.visual.style_label = artist_domain.visual_style_label(
+            artist_domain.PHOTO_STYLE_KEY
+        )
+        bible.visual.photo_style_description = descripcion
+        artista = repo.require(character_id)
+        if artista.get("status") == CanonStatus.APPROVED.value:
+            bible.visual.master_stale = True
+            repo.update(character_id, {"master_stale": True})
+        save_bible(studio.db, universe_id, bible)
+        return {
+            "photo_mode": mode,
+            "photo_path": stored.path,
+            "visual": bible.visual.model_dump(),
+        }
 
-
-@router.patch("/wardrobe/{outfit_id}")
-def patch_outfit(
-    owner: OwnerDep, studio: StudioDep, universe_id: str, outfit_id: str, body: dict[str, Any]
-) -> dict[str, Any]:
-    return _repo(studio, universe_id, WARDROBE).update(outfit_id, body)
-
-
-@router.post("/wardrobe/{outfit_id}/image")
-def generate_outfit_image(
-    owner: OwnerDep, studio: StudioDep, universe_id: str, outfit_id: str, body: ImageIn
-) -> dict[str, Any]:
-    outfit = _repo(studio, universe_id, WARDROBE).require(outfit_id)
-    prompt = body.prompt or f"{outfit['name']}: {outfit.get('description','')}"
-    return studio.orchestrator.submit(
+    # base_for_master: a new portrait from the photo, in the chosen style.
+    bible = load_bible(studio.db, universe_id)
+    estilo = artist_domain.visual_style_prompt(bible)
+    base = _shot_prompt(repo.require(character_id), "portrait")
+    prompt = (
+        (base + "\n\n") if base else ""
+    ) + (
+        "New portrait of this same person, generated from the attached photo. "
+        "Keep the face and the recognisable features exactly; render the "
+        "person in the artist's fixed visual style."
+        + (f"\nStyle: {estilo}" if estilo else "")
+    )
+    trabajo = studio.orchestrator.submit(
         GenerationRequest(
             universe_id=universe_id,
             kind="image",
-            target_type="wardrobe",
-            target_id=outfit_id,
-            model=body.model,
-            variant=body.variant,
-            idempotency_key=body.idempotency_key,
+            target_type="character",
+            target_id=character_id,
+            model=model,
             payload={
-                "purpose": "wardrobe",
+                "purpose": "character_master",
+                "shot_key": "portrait",
                 "prompt": prompt,
-                "aspect_ratio": body.aspect_ratio,
-                "reference_paths": body.reference_paths,
-                "negative_prompt": body.negative_prompt,
+                "aspect_ratio": "1:1",
+                "reference_paths": [stored.path],
             },
         )
     )
-
-
-@router.post("/wardrobe/{outfit_id}/approve")
-def approve_outfit(
-    owner: OwnerDep, studio: StudioDep, universe_id: str, outfit_id: str
-) -> dict[str, Any]:
-    outfit = _repo(studio, universe_id, WARDROBE).require(outfit_id)
-    service = ApprovalService(studio.db)
-    updated = service.approve(universe_id, WARDROBE, outfit_id)
-    service.save_to_canon(
-        universe_id,
-        entity_type="wardrobe",
-        entity_id=outfit_id,
-        label=outfit.get("name", ""),
-        storage_path=outfit.get("image_path"),
-    )
-    return updated
-
-
-# --- Locations -------------------------------------------------------------
-
-
-class LocationIn(BaseModel):
-    name: str
-    description: str = ""
-    lighting: str = ""
-    time_of_day: str = ""
-    architecture: str = ""
-    mood: str = ""
-
-
-@router.delete("/wardrobe/{outfit_id}")
-def delete_outfit(
-    owner: OwnerDep, studio: StudioDep, universe_id: str, outfit_id: str
-) -> dict[str, str]:
-    _repo(studio, universe_id, WARDROBE).require(outfit_id)
-    _repo(studio, universe_id, WARDROBE).delete(outfit_id)
-    return {"deleted": outfit_id}
-
-
-@router.post("/locations")
-def create_location(
-    owner: OwnerDep, studio: StudioDep, universe_id: str, body: LocationIn
-) -> dict[str, Any]:
-    return _repo(studio, universe_id, LOCATIONS).create(
-        new_id("loc"),
-        {**body.model_dump(), "reference_paths": [], "status": CanonStatus.DRAFT.value},
-    )
-
-
-@router.get("/locations")
-def list_locations(owner: OwnerDep, studio: StudioDep, universe_id: str) -> list[dict[str, Any]]:
-    return _repo(studio, universe_id, LOCATIONS).list(limit=200)
-
-
-@router.patch("/locations/{location_id}")
-def patch_location(
-    owner: OwnerDep, studio: StudioDep, universe_id: str, location_id: str, body: dict[str, Any]
-) -> dict[str, Any]:
-    return _repo(studio, universe_id, LOCATIONS).update(location_id, body)
-
-
-@router.post("/locations/{location_id}/image")
-def generate_location_image(
-    owner: OwnerDep, studio: StudioDep, universe_id: str, location_id: str, body: ImageIn
-) -> dict[str, Any]:
-    location = _repo(studio, universe_id, LOCATIONS).require(location_id)
-    prompt = body.prompt or (
-        f"{location['name']}: {location.get('description','')}. "
-        f"Lighting: {location.get('lighting','')}. {location.get('time_of_day','')}"
-    )
-    return studio.orchestrator.submit(
-        GenerationRequest(
-            universe_id=universe_id,
-            kind="image",
-            target_type="location",
-            target_id=location_id,
-            model=body.model,
-            variant=body.variant,
-            idempotency_key=body.idempotency_key,
-            payload={
-                "purpose": "location",
-                "prompt": prompt,
-                "aspect_ratio": body.aspect_ratio or "16:9",
-                "reference_paths": body.reference_paths,
-                "negative_prompt": body.negative_prompt,
-            },
-        )
-    )
-
-
-@router.post("/locations/{location_id}/approve")
-def approve_location(
-    owner: OwnerDep, studio: StudioDep, universe_id: str, location_id: str
-) -> dict[str, Any]:
-    location = _repo(studio, universe_id, LOCATIONS).require(location_id)
-    service = ApprovalService(studio.db)
-    updated = service.approve(universe_id, LOCATIONS, location_id)
-    service.save_to_canon(
-        universe_id,
-        entity_type="location",
-        entity_id=location_id,
-        label=location.get("name", ""),
-        storage_path=(location.get("reference_paths") or [None])[0],
-    )
-    return updated
-
-
-@router.delete("/locations/{location_id}")
-def delete_location(
-    owner: OwnerDep, studio: StudioDep, universe_id: str, location_id: str
-) -> dict[str, str]:
-    _repo(studio, universe_id, LOCATIONS).require(location_id)
-    _repo(studio, universe_id, LOCATIONS).delete(location_id)
-    return {"deleted": location_id}
+    return {"photo_mode": mode, "photo_path": stored.path, "job": trabajo}

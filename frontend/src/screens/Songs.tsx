@@ -6,6 +6,8 @@ import type { Song } from '../api/types'
 import { ApprovalBar } from '../components/ApprovalBar'
 import { JobWatcher } from '../components/JobWatcher'
 import { Card, Empty, ErrorNote, Field, Loading, Sheet, StatusBadge, TopBar, DeleteButton } from '../components/ui'
+import { ElegirGeneros } from '../components/Seleccion'
+import { textoGeneros } from '../lib/catalogo'
 
 export function SongsScreen() {
   const { universeId = '' } = useParams()
@@ -115,10 +117,38 @@ export function SongScreen() {
   const [lyrics, setLyrics] = useState('')
   const [brief, setBrief] = useState('')
   const [genreOverride, setGenreOverride] = useState('')
+  const [generos, setGeneros] = useState<string[]>([])
+  const [mezcla, setMezcla] = useState('')
+  const [enlace, setEnlace] = useState('')
+  const [resumen, setResumen] = useState('')
 
   useEffect(() => {
-    if (data) setLyrics(data.lyrics ?? '')
+    if (!data) return
+    setLyrics(data.lyrics ?? '')
+    setGeneros(data.genres ?? [])
+    setMezcla(data.genre_free ?? '')
+    setResumen(data.inspiration_summary ?? '')
   }, [data])
+
+  const guardarGeneros = async () => {
+    await action.run(() =>
+      api.patch(base, { genres: generos, genre_free: mezcla }),
+    )
+    await reload()
+  }
+
+  const analizarEnlace = async () => {
+    const hecho = await action.run(() =>
+      api.post(`${base}/inspiration`, { url: enlace }),
+    )
+    if (hecho) setEnlace('')
+    await reload()
+  }
+
+  const guardarResumen = async () => {
+    await action.run(() => api.patch(base, { inspiration_summary: resumen }))
+    await reload()
+  }
 
   const run = async (fn: () => Promise<{ id: string }>) => {
     const job = await action.run(fn)
@@ -143,6 +173,56 @@ export function SongScreen() {
 
         {data && (
           <>
+            {/* Lo de esta cancion: su combinacion y su referencia propia */}
+            <Card>
+              <h3>Generos de esta cancion</h3>
+              <p className="muted" style={{ margin: 0 }}>
+                Viene relleno con la combinacion de su artista. Si la cambias aqui, cambia solo
+                esta cancion; la del artista sigue
+                como esta en su Identidad. Entra en la letra y en el encargo a Lyria.
+              </p>
+              <ElegirGeneros valor={generos} alCambiar={setGeneros} />
+              <Field
+                label="O escribe tu mezcla para esta cancion"
+                value={mezcla}
+                onChange={setMezcla}
+              />
+              {textoGeneros(generos, mezcla) && (
+                <p className="muted">Suena a: {textoGeneros(generos, mezcla)}</p>
+              )}
+              <button className="btn block" onClick={guardarGeneros} disabled={action.busy}>
+                Guardar los generos de esta cancion
+              </button>
+
+              <div className="section-title">Una referencia solo para esta cancion</div>
+              <Field
+                label="Enlace de YouTube"
+                value={enlace}
+                onChange={setEnlace}
+                placeholder="https://www.youtube.com/watch?v=…"
+              />
+              <button
+                className="btn block"
+                onClick={analizarEnlace}
+                disabled={action.busy || !enlace.trim()}
+              >
+                {action.busy ? 'Escuchandola…' : 'Analizar esta cancion'}
+              </button>
+              {(resumen || data.inspiration_url) && (
+                <>
+                  <Field
+                    label="Resumen de su estilo (editable: alimenta esta cancion)"
+                    value={resumen}
+                    onChange={setResumen}
+                    multiline
+                  />
+                  <button className="btn block" onClick={guardarResumen} disabled={action.busy}>
+                    Guardar el resumen
+                  </button>
+                </>
+              )}
+            </Card>
+
             {/* 1. Concept */}
             <Card>
               <div className="row between">

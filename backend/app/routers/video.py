@@ -2,9 +2,12 @@
 
 The order is fixed and every step is gated:
 
-    song approved -> video concept -> story approved -> casting -> locations ->
-    wardrobe -> storyboard approved -> scene images approved and locked ->
-    Veo clips approved -> assembly -> 16:9 and 9:16.
+    song approved -> video concept (with its wardrobe and locations written
+    inside it) -> story approved -> storyboard approved -> scene images
+    approved and locked -> Veo clips approved -> assembly -> 16:9 and 9:16.
+
+The only character is the artist: the project takes them automatically when
+it is created. There is no casting step.
 """
 
 from __future__ import annotations
@@ -15,8 +18,8 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from ..db.repositories import (
+    CHARACTERS,
     IMAGES,
-    LOCATIONS,
     SCENES,
     SONGS,
     VIDEO_PROJECTS,
@@ -24,7 +27,7 @@ from ..db.repositories import (
     Repository,
 )
 from ..domain.enums import CanonStatus, CreativeRole, StageKey, StageStatus, UserAction, VideoType
-from ..errors import Conflict, NotFound
+from ..errors import Conflict
 from ..ids import new_id
 from ..orchestrator.orchestrator import GenerationRequest
 from ..services import approvals as rules
@@ -103,6 +106,16 @@ def create_project(
 ) -> dict[str, Any]:
     """Requires an approved song: a rejected song does not trigger a video."""
     song = rules.assert_song_approved(studio.db, universe_id, body.song_id)
+    # El unico personaje posible es el artista: entra solo, sin paso de
+    # reparto. Sin el, el storyboard no tendria a quien retratar.
+    artista = next(
+        (
+            c
+            for c in Repository(studio.db, universe_id, CHARACTERS).list(limit=50)
+            if c.get("role") == "lead"
+        ),
+        None,
+    )
     project_id = new_id("vp")
     project = _projects(studio, universe_id).create(
         project_id,
@@ -110,6 +123,7 @@ def create_project(
             "song_id": body.song_id,
             "title": body.title or song.get("title", ""),
             "video_type": body.video_type.value,
+            "character_ids": [artista["id"]] if artista else [],
             "story": {"status": CanonStatus.DRAFT.value},
             "storyboard_status": CanonStatus.DRAFT.value,
             "status": CanonStatus.DRAFT.value,
@@ -182,7 +196,7 @@ def _stage_summary(studio, universe_id: str, project: dict, scenes: list[dict]) 
              (project.get("story") or {}).get("status") == CanonStatus.APPROVED.value,
              bool((project.get("story") or {}).get("premise"))),
          "detail": ""},
-        {"key": StageKey.CHARACTERS.value, "label": "Personajes",
+        {"key": StageKey.CHARACTERS.value, "label": "Artista",
          "status": status_of(bool(project.get("character_ids")), True), "detail": ""},
         {"key": StageKey.STORYBOARD.value, "label": "Storyboard",
          "status": status_of(
@@ -271,22 +285,6 @@ def approve_story(
     return repo.update(project_id, {"story": story})
 
 
-class CastIn(BaseModel):
-    character_ids: list[str] = Field(default_factory=list)
-    location_ids: list[str] = Field(default_factory=list)
-    wardrobe_ids: list[str] = Field(default_factory=list)
-
-
-@router.put("/video-projects/{project_id}/cast")
-def set_cast(
-    owner: OwnerDep, studio: StudioDep, universe_id: str, project_id: str, body: CastIn
-) -> dict[str, Any]:
-    """Characters exist before the scenes do (PRD 17)."""
-    repo = _projects(studio, universe_id)
-    repo.require(project_id)
-    return repo.update(project_id, body.model_dump())
-
-
 @router.post("/video-projects/{project_id}/storyboard")
 def propose_storyboard(
     owner: OwnerDep, studio: StudioDep, universe_id: str, project_id: str, body: DirectorIn
@@ -299,8 +297,6 @@ def propose_storyboard(
         studio.db,
         universe_id,
         character_ids=project.get("character_ids") or [],
-        location_id=None,
-        wardrobe_ids=project.get("wardrobe_ids") or [],
         max_references=0,
     )
     return studio.orchestrator.submit(
@@ -323,14 +319,8 @@ def propose_storyboard(
                     {"name": c.get("name"), "appearance": c.get("appearance")}
                     for c in context.characters
                 ],
-                "locations": [
-                    {"name": loc.get("name"), "description": loc.get("description")}
-                    for loc in Repository(studio.db, universe_id, LOCATIONS).list(limit=50)
-                ],
-                "wardrobe": [
-                    {"name": o.get("name"), "description": o.get("description")}
-                    for o in context.outfits
-                ],
+                "wardrobe_notes": project.get("wardrobe_notes") or "",
+                "location_notes": project.get("location_notes") or "",
             },
         )
     )
@@ -419,7 +409,7 @@ def patch_scene(
         if k in {
             "action", "emotion", "camera", "lighting", "environment", "dialogue",
             "visual_objective", "image_prompt", "video_prompt", "character_ids",
-            "location_id", "wardrobe_ids", "song_timestamp",
+            "location_description", "wardrobe_description", "planos", "song_timestamp",
         }
     }
     return repo.update(scene_id, allowed)
@@ -465,8 +455,6 @@ def generate_scene_image(
         studio.db,
         universe_id,
         character_ids=scene.get("character_ids") or [],
-        location_id=scene.get("location_id"),
-        wardrobe_ids=scene.get("wardrobe_ids") or [],
     )
     prompt = body.prompt or scene.get("image_prompt") or ""
     if not prompt:
@@ -533,8 +521,6 @@ def generate_scene_clip(
         studio.db,
         universe_id,
         character_ids=scene.get("character_ids") or [],
-        location_id=scene.get("location_id"),
-        wardrobe_ids=scene.get("wardrobe_ids") or [],
         max_references=3,
     )
     return studio.orchestrator.submit(
@@ -610,8 +596,13 @@ def approve_project(
     owner: OwnerDep, studio: StudioDep, universe_id: str, project_id: str
 ) -> dict[str, Any]:
     project = _projects(studio, universe_id).require(project_id)
-    if not project.get("master_16x9_path") and not project.get("edl_path"):
-        raise NotFound("El proyecto todavia no tiene ensamblaje.")
+    if not project.get("master_16x9_path"):
+        # Un plan de montaje (EDL) sin el MP4 renderizado no es un videoclip
+        # terminado: aprobarlo dejaba proyectos "acabados" que no se podian
+        # descargar ni publicar.
+        raise Conflict(
+            "Todavia no hay MP4 final renderizado. Monta el videoclip antes de aprobarlo."
+        )
     service = ApprovalService(studio.db)
     updated = service.approve(universe_id, VIDEO_PROJECTS, project_id)
     service.save_to_canon(

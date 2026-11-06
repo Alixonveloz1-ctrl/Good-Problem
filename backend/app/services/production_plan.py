@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ..db.repositories import CHARACTERS, LOCATIONS, SCENES, VIDEO_PROJECTS, WARDROBE, Repository
+from ..db.repositories import SCENES, VIDEO_PROJECTS, Repository
 from ..domain.enums import CanonStatus, ModelKind
 from ..domain.pricing import estimate_images, estimate_video
 from ..errors import NotFound
@@ -79,9 +79,7 @@ def build(
         "project_title": project.get("title") or project.get("id"),
         "video_type": project.get("video_type"),
         "scenes": len(scenes),
-        "characters": len(Repository(studio.db, universe_id, CHARACTERS).list(limit=200)),
-        "locations": len(Repository(studio.db, universe_id, LOCATIONS).list(limit=200)),
-        "wardrobe": len(Repository(studio.db, universe_id, WARDROBE).list(limit=200)),
+        "planos": sum(len(e.get("planos") or []) for e in scenes),
         "scene_images": {
             "count": image_attempts,
             "model": inputs.image_model,
@@ -118,14 +116,8 @@ def render_text(plan: dict[str, Any]) -> str:
             "SCENES:",
             str(plan["scenes"]),
             "",
-            "CHARACTERS:",
-            str(plan["characters"]),
-            "",
-            "LOCATIONS:",
-            str(plan["locations"]),
-            "",
-            "WARDROBE:",
-            str(plan["wardrobe"]),
+            "PLANOS:",
+            str(plan["planos"]),
             "",
             "SCENE IMAGES:",
             f"{images['count']}   (modelo: {images['model']} {images['variant']})",
