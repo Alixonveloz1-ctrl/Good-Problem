@@ -89,6 +89,31 @@ How the Artist Bible and a song reference divide the work:
   internal decisions.
 """
 
+# How local slang may enter a sung text — a standing quality rule the owner
+# set after hearing lyrics that sprinkled Venezuelan slang forced and wrong:
+# words with the wrong meaning, or dropped into lines where no speaker would
+# put them, as decoration to "sound" local. That is exactly what makes a
+# lyric sound machine-written. Slang used WELL is welcome — this is a craft
+# rule, never a ban, and there is deliberately no list of forbidden words
+# anywhere. It rides only with the song tasks, in the same split as
+# _REPARTO_CANCIONES: it governs sung text, so image, video and storyboard
+# tasks never see it.
+_JERGA_NATURAL = """
+How slang works in anything sung:
+- Local slang enters a line only when it falls NATURALLY in it: with its
+  real meaning, in the context where a native speaker would actually say
+  it. A little, well placed.
+- Never scatter slang words as decoration to "sound" local or authentic.
+  Forced slang is the loudest tell of a machine-written lyric.
+- If you are not certain of a slang word's exact meaning or use, do not
+  use it: clean, natural Spanish always beats slang placed wrong.
+- How much local flavour a lyric carries is set by the artist's identity
+  as given — their concept and their Bible — never by a quota of slang
+  per verse.
+- This is not a ban: slang that belongs to the artist's world, used the
+  way their people really use it, is welcome.
+"""
+
 # Tasks whose output IS a song or is written from one. Video tasks are not
 # here: they adapt a song that already exists, and the visual forbidden
 # elements still guard what gets generated on screen.
@@ -149,8 +174,9 @@ def system_instruction(
 
     ``reparto_canciones`` swaps the coherence/censorship block for the song
     split (the reference sets the form; the Bible gives the artist and never
-    vetoes). Only the song tasks pass it — see TAREAS_DE_CANCION and
-    director.run.
+    vetoes) and adds the slang-naturalness rule (_JERGA_NATURAL), which
+    governs sung text only. Only the song tasks pass it — see
+    TAREAS_DE_CANCION and director.run.
 
     ``reescritura_biblia`` is the Bible generation's own split, and it is
     stronger than a block swap: the thing being rewritten must not ride
@@ -161,7 +187,7 @@ def system_instruction(
     if reescritura_biblia:
         reglas = _REESCRITURA_BIBLIA
     elif reparto_canciones:
-        reglas = _REPARTO_CANCIONES
+        reglas = _REPARTO_CANCIONES.strip() + "\n\n" + _JERGA_NATURAL.strip()
     else:
         reglas = _COHERENCIA
     parts = [_ROLE_INSTRUCTIONS[role].strip(), _BASE.strip(), reglas.strip()]
