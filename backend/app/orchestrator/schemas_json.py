@@ -283,6 +283,12 @@ INSPIRATION_SCHEMA: dict[str, Any] = {
     "properties": {
         "title": _str("Titulo del video analizado"),
         "genres": _str("Generos y mezcla que se oyen, en espanol"),
+        "genre_keys": _arr(
+            _str(
+                "Una clave del catalogo fijo de generos de la app, escrita "
+                "exactamente como viene en la instruccion"
+            )
+        ),
         "rhythm": _str("Ritmo, velocidad y sensacion, en espanol"),
         "instruments": _arr(_str("Un instrumento dominante por elemento")),
         "structure": _str("Estructura: verso, coro, puente..., en espanol"),

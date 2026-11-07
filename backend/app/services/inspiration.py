@@ -19,6 +19,7 @@ import logging
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
+from ..domain import artist as artist_domain
 from ..domain.enums import CreativeRole
 from ..domain.schemas import ArtistBible, Inspiration
 from ..errors import InvalidGenerationRequest, ProviderError
@@ -40,6 +41,45 @@ INSTRUCTION = (
     "or quote the lyrics, and never describe the melody note by note: the new "
     "song must be original material, not a copy."
 )
+
+
+def instruccion_analisis() -> str:
+    """The analysis instruction, with the app's genre catalogue in it.
+
+    On top of the style summary, the analysis matches what it hears to
+    the fixed catalogue (``genre_keys``), so a song's sheet can fill its
+    own genre combination from the analysis alone — analysing a link and
+    then marking the genres by hand anyway made the analysis pointless
+    to its owner. The keys are written out here, from the domain
+    catalogue (the one source), and the match is validated again in code
+    when the result lands: an invented key never reaches a sheet.
+    """
+    catalogo = ", ".join(
+        f"{genero['key']} ({genero['label']})" for genero in artist_domain.MUSIC_GENRES
+    )
+    return (
+        INSTRUCTION
+        + "\n\nAlso match the song to the app's fixed genre catalogue. In "
+        "genre_keys, return the keys of the catalogue genres that are "
+        "actually heard in this song — at most three, the main ones "
+        "first, each key written EXACTLY as listed. If no catalogue genre "
+        f"honestly fits, return an empty list. The catalogue is: {catalogo}."
+    )
+
+
+def casar_generos(claves: Any) -> list[str]:
+    """The keys the analysis returned, matched to the catalogue.
+
+    Anything that is not a catalogue key does not enter (the model can
+    reword a genre or invent one), repeats count once, and the cap is
+    the usual one: MAX_MAIN_GENRES main genres.
+    """
+    casadas: list[str] = []
+    for clave in claves or []:
+        clave = str(clave).strip().lower()
+        if clave in artist_domain.MUSIC_GENRE_KEYS and clave not in casadas:
+            casadas.append(clave)
+    return casadas[: artist_domain.MAX_MAIN_GENRES]
 
 
 def is_youtube_url(url: str) -> bool:
@@ -118,7 +158,7 @@ def _analyse(studio, url: str, *, video_part: dict[str, Any]) -> dict[str, Any]:
         studio.vertex,
         spec.id if spec else "gemini-3.1-pro-preview",
         system_instruction=system_instruction(CreativeRole.MUSIC_DIRECTOR),
-        prompt=INSTRUCTION,
+        prompt=instruccion_analisis(),
         schema=S.INSPIRATION_SCHEMA,
         extra_parts=[video_part],
         # El video primero y la instruccion despues, como en la forma que
@@ -328,7 +368,9 @@ def _merge(studio, parciales: list[dict[str, Any]]) -> dict[str, Any]:
         prompt=(
             "These are partial summaries of chunks of ONE music video, all "
             "describing its style as inspiration. Merge them into a single "
-            "summary of the whole song.\n\n" + texto
+            "summary of the whole song. Carry the genre_keys over: the "
+            "union of the partial summaries' keys, at most three, main "
+            "first.\n\n" + texto
         ),
         schema=S.INSPIRATION_SCHEMA,
     )
@@ -346,6 +388,7 @@ def _to_inspiration(url: str, data: dict[str, Any]) -> Inspiration:
         mood=str(data.get("mood") or ""),
         lyric_themes=[str(x) for x in (data.get("lyric_themes") or [])],
         lyric_style=str(data.get("lyric_style") or ""),
+        genre_keys=casar_generos(data.get("genre_keys")),
     )
     inspiracion.summary_text = summary_text(inspiracion)
     return inspiracion

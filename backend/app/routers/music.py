@@ -432,7 +432,10 @@ def song_inspiration(
 ) -> dict[str, Any]:
     """Un enlace de YouTube solo para esta cancion. Se analiza al momento y
     su resumen queda guardado en la cancion, editable, alimentando su letra
-    y su encargo a Lyria.
+    y su encargo a Lyria. El mismo analisis llena la combinacion de
+    generos de la cancion (los casados con el catalogo y la mezcla oida):
+    analizar y luego marcar los generos a mano era hacer el trabajo dos
+    veces.
 
     Si el analisis falla — o vuelve fabricado de una pagina de error, que
     la guardia del servicio detecta — la cancion queda con una marca
@@ -440,7 +443,7 @@ def song_inspiration(
     sube tal cual: nunca se guarda un "analizado" fantasma.
     """
     repo = _repo(studio, universe_id)
-    repo.require(song_id)
+    cancion = repo.require(song_id)
     try:
         inspiracion = inspiration_service.analyse_youtube(studio, body.url)
     except DomainError as exc:
@@ -454,12 +457,29 @@ def song_inspiration(
             },
         )
         raise
-    return repo.update(
-        song_id,
-        {
-            "inspiration_url": inspiracion.url,
-            "inspiration_summary": inspiracion.summary_text,
-            "inspiration_failed": False,
-            "inspiration_error": "",
-        },
+    # El analisis llena tambien la combinacion de ESTA cancion: los generos
+    # que caso con el catalogo quedan marcados y la mezcla libre pasa a
+    # ser la que el analisis oyo — la linea «Suena a…» — sin que el
+    # usuario tenga que copiarlos a mano de un resumen. Si no caso
+    # ningun genero del catalogo, los marcados NO se tocan (un analisis
+    # nunca vacia la combinacion) y solo se mueve la mezcla; si el
+    # analisis no oyo mezcla describible, tampoco se borra la que habia.
+    # Los generos del ARTISTA no se tocan: esto es la ficha de la cancion.
+    guardado: dict[str, Any] = {
+        "inspiration_url": inspiracion.url,
+        "inspiration_summary": inspiracion.summary_text,
+        "inspiration_failed": False,
+        "inspiration_error": "",
+    }
+    mezcla = (inspiracion.genres or "").strip()
+    if inspiracion.genre_keys:
+        guardado["genres"] = list(inspiracion.genre_keys)
+    if mezcla:
+        guardado["genre_free"] = mezcla
+    linea = artist_domain.genres_text(
+        inspiracion.genre_keys or cancion.get("genres") or [],
+        mezcla or cancion.get("genre_free") or "",
     )
+    if linea:
+        guardado["genre"] = linea
+    return repo.update(song_id, guardado)

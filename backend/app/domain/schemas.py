@@ -178,6 +178,13 @@ class Inspiration(Base):
     mood: str = ""
     lyric_themes: list[str] = Field(default_factory=list)
     lyric_style: str = ""
+    genre_keys: list[str] = Field(default_factory=list)
+    """What was heard, matched to the app's fixed genre catalogue: keys of
+    domain.artist.MUSIC_GENRES, validated when the analysis lands (the
+    model's raw picks never reach a sheet unfiltered). A song's own sheet
+    fills its genre combination from these after an analysis, so analysing
+    a reference leaves the song ready instead of asking the user to mark
+    the genres by hand. The summary stays the piece that feeds concepts."""
     summary_text: str = ""
     """The whole summary as one editable text: this is what feeds the songs."""
     created_at: str = Field(default_factory=now_iso)

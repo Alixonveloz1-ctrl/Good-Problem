@@ -146,6 +146,39 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
         sections.extend(_fixed_music_blocks(payload, task))
         if brief:
             sections.append(f"USER IDEA\n{brief}")
+        else:
+            # La Idea es opcional de verdad: vacia no es una pieza que
+            # falta, es el encargo de inventarla. Sin esta orden el
+            # Director recibia la ficha con un hueco donde iria la idea
+            # del usuario y el concepto podia salir generico, como si le
+            # faltara algo — y en la pantalla parecia que habia que
+            # escribirla si o si.
+            if (payload.get("song_inspiration_text") or "").strip():
+                sections.append(
+                    "NO USER IDEA — INVENT THE SONG YOURSELF. The user "
+                    "analysed the reference above and left the idea blank "
+                    "on purpose: the concept is yours to invent, complete "
+                    "— this song's own story, its setting, the kind of "
+                    "lyrics and their structure. Take the FORM from the "
+                    "reference (its rhythm, its structure, its kind of "
+                    "lyrics and its kind of story: what made it work) and "
+                    "pass it through this artist's style and identity; the "
+                    "story you tell is new, never the reference's own plot "
+                    "or themes retold. A blank idea is not a missing "
+                    "piece: do not return a generic or half-told concept "
+                    "for lack of one."
+                )
+            else:
+                sections.append(
+                    "NO USER IDEA — INVENT THE SONG YOURSELF. The user "
+                    "left the idea blank: the concept is yours to invent, "
+                    "complete — this song's own story, its setting, the "
+                    "kind of lyrics and their structure — from this artist "
+                    "alone: their concept, their life story and their "
+                    "Bible. A blank idea is not a missing piece: do not "
+                    "return a generic or half-told concept for lack of "
+                    "one."
+                )
         duration = payload.get("duration_seconds")
         if duration:
             sections.append(f"Requested song duration: {duration} seconds (Lyria 3 Pro, max 180).")

@@ -119,6 +119,10 @@ export function SongScreen() {
   const [mezcla, setMezcla] = useState('')
   const [enlace, setEnlace] = useState('')
   const [resumen, setResumen] = useState('')
+  // Guardar sin decir nada parecia que no pasaba nada: cada boton de
+  // guardar enciende su aviso, y el aviso se apaga al volver a editar.
+  const [avisoGeneros, setAvisoGeneros] = useState(false)
+  const [avisoResumen, setAvisoResumen] = useState(false)
 
   useEffect(() => {
     if (!data) return
@@ -129,9 +133,10 @@ export function SongScreen() {
   }, [data])
 
   const guardarGeneros = async () => {
-    await action.run(() =>
+    const hecho = await action.run(() =>
       api.patch(base, { genres: generos, genre_free: mezcla }),
     )
+    if (hecho) setAvisoGeneros(true)
     await reload()
   }
 
@@ -144,7 +149,8 @@ export function SongScreen() {
   }
 
   const guardarResumen = async () => {
-    await action.run(() => api.patch(base, { inspiration_summary: resumen }))
+    const hecho = await action.run(() => api.patch(base, { inspiration_summary: resumen }))
+    if (hecho) setAvisoResumen(true)
     await reload()
   }
 
@@ -174,15 +180,25 @@ export function SongScreen() {
             <Card>
               <h3>Generos de esta cancion</h3>
               <p className="muted" style={{ margin: 0 }}>
-                Viene relleno con la combinacion de su artista. Si la cambias aqui, cambia solo
+                Viene relleno con la combinacion de su artista — y si analizas una cancion en la
+                referencia de abajo, con los generos de esa cancion. Si la cambias aqui, cambia solo
                 esta cancion; la del artista sigue
                 como esta en su Identidad. Entra en la letra y en el encargo a Lyria.
               </p>
-              <ElegirGeneros valor={generos} alCambiar={setGeneros} />
+              <ElegirGeneros
+                valor={generos}
+                alCambiar={(valor) => {
+                  setGeneros(valor)
+                  setAvisoGeneros(false)
+                }}
+              />
               <Field
                 label="O escribe tu mezcla para esta cancion"
                 value={mezcla}
-                onChange={setMezcla}
+                onChange={(valor) => {
+                  setMezcla(valor)
+                  setAvisoGeneros(false)
+                }}
               />
               {textoGeneros(generos, mezcla) && (
                 <p className="muted">Suena a: {textoGeneros(generos, mezcla)}</p>
@@ -190,6 +206,11 @@ export function SongScreen() {
               <button className="btn block" onClick={guardarGeneros} disabled={action.busy}>
                 Guardar los generos de esta cancion
               </button>
+              {avisoGeneros && (
+                <p className="muted" style={{ margin: 0 }}>
+                  ✓ Guardado
+                </p>
+              )}
 
               <div className="section-title">Una referencia solo para esta cancion</div>
               <Field
@@ -220,12 +241,20 @@ export function SongScreen() {
                   <Field
                     label="Resumen de su estilo (editable: alimenta esta cancion)"
                     value={resumen}
-                    onChange={setResumen}
+                    onChange={(valor) => {
+                      setResumen(valor)
+                      setAvisoResumen(false)
+                    }}
                     multiline
                   />
                   <button className="btn block" onClick={guardarResumen} disabled={action.busy}>
                     Guardar el resumen
                   </button>
+                  {avisoResumen && (
+                    <p className="muted" style={{ margin: 0 }}>
+                      ✓ Guardado
+                    </p>
+                  )}
                 </>
               )}
             </Card>
@@ -236,12 +265,16 @@ export function SongScreen() {
                 <h3>1 · Concepto musical</h3>
               </div>
               <Field
-                label="Idea"
+                label="Idea (opcional)"
                 value={brief}
                 onChange={setBrief}
                 multiline
                 placeholder="Una noche que no termina, luces de neon, despedida…"
               />
+              <p className="muted" style={{ margin: 0 }}>
+                Si la dejas vacia, el Director inventa la idea: de la cancion que analizaste, o
+                del artista si no analizaste ninguna.
+              </p>
               <Field
                 label="Cambiar el genero que propuso el Director"
                 value={genreOverride}
