@@ -101,12 +101,43 @@ def handle_text(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
     )
 
 
+def _exigir_que_devolvio_algo(
+    data: dict[str, Any], claves: tuple[str, ...], mensaje: str
+) -> None:
+    """Un «exito» vacio es un fallo que se calla.
+
+    Cada rama de ``_apply_director_result`` escribe con valores por defecto
+    cuando el Director no devuelve una clave: si no devuelve NINGUNA, la rama
+    «aplica» un texto hecho de huecos encima de lo que ya habia, y el trabajo
+    termina LISTO como si hubiera pasado algo. Paso con la Biblia de un
+    artista real: dos trabajos «terminaron» sin tocar ni una palabra, y
+    nadie vio un error en ninguna parte. Un Director que no devuelve nada
+    no ha hecho el trabajo: eso es un fallo del proveedor, con su motivo a
+    la vista, no un exito.
+    """
+    if not any(data.get(clave) for clave in claves):
+        raise ProviderError(mensaje)
+
+
 def _apply_director_result(
     studio, universe_id: str, job: dict[str, Any], task: str, data: dict[str, Any]
 ) -> dict[str, Any]:
     target_id = job.get("target_id") or ""
 
     if task == "artist_bible":
+        # Las secciones que esta rama de verdad fusiona. Si el Director no
+        # trae ninguna —JSON vacio o sin secciones—, «aplicar» seria subir
+        # la version y devolver exito sin tocar ni una palabra de la
+        # Biblia: el exito vacio que dejo dos trabajos «LISTO» con la
+        # Biblia intacta. Eso es un fallo, y se dice.
+        trae_seccion = any(
+            isinstance(data.get(seccion), dict) and data[seccion]
+            for seccion in ("identity", "musical", "communication", "visual")
+        )
+        if not trae_seccion and not data.get("voice_profile_lines"):
+            raise ProviderError(
+                "El Director no devolvió la Biblia: vuelve a intentarlo."
+            )
         bible = load_bible(studio.db, universe_id)
         merged = bible.model_dump()
         for section in ("identity", "musical", "communication"):
@@ -146,6 +177,20 @@ def _apply_director_result(
         return {"entity": "artist_bible", "id": "current"}
 
     if task in {"music_concept", "lyrics_analysis"}:
+        # El mismo exito vacio: sin ninguna de las claves que esta rama
+        # lee, el concepto se reconstruiria con huecos encima del que ya
+        # habia y naceria «en uso». Si el Director no devolvio concepto,
+        # el trabajo fallo.
+        _exigir_que_devolvio_algo(
+            data,
+            (
+                "title", "concept", "summary", "hook", "hooks", "genre",
+                "proposed_genre", "bpm", "proposed_bpm", "mood", "structure",
+                "production", "proposed_production", "interpretation",
+                "proposed_interpretation", "visual_concept", "music_prompt",
+            ),
+            "El Director no devolvió el concepto de la canción: vuelve a intentarlo.",
+        )
         repo = _repo(studio, universe_id, SONGS)
         song = repo.require(target_id)
         concept = {
@@ -182,6 +227,11 @@ def _apply_director_result(
         return {"entity": "song", "id": target_id}
 
     if task == "lyrics":
+        # Sin letra no hay nada que aplicar: escribir "" encima de la
+        # letra que hubiera y marcarla «en uso» seria un exito vacio y
+        # encima destructivo.
+        if not str(data.get("lyrics") or "").strip():
+            raise ProviderError("El Director no devolvió la letra: vuelve a intentarlo.")
         repo = _repo(studio, universe_id, SONGS)
         song = repo.require(target_id)
         author = (
@@ -203,6 +253,14 @@ def _apply_director_result(
         return {"entity": "song", "id": target_id}
 
     if task == "video_concept":
+        # Sin titulo, concepto, historia ni notas no hay propuesta: la
+        # rama escribiria huecos encima del proyecto y una historia vacia
+        # «en uso». (video_type no cuenta: tiene valor por defecto.)
+        _exigir_que_devolvio_algo(
+            data,
+            ("title", "concept", "story", "wardrobe_notes", "location_notes"),
+            "El Director no devolvió el concepto del video: vuelve a intentarlo.",
+        )
         repo = _repo(studio, universe_id, VIDEO_PROJECTS)
         repo.update(
             target_id,
@@ -225,6 +283,13 @@ def _apply_director_result(
         return _apply_storyboard(studio, universe_id, target_id, data)
 
     if task == "character":
+        # El mismo hueco: sin nombre, descripcion ni prompts, la rama
+        # escribiria una ficha vacia encima de la que ya habia.
+        _exigir_que_devolvio_algo(
+            data,
+            ("name", "apparent_age", "appearance", "personality", "master_prompts"),
+            "El Director no devolvió el personaje: vuelve a intentarlo.",
+        )
         repo = _repo(studio, universe_id, CHARACTERS)
         prompts = {p["key"]: p["prompt"] for p in (data.get("master_prompts") or []) if "key" in p}
         shots = [
@@ -266,6 +331,12 @@ def _apply_director_result(
 def _apply_storyboard(
     studio, universe_id: str, project_id: str, data: dict[str, Any]
 ) -> dict[str, Any]:
+    # Sin escenas no hay storyboard que aplicar, y esta rama SUSTITUYE el
+    # anterior entero: un resultado vacio borraria las escenas que hubiera
+    # y dejaria el proyecto «en uso» sin una sola. Es el exito vacio mas
+    # destructivo de todos: un fallo, con su motivo, antes de tocar nada.
+    if not data.get("scenes"):
+        raise ProviderError("El Director no devolvió el storyboard: vuelve a intentarlo.")
     project = _repo(studio, universe_id, VIDEO_PROJECTS).require(project_id)
     characters = {c["name"]: c["id"] for c in _repo(studio, universe_id, CHARACTERS).list()}
     # The only character a storyboard can name is the artist. Anyone else the

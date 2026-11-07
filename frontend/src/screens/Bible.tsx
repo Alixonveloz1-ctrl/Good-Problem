@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { api, newIdempotencyKey } from '../api/client'
+import { ClaveDeEnvio } from '../lib/claveEnvio'
 import { useAction, useResource } from '../hooks/useApi'
 import type { ArtistBible, Inspiration, Registry, SingingVoice } from '../api/types'
 import { JobWatcher } from '../components/JobWatcher'
@@ -33,6 +34,11 @@ export function BibleScreen() {
   const action = useAction()
   const [brief, setBrief] = useState('')
   const [jobId, setJobId] = useState<string | null>(null)
+  // La clave de ESTE encargo: la misma entre toques hasta que el envio
+  // devuelva su trabajo. Si la respuesta se pierde a los 45 segundos y
+  // el servidor si creo el trabajo, el siguiente toque lo recupera en
+  // vez de quedarse sin nada (ver lib/claveEnvio).
+  const [claveBiblia] = useState(() => new ClaveDeEnvio(() => newIdempotencyKey('bible')))
 
   const [estilo, setEstilo] = useState('')
   const [voz, setVoz] = useState<SingingVoice>(VOZ_VACIA)
@@ -54,10 +60,14 @@ export function BibleScreen() {
     const job = await action.run(() =>
       api.post<{ id: string }>(`/api/universes/${universeId}/bible/generate`, {
         brief,
-        idempotency_key: newIdempotencyKey('bible'),
+        idempotency_key: claveBiblia.paraEnviar(),
       }),
     )
-    if (job) setJobId(job.id)
+    if (job) {
+      // Encargo conseguido: el proximo lleva una clave nueva.
+      claveBiblia.conseguida()
+      setJobId(job.id)
+    }
   }
 
   const guardarEstilo = async () => {

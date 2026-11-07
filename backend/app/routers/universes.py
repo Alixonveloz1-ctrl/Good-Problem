@@ -392,6 +392,17 @@ def put_bible(
 def generate_bible(
     owner: OwnerDep, studio: StudioDep, universe_id: str, body: BibleGenerateIn
 ) -> dict[str, Any]:
+    # La marca de entrada: un envio que muere antes de crear el trabajo
+    # no dejaba rastro en ninguna parte, y sin rastro no hay manera de
+    # saber si la peticion llego siquiera. Con esta linea y la de
+    # «job_created» en submit, los registros cuentan si llego, si creo
+    # el trabajo y cual.
+    logger.info(
+        "generate_bible universe=%s idempotency_key=%s brief=%s",
+        universe_id,
+        "presente" if body.idempotency_key else "ausente",
+        "presente" if body.brief else "vacio",
+    )
     return studio.orchestrator.submit(
         GenerationRequest(
             universe_id=universe_id,

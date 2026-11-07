@@ -204,6 +204,17 @@ class Orchestrator:
             estimated_cost_usd=estimate.amount_usd,
             idempotency_key=request.idempotency_key,
         )
+        # La marca de creacion: emparejada con la de entrada del endpoint,
+        # deja en los registros la prueba de que este envio concreto si
+        # creo su trabajo, y de cual. Un envio sin esta linea murio antes.
+        logger.info(
+            "job_created %s kind=%s universe=%s target=%s/%s",
+            job["id"],
+            request.kind,
+            request.universe_id,
+            request.target_type,
+            request.target_id,
+        )
         if request.idempotency_key:
             self.studio.idempotency.remember(
                 request.universe_id, request.idempotency_key, job["id"], request.to_dict()
