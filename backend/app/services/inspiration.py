@@ -96,11 +96,18 @@ def normalize_youtube_url(url: str) -> str:
 
 
 def _video_part(url: str, *, start: int | None = None, end: int | None = None) -> dict[str, Any]:
-    part: dict[str, Any] = {"fileData": {"fileUri": url, "mimeType": "video/mp4"}}
+    # La forma EXACTA de la instalacion hermana que si ve los videos
+    # (Drama, inspiracion.js): el enlace declarado como «video/*» y los
+    # cortes como objetos {seconds: n}. Declararlo «video/mp4» hacia que
+    # Vertex tratara la pagina watch como un archivo remoto que descargar,
+    # y lo que hay tras esa URL es la pagina HTML: a una descarga sin
+    # navegador real le sirve su version «browser is deprecated», y el
+    # modelo analizaba esa pagina en vez de la cancion.
+    part: dict[str, Any] = {"fileData": {"fileUri": url, "mimeType": "video/*"}}
     if start is not None and end is not None:
         part["videoMetadata"] = {
-            "startOffset": f"{start}s",
-            "endOffset": f"{end}s",
+            "startOffset": {"seconds": int(start)},
+            "endOffset": {"seconds": int(end)},
         }
     return part
 
@@ -114,6 +121,9 @@ def _analyse(studio, url: str, *, video_part: dict[str, Any]) -> dict[str, Any]:
         prompt=INSTRUCTION,
         schema=S.INSPIRATION_SCHEMA,
         extra_parts=[video_part],
+        # El video primero y la instruccion despues, como en la forma que
+        # funciona: con el texto primero, Vertex no lo miraba como video.
+        extra_parts_first=True,
     )
     return resultado.data or {}
 
@@ -227,6 +237,54 @@ def motivo_resumen_no_utilizable(summary_text: str) -> str | None:
     return None
 
 
+def motivo_inspiracion_no_utilizable(inspiracion: Inspiration) -> str | None:
+    """Why one STORED Inspiration cannot feed a prompt, or None.
+
+    The same check the analysis passes on its way in, applied to what is
+    already saved — to the summary text as it finally sits in the Bible.
+    That distinction is the hole this closes: the guard inside
+    ``analyse_youtube`` only ever sees the object ``_to_inspiration``
+    composes from the model's structured fields, while the text that is
+    finally persisted is a free, editable field. The Bible's write
+    routes (the verbatim list PUT, the whole-Bible PUT) persist whatever
+    summary text they are sent, and until now no read or prompt route
+    re-checked it — so a stored summary leading with «Reference: Your
+    browser is deprecated» under a perfectly good title (a text the
+    composition could never produce from that title) sailed past the
+    guard and into every prompt. The check therefore runs on the stored
+    text, every time it is read, marked or used.
+    """
+    motivo = motivo_resumen_no_utilizable(inspiracion.summary_text)
+    if motivo is not None:
+        return motivo
+    firma = _firma_en(inspiracion.title)
+    if firma:
+        return (
+            f"el titulo guardado no es el de la cancion: trae «{firma}», "
+            "la firma de una pagina de error de YouTube"
+        )
+    return None
+
+
+def inspiracion_utilizable(inspiracion: Inspiration) -> bool:
+    return motivo_inspiracion_no_utilizable(inspiracion) is None
+
+
+def con_marca(inspiracion: Inspiration) -> dict[str, Any]:
+    """The inspiration as the screens receive it, with its usability mark.
+
+    The mark is recomputed here, from the stored text, at read time —
+    never stored and never trusted from the client — so re-saving a
+    fabricated summary cannot launder it into a valid one.
+    """
+    motivo = motivo_inspiracion_no_utilizable(inspiracion)
+    return {
+        **inspiracion.model_dump(),
+        "inspiration_usable": motivo is None,
+        "inspiration_unusable_reason": motivo or "",
+    }
+
+
 def _comprobar_que_vio_el_video(inspiracion: Inspiration) -> None:
     """Raise unless the analysis really saw a video.
 
@@ -313,7 +371,15 @@ def summary_text(inspiracion: Inspiration) -> str:
 
 
 def bible_inspiration_text(bible: ArtistBible) -> str:
-    """All of the artist's inspiration summaries as one block for a prompt."""
+    """The artist's USABLE inspiration summaries as one block for a prompt.
+
+    A summary that did not come from its song (empty, or carrying the
+    fabricated-analysis signature) is excluded here, at the prompt's
+    door: it stays on the artist's sheet, visibly marked, but it never
+    reaches a prompt.
+    """
     return "\n\n".join(
-        inspiracion.summary_text for inspiracion in bible.inspirations if inspiracion.summary_text
+        inspiracion.summary_text
+        for inspiracion in bible.inspirations
+        if inspiracion.summary_text and inspiracion_utilizable(inspiracion)
     )

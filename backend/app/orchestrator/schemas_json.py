@@ -273,6 +273,11 @@ EDIT_PLAN_SCHEMA: dict[str, Any] = {
 
 # --- Inspiration and photo style (simplified studio) ------------------------
 
+# ``title`` es obligatorio a proposito: un analisis que no nombra el video
+# que vio no es un analisis del video. Cuando era opcional, una respuesta
+# sin titulo (o con el titulo de la pagina de error de YouTube) pasaba el
+# esquema y se guardaba como resumen «valido»; sin titulo, ahora es un
+# error de esquema en vez de un resumen.
 INSPIRATION_SCHEMA: dict[str, Any] = {
     "type": "OBJECT",
     "properties": {
@@ -285,7 +290,7 @@ INSPIRATION_SCHEMA: dict[str, Any] = {
         "lyric_themes": _arr(_str("Un tema de la letra por elemento")),
         "lyric_style": _str("Manera de escribir la letra, en espanol"),
     },
-    "required": ["genres", "rhythm", "structure"],
+    "required": ["title", "genres", "rhythm", "structure"],
 }
 
 PHOTO_STYLE_SCHEMA: dict[str, Any] = {
