@@ -38,6 +38,7 @@ from ..providers import gemini_image, lyria, veo
 from ..providers.storage import character_path, scene_path, song_path
 from ..services import approvals
 from ..services.context import load_bible, save_bible, sync_bible_identity
+from ..services.inspiration import inspiracion_utilizable
 from . import director
 from .orchestrator import Outcome
 
@@ -608,7 +609,10 @@ def _fixed_music_texts(studio, universe_id: str, song: dict[str, Any]) -> dict[s
     )
     inspiraciones: list[str] = []
     for inspiracion in bible.inspirations:
-        if inspiracion.summary_text:
+        # Tampoco por esta puerta entra un resumen fabricado: solo los
+        # resumenes que de verdad vienen de su cancion alimentan la letra
+        # y el encargo a Lyria.
+        if inspiracion.summary_text and inspiracion_utilizable(inspiracion):
             inspiraciones.append(inspiracion.summary_text)
     if (song.get("inspiration_summary") or "").strip():
         inspiraciones.append(song["inspiration_summary"].strip())

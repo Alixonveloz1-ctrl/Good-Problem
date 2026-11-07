@@ -132,6 +132,10 @@ export interface Inspiration {
   lyric_style: string
   summary_text: string
   created_at: string
+  /** Marca recalculada por el servidor en cada lectura: false cuando el
+   * resumen guardado no viene de la cancion (analisis fabricado). */
+  inspiration_usable?: boolean
+  inspiration_unusable_reason?: string
 }
 
 export interface VisualIdentity {
@@ -163,6 +167,9 @@ export interface ArtistBible {
   music_genres: string[]
   music_genre_free: string
   inspirations: Inspiration[]
+  /** Enlaces pegados al crear el artista cuyo analisis fallo: visibles
+   * para volver a pegarlos, no desaparecen en silencio. */
+  inspirations_failed?: string[]
   summary?: string
 }
 

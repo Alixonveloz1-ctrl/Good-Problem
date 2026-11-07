@@ -245,6 +245,22 @@ export function BibleScreen() {
               >
                 {action.busy ? 'Escuchandola…' : 'Analizar esta cancion'}
               </button>
+              {(data.inspirations_failed ?? []).length > 0 && (
+                <div>
+                  <p className="error" style={{ margin: 0 }}>
+                    Estos enlaces no se pudieron analizar cuando se creo el artista:
+                  </p>
+                  {(data.inspirations_failed ?? []).map((enlaceFallido) => (
+                    <div key={enlaceFallido} className="sub">
+                      {enlaceFallido}
+                    </div>
+                  ))}
+                  <p className="muted" style={{ margin: 0 }}>
+                    Vuelve a pegar el que quieras en el campo de arriba y analizalo: al
+                    entrar bien, sale de esta lista solo.
+                  </p>
+                </div>
+              )}
               {inspiraciones.map((inspiracion, indice) => (
                 <div key={`${inspiracion.url}-${indice}`} className="card">
                   <div className="row between">
@@ -258,6 +274,19 @@ export function BibleScreen() {
                     </button>
                   </div>
                   <div className="sub">{inspiracion.url}</div>
+                  {inspiracion.inspiration_usable === false && (
+                    <>
+                      <p className="error" style={{ margin: 0 }}>
+                        Este resumen no viene de la cancion: vuelve a pegar el enlace.
+                      </p>
+                      <p className="muted" style={{ margin: 0 }}>
+                        {inspiracion.inspiration_unusable_reason
+                          ? `Motivo: ${inspiracion.inspiration_unusable_reason}. `
+                          : ''}
+                        Mientras tanto, no alimenta ninguna cancion.
+                      </p>
+                    </>
+                  )}
                   <Field
                     label="Resumen de su estilo (editable: esto es lo que leen sus canciones)"
                     value={inspiracion.summary_text}
