@@ -439,6 +439,10 @@ def _store_image(studio, universe_id, job, purpose, payload, result, reference_p
             if shot.get("key") == shot_key:
                 shot["storage_path"] = stored.path
                 shot["status"] = CanonStatus.APPROVED.value
+                # La ruta no cambia al regenerar: la version si, y es la
+                # marca que la vista pone en la URL para no ensenar la
+                # imagen anterior desde la cache del telefono.
+                shot["version"] = int(shot.get("version") or 0) + 1
                 found = True
         if not found:
             shots.append(
@@ -447,6 +451,7 @@ def _store_image(studio, universe_id, job, purpose, payload, result, reference_p
                     "label": shot_key,
                     "storage_path": stored.path,
                     "status": CanonStatus.APPROVED.value,
+                    "version": 1,
                 }
             )
         # Regla del estudio, decidida por su dueno: lo que se genera queda

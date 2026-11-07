@@ -397,3 +397,26 @@ def test_master_aprobado_se_regenera_y_sigue_aprobado_y_en_uso(client, studio):
     assert retrato["status"] == CanonStatus.APPROVED.value
     assert despues["reference_image_paths"] == referencias_antes
     assert len(despues.get("approval_history") or []) > historial_antes
+
+
+def test_la_version_de_la_toma_sube_en_cada_regeneracion(client, studio):
+    """La regeneracion sobrescribe la misma ruta canonica: lo unico que
+    distingue la imagen nueva de la vieja es la version de la toma, que es
+    la marca que la vista pone en la URL para no ensenar la copia guardada
+    en la cache del telefono."""
+    creado = _universo(client, studio, gender="hombre")
+    uid, char_id = creado["id"], creado["lead_character_id"]
+
+    _generar_retrato(client, studio, uid, char_id)
+    ficha = client.get(f"/api/universes/{uid}/characters/{char_id}").json()
+    retrato = next(s for s in ficha["master_shots"] if s["key"] == "portrait")
+    assert retrato["version"] == 1
+    ruta = retrato["storage_path"]
+
+    _generar_retrato(client, studio, uid, char_id)
+    ficha = client.get(f"/api/universes/{uid}/characters/{char_id}").json()
+    retrato = next(s for s in ficha["master_shots"] if s["key"] == "portrait")
+    # Misma ruta de siempre, version nueva: la URL cambia y la vista esta
+    # obligada a pedir la imagen recien generada.
+    assert retrato["storage_path"] == ruta
+    assert retrato["version"] == 2

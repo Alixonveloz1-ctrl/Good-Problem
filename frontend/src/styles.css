@@ -600,6 +600,58 @@ video {
   padding: 16px;
 }
 
+/* --- Tomas del Master: ver y generar son dos toques -----------------------
+ * La foto se toca para mirarla grande; el boton de debajo es lo unico que
+ * genera. Antes la tarjeta entera era un solo boton y mirar la foto costaba
+ * una generacion. */
+
+.shot-card {
+  padding: 0 0 8px;
+  min-height: 0;
+  overflow: hidden;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.shot-view {
+  display: block;
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: zoom-in;
+}
+
+.shot-card .btn {
+  width: calc(100% - 16px);
+}
+
+.visor-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+}
+
+.visor-img {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+}
+
+.visor-bar {
+  width: 100%;
+  max-width: 560px;
+  color: #fff;
+}
+
 /* --- Feedback ----------------------------------------------------------- */
 
 .error {

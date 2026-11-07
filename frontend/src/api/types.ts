@@ -169,6 +169,8 @@ export interface MasterShot {
   storage_path: string | null
   status: CanonStatus
   prompt?: string
+  /** Cuantas veces se ha sustituido la imagen; va en su URL como marca. */
+  version?: number
 }
 
 export interface Character {

@@ -118,8 +118,16 @@ export const api = {
   },
 }
 
-export function mediaUrl(path: string | null | undefined): string | null {
+export function mediaUrl(
+  path: string | null | undefined,
+  version?: number | null,
+): string | null {
   if (!path) return null
-  if (path.startsWith('http') || path.startsWith('/')) return path
-  return `/media/${path}`
+  const base =
+    path.startsWith('http') || path.startsWith('/') ? path : `/media/${path}`
+  // Una imagen que se regenera se guarda en la misma ruta que la anterior.
+  // Sin una marca distinta, el telefono pinta la copia que ya tiene guardada
+  // y la nueva no se ve nunca: la version de la toma es esa marca.
+  if (version == null || version <= 0) return base
+  return `${base}${base.includes('?') ? '&' : '?'}v=${version}`
 }

@@ -108,6 +108,9 @@ function CharacterSheet({
   const [extra, setExtra] = useState('')
   const [modoFoto, setModoFoto] = useState('use_as_master')
   const entradaFoto = useRef<HTMLInputElement>(null)
+  // La foto que se esta mirando grande. Ver y generar son dos toques
+  // distintos: mirar no debe lanzar (ni cobrar) ninguna generacion.
+  const [visor, setVisor] = useState<{ url: string; label: string } | null>(null)
 
   const design = async () => {
     const job = await action.run(() =>
@@ -260,30 +263,55 @@ function CharacterSheet({
 
       <div className="thumbs">
         {character.master_shots.map((shot) => {
-          const url = mediaUrl(shot.storage_path)
+          // La version va en la direccion: la imagen nueva se guarda en la
+          // misma ruta que la vieja, y sin esta marca el telefono sigue
+          // ensenando la copia anterior aunque el trabajo ya termino.
+          const url = mediaUrl(shot.storage_path, shot.version)
           return (
-            <button
-              key={shot.key}
-              type="button"
-              className="variant"
-              style={{ padding: 0, minHeight: 0, overflow: 'hidden' }}
-              onClick={() => generateShot(shot.key)}
-              disabled={action.busy}
-            >
+            <div key={shot.key} className="variant shot-card">
               {url ? (
-                <img className="media square" src={url} alt={shot.label} />
+                <button
+                  type="button"
+                  className="shot-view"
+                  onClick={() => setVisor({ url, label: shot.label })}
+                  aria-label={`Ver grande: ${shot.label}`}
+                >
+                  <img className="media square" src={url} alt={shot.label} />
+                </button>
               ) : (
                 <div className="placeholder" style={{ minHeight: 96, border: 0 }}>
                   {shot.label}
                 </div>
               )}
-              <span className="price" style={{ padding: '4px 0' }}>
+              <button
+                type="button"
+                className="btn small block"
+                onClick={() => generateShot(shot.key)}
+                disabled={action.busy}
+              >
                 {shot.storage_path ? 'Regenerar' : 'Generar'}
-              </span>
-            </button>
+              </button>
+            </div>
           )
         })}
       </div>
+
+      {visor && (
+        <div
+          className="visor-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setVisor(null)
+          }}
+        >
+          <img className="visor-img" src={visor.url} alt={visor.label} />
+          <div className="row between visor-bar">
+            <span>{visor.label}</span>
+            <button className="btn small" onClick={() => setVisor(null)}>
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
 
       {jobId && (
         <JobWatcher

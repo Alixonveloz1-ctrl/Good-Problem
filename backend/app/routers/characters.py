@@ -402,11 +402,15 @@ async def upload_artist_photo(
             if shot.get("key") == "portrait":
                 shot["storage_path"] = stored.path
                 shot["status"] = CanonStatus.DRAFT.value
+                # La foto se guarda siempre en la misma ruta: al subir otra,
+                # la version es lo unico que distingue la nueva de la vieja
+                # en la URL que pinta la vista.
+                shot["version"] = int(shot.get("version") or 0) + 1
         if not any(s.get("key") == "portrait" for s in shots):
             shots.append(
                 {"key": "portrait", "label": "Retrato", "image_id": None,
                  "storage_path": stored.path, "status": CanonStatus.DRAFT.value,
-                 "prompt": ""}
+                 "prompt": "", "version": 1}
             )
         repo.update(character_id, {"master_shots": shots})
         actualizado = _approve_master(studio, universe_id, character_id)

@@ -221,6 +221,11 @@ class MasterShot(Base):
     image_id: str | None = None
     storage_path: str | None = None
     status: CanonStatus = CanonStatus.DRAFT
+    # Cuantas veces se ha sustituido la imagen de esta toma. La ruta es
+    # canonica y no cambia al regenerar, asi que sin esto la vista pinta
+    # siempre la misma direccion y el telefono sigue ensenando la copia
+    # vieja de su cache: la version viaja en la URL como marca nueva.
+    version: int = 0
 
 
 MASTER_SHOTS: tuple[tuple[str, str], ...] = (
