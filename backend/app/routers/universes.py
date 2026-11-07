@@ -94,8 +94,11 @@ def create_universe(owner: OwnerDep, studio: StudioDep, body: UniverseIn) -> dic
             bible.inspirations.append(inspiration_service.analyse_youtube(studio, enlace))
         except Exception:
             # Un enlace que no se puede analizar no puede tumbar la creacion
-            # del artista: se puede volver a pegar desde su ficha.
+            # del artista: se puede volver a pegar desde su ficha. Pero ya
+            # no desaparece en silencio: queda en la lista visible de
+            # enlaces fallidos de la ficha, para que se sepa que falta.
             logger.exception("no se pudo analizar la inspiracion %s", enlace)
+            bible.inspirations_failed.append(enlace)
     save_bible(studio.db, universe_id, bible)
 
     # Y el artista, que ES el estudio. El nombre y el sexo quedan puestos desde
@@ -359,7 +362,16 @@ def get_bible(owner: OwnerDep, studio: StudioDep, universe_id: str) -> dict[str,
     # las otras fichas (la edad, de los rasgos del artista), asi que un
     # universo creado antes de la sincronia se corrige solo al abrirla.
     bible = sync_bible_identity(studio.db, universe_id)
-    return {**bible.model_dump(), "summary": summarize_bible(bible)}
+    datos = bible.model_dump()
+    # Cada resumen viaja con su marca de utilizable, recalculada del
+    # texto guardado en esta misma lectura (nunca guardada como dato ni
+    # fiada al cliente): un resumen fabricado se ve como tal en la
+    # ficha, y las puertas de prompt lo excluyen por la misma
+    # comprobacion.
+    datos["inspirations"] = [
+        inspiration_service.con_marca(inspiracion) for inspiracion in bible.inspirations
+    ]
+    return {**datos, "summary": summarize_bible(bible)}
 
 
 @router.put("/{universe_id}/bible")
@@ -527,8 +539,17 @@ def add_inspiration(
     bible = load_bible(studio.db, universe_id)
     inspiracion = inspiration_service.analyse_youtube(studio, body.url)
     bible.inspirations.append(inspiracion)
+    # Si este enlace era de los que no se pudieron analizar al crear el
+    # artista, ya no falta: sale de la lista visible de fallidos.
+    video_id = inspiration_service.youtube_video_id(inspiracion.url)
+    if video_id:
+        bible.inspirations_failed = [
+            enlace
+            for enlace in bible.inspirations_failed
+            if inspiration_service.youtube_video_id(enlace) != video_id
+        ]
     save_bible(studio.db, universe_id, bible)
-    return inspiracion.model_dump()
+    return inspiration_service.con_marca(inspiracion)
 
 
 @router.put("/{universe_id}/bible/inspirations")
@@ -536,12 +557,14 @@ def put_inspirations(
     owner: OwnerDep, studio: StudioDep, universe_id: str, body: InspirationPatch
 ) -> list[dict[str, Any]]:
     """El resumen es editable: lo que quede escrito aqui es lo que leen las
-    canciones."""
+    canciones. Con un limite: la marca de utilizable no la pone el cliente,
+    se recalcula del texto al guardar y al leer, asi que un resumen
+    fabricado no puede re-guardarse como si fuera valido."""
     studio.orchestrator.require_universe(universe_id)
     bible = load_bible(studio.db, universe_id)
     bible.inspirations = body.inspirations
     save_bible(studio.db, universe_id, bible)
-    return [i.model_dump() for i in bible.inspirations]
+    return [inspiration_service.con_marca(i) for i in bible.inspirations]
 
 
 @router.delete("/{universe_id}/bible/inspirations/{indice}")
@@ -553,7 +576,11 @@ def delete_inspiration(
     if 0 <= indice < len(bible.inspirations):
         bible.inspirations.pop(indice)
         save_bible(studio.db, universe_id, bible)
-    return {"inspirations": [i.model_dump() for i in bible.inspirations]}
+    return {
+        "inspirations": [
+            inspiration_service.con_marca(i) for i in bible.inspirations
+        ]
+    }
 
 
 class PreferencesIn(BaseModel):

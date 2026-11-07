@@ -197,6 +197,13 @@ class ArtistBible(Entity):
     music_genre_free: str = ""
     """The user's own mix in their own words, on top of the picked genres."""
     inspirations: list[Inspiration] = Field(default_factory=list)
+    inspirations_failed: list[str] = Field(default_factory=list)
+    """Enlaces pegados al crear el artista cuyo analisis fallo.
+
+    Antes ese fallo se tragaba en silencio (una linea de log) y el enlace
+    desaparecia: «Como Mario» nunca llego a ser referencia y nadie lo
+    supo. Ahora quedan a la vista en la ficha, para volver a pegarlos.
+    """
     status: CanonStatus = CanonStatus.DRAFT
     version: int = 1
 

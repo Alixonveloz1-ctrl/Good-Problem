@@ -17,6 +17,7 @@ from ..db.repositories import CANON, CHARACTERS, Repository, doc_path
 from ..domain import artist as artist_domain
 from ..domain.enums import CanonStatus
 from ..domain.schemas import ArtistBible
+from .inspiration import inspiracion_utilizable
 
 BIBLE_DOC = "artist_bible/current"
 
@@ -179,6 +180,12 @@ def summarize_bible(bible: ArtistBible, *, vista: str = "general") -> str:
     if not en_concepto:
         for inspiracion in bible.inspirations:
             if not inspiracion.summary_text:
+                continue
+            # Un resumen fabricado (el que «vio» la pagina de error de
+            # YouTube) no entra en ningun prompt, tampoco por esta puerta:
+            # se queda en la ficha, marcado, hasta que se vuelva a pegar
+            # el enlace y se analice de verdad.
+            if not inspiracion_utilizable(inspiracion):
                 continue
             lines.append("")
             if vista == "biblia_artista":
