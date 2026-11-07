@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..clock import now_iso
 from ..db.client import Database
 from ..db.repositories import CANON, CHARACTERS, Repository, doc_path
 from ..domain import artist as artist_domain
@@ -34,6 +35,16 @@ def load_bible(db: Database, universe_id: str) -> ArtistBible:
 
 
 def save_bible(db: Database, universe_id: str, bible: ArtistBible) -> dict[str, Any]:
+    # updated_at es un dato de la ESCRITURA, no del contenido: cada
+    # guardado lo estampa. Antes el volcado conservaba el que trajera el
+    # objeto —normalmente el del documento leido— y una Biblia cuyo
+    # contenido habia cambiado varias veces (reescrituras, inspiraciones,
+    # la sincronia de identidad) seguia ensenando la fecha de su creacion,
+    # como si nunca se hubiera guardado: en produccion el documento de un
+    # artista real quedo con updated_at == created_at tras un trabajo
+    # READY que lo habia aplicado. created_at no se toca: es el del
+    # documento y viaja en el propio modelo.
+    bible.updated_at = now_iso()
     return db.set(bible_path(universe_id), bible.model_dump())
 
 

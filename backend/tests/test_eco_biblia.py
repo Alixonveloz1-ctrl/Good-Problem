@@ -222,3 +222,46 @@ def test_un_cambio_parcial_legitimo_pasa_la_red(studio, universe, monkeypatch):
     assert despues.communication.speech_style == "Cercano, con humor seco"
     assert despues.identity.backstory == antes.identity.backstory
     assert despues.version == antes.version + 1
+
+
+# --- 3. Aplicada quiere decir persistida ------------------------------------
+
+
+def test_aplicar_es_persistir_contenido_version_y_fecha(
+    studio, universe, monkeypatch
+):
+    """La garantia completa, de punta a punta: tras aplicar un resultado
+    CON cambios reales, lo que se lee de vuelta es lo nuevo — contenido,
+    version = previa + 1 y updated_at posterior al guardado.
+
+    La fecha importa porque en produccion falto: el documento de la
+    Biblia de un artista real quedo con updated_at igual a su created_at
+    tras un trabajo READY que lo habia aplicado, porque save_bible
+    guardaba el volcado con la fecha que trajera el objeto leido y nadie
+    la refrescaba al escribir. created_at, en cambio, no se mueve: es el
+    nacimiento del documento."""
+    uid = universe
+    studio.jobs.wait_for_idle(20)
+    antes = _biblia_con_historia(studio, uid)
+    # El documento, tal como estaba en produccion: fechas de su creacion.
+    antes.created_at = "2026-01-01T00:00:00+00:00"
+    antes.updated_at = "2026-01-01T00:00:00+00:00"
+    save_bible(studio.db, uid, antes)
+    previa = load_bible(studio.db, uid)
+    assert previa.updated_at > "2026-01-01T00:00:00+00:00"  # el guardado estampa
+
+    datos = _eco_de(previa)
+    datos["identity"] = {
+        **datos["identity"],
+        "personality": "Personalidad reescrita y guardada.",
+    }
+    _director_devuelve(monkeypatch, datos)
+    trabajo = _trabajo_biblia(studio, uid)
+    resultado = studio.orchestrator.run_job(uid, trabajo["id"])
+
+    assert resultado["state"] == JobState.READY.value
+    despues = load_bible(studio.db, uid)
+    assert despues.identity.personality == "Personalidad reescrita y guardada."
+    assert despues.version == previa.version + 1
+    assert despues.updated_at >= previa.updated_at
+    assert despues.created_at == previa.created_at

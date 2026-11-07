@@ -188,6 +188,31 @@ def _apply_director_result(
                 elif clave in merged.get("visual", {}):
                     visual[clave] = merged["visual"][clave]
             merged["visual"] = visual
+        # El nombre del artista no lo escribe el Director: lo decidio el
+        # usuario al crear el personaje, y la identidad guardada es su
+        # sitio. En la primera reescritura real tras el arreglo del eco,
+        # el Director devolvio como nombre artistico el nombre del
+        # UNIVERSO («Verso Oscuro» en vez de «K-Ronte») y la fusion lo
+        # pinto encima del bueno. Como el estilo visual y la voz fija:
+        # lo que ya tiene nombre puesto, se queda con su nombre.
+        identidad_previa = previa.get("identity") or {}
+        for clave in ("stage_name", "fictional_name"):
+            if identidad_previa.get(clave):
+                merged["identity"][clave] = identidad_previa[clave]
+        # El genero de la identidad musical es la etiqueta corta del
+        # genero principal («Rap / hip-hop»), no la combinacion entera:
+        # en esa misma reescritura volvio dentro del campo genre el texto
+        # largo de «Suena a» — la mezcla libre del usuario, palabra por
+        # palabra. Si lo devuelto ES ese texto (o no cabe en una
+        # etiqueta), se conserva el genero guardado.
+        genero_devuelto = (merged.get("musical") or {}).get("genre") or ""
+        texto_libre = (merged.get("music_genre_free") or "").strip()
+        genero_guardado = (previa.get("musical") or {}).get("genre") or ""
+        if genero_guardado and genero_devuelto and (
+            (texto_libre and texto_libre.lower() in genero_devuelto.lower())
+            or len(genero_devuelto) > 80
+        ):
+            merged["musical"]["genre"] = genero_guardado
         if data.get("voice_profile_lines"):
             merged["voice_profile"] = {
                 **merged.get("voice_profile", {}),

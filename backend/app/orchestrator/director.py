@@ -337,13 +337,26 @@ def _secciones_reescritura(studio, universe_id: str, bible) -> list[str]:
         "sheets; keep them exactly. They stay because they are the "
         "artist's, not because the draft below repeats them."
     ]
-    nombre = (
-        protagonista.get("name")
-        or universo.get("name")
-        or bible.identity.stage_name
-    )
+    # El nombre artistico sale de la identidad guardada o de la ficha del
+    # personaje — NUNCA del nombre del universo. La cadena anterior caia
+    # al nombre del universo cuando los otros faltaban, y como la ficha
+    # del personaje nace con el nombre del formulario de creacion (el del
+    # universo), el bloque acabo presentando «Verso Oscuro» como nombre
+    # artistico y el Director lo escribio encima de «K-Ronte». El nombre
+    # del universo viaja aparte, rotulado como lo que es: el proyecto,
+    # no el artista.
+    nombre = bible.identity.stage_name or protagonista.get("name")
     if nombre:
         lineas.append(f"Stage name: {nombre}")
+        lineas.append(
+            "That is the artist's name, decided by the user. The "
+            "Director never renames the artist."
+        )
+    if universo.get("name"):
+        lineas.append(
+            f"Universe: {universo['name']} — the project this artist "
+            "belongs to. The universe's name is NOT the artist's name."
+        )
     if universo.get("tagline"):
         lineas.append(f"The universe in one line: {universo['tagline']}")
     if protagonista.get("gender"):
@@ -361,6 +374,12 @@ def _secciones_reescritura(studio, universe_id: str, bible) -> list[str]:
     if generos:
         lineas.append(
             f"Genre combination chosen on the artist's sheet: {generos}"
+        )
+        lineas.append(
+            "In the musical identity you write, the genre field holds "
+            "only the short label of the artist's main genre (e.g. "
+            "'Rap / hip-hop') — never the full combination above and "
+            "never the free-text mix."
         )
     voz = (bible.singing_voice.text or "").strip() or bible.voice_profile.as_prompt()
     if voz:
