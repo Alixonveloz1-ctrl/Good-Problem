@@ -21,11 +21,21 @@ export function CharactersScreen() {
   const { data, loading, error, reload } = useResource<Character[]>(
     `/api/universes/${universeId}/characters`,
   )
-  const borrado = useAction()
   const [abiertoId, setAbiertoId] = useState<string | null>(null)
 
   const abierto = (data ?? []).find((c) => c.id === abiertoId) ?? null
   const artista = (data ?? []).find((c) => c.role === 'lead') ?? null
+
+  // Su foto en la tarjeta es el retrato vigente, con su marca de version:
+  // regenerar guarda en la misma ruta, y sin la marca el telefono seguiria
+  // ensenando la foto anterior. Si ninguna toma tiene imagen todavia, la
+  // tarjeta es solo el nombre: ni imagen rota ni hueco.
+  const tomaConFoto =
+    artista?.master_shots.find((toma) => toma.key === 'portrait' && toma.storage_path) ??
+    artista?.master_shots.find((toma) => toma.storage_path)
+  const fotoArtista = tomaConFoto
+    ? mediaUrl(tomaConFoto.storage_path, tomaConFoto.version)
+    : null
 
   return (
     <>
@@ -35,39 +45,24 @@ export function CharactersScreen() {
         <ErrorNote error={error} />
         {artista ? (
           <div className="list">
-            <div className="card fila-borrable">
-              <button
-                type="button"
-                className="grow destapado"
-                onClick={() => setAbiertoId(artista.id)}
-              >
-                <div className="row between">
-                  <strong>{artista.name || 'Sin nombre'}</strong>
-                </div>
-                <div className="sub">{artista.appearance || 'Todavía sin descripción'}</div>
-                <div className="row between muted">
-                  <span>{artista.gender || 'sin decir quién es'}</span>
-                  <span>
-                    {artista.master_shots.filter((shot) => shot.storage_path).length}/
-                    {artista.master_shots.length} tomas
-                  </span>
-                </div>
-                {artista.master_stale && (
-                  <div className="error">
-                    Su estilo visual cambio: esta cara esta desactualizada y hay que rehacerla.
-                  </div>
-                )}
-              </button>
-              <DeleteButton
-                busy={borrado.busy}
-                onDelete={async () => {
-                  await borrado.run(() =>
-                    api.del(`/api/universes/${universeId}/characters/${artista.id}`),
-                  )
-                  await reload()
-                }}
-              />
-            </div>
+            {/* Solo su foto y su nombre. La descripcion, el sexo y el conteo
+                de tomas ya viven dentro de su ficha, y repetirlos aqui era
+                ruido en una tarjeta que solo tiene que abrirla. Borrar
+                tambien vive dentro, al final de la ficha. */}
+            <button
+              type="button"
+              className="card tappable"
+              onClick={() => setAbiertoId(artista.id)}
+            >
+              {fotoArtista && (
+                <img
+                  className="media square"
+                  src={fotoArtista}
+                  alt={artista.name || 'El artista'}
+                />
+              )}
+              <strong>{artista.name || 'Sin nombre'}</strong>
+            </button>
           </div>
         ) : (
           <Empty
@@ -341,6 +336,26 @@ function CharacterSheet({
       )}
 
       <div className="muted">Ultima toma pedida: {shotKey}</div>
+
+      {/* Borrar vive aqui, al final de la ficha: es el unico sitio donde se
+          decide sobre el artista entero. En la tarjeta de la lista ya no
+          esta. La misma confirmacion de dos toques de siempre: el primer
+          toque arma el boton («¿Seguro?») y el segundo borra. */}
+      <div className="row between">
+        <span className="muted">Borrar a este artista</span>
+        <DeleteButton
+          busy={action.busy}
+          onDelete={async () => {
+            const hecho = await action.run(() =>
+              api.del(`/api/universes/${universeId}/characters/${character.id}`),
+            )
+            if (hecho !== null) {
+              onClose()
+              await onChanged()
+            }
+          }}
+        />
+      </div>
     </Sheet>
   )
 }
