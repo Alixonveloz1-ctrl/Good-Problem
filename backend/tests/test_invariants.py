@@ -717,12 +717,18 @@ def test_cada_modelo_se_pide_donde_vive():
         assert "/locations/us-central1/" in url, url
 
 
-def test_lyria_se_pide_como_gemini_no_como_una_prediccion():
-    """Lyria no tiene endpoint propio: es :generateContent con audio.
+def test_lyria_se_pide_por_interactions_como_la_instalacion_que_funciona():
+    """Lyria se pide por la API de interacciones, no como un Gemini.
 
-    Pedirsela con :predict, que es como se pide un modelo de generacion
-    normal, devuelve el mismo 404 de arriba. Y la duracion no es un parametro:
-    si no se le dice en el propio texto que no pare, entrega 30 segundos.
+    Reescribe la prueba anterior, que afirmaba justo la forma que fallo en
+    produccion: la ruta estilo Gemini (:generateContent con
+    responseModalities AUDIO) no es la documentada para Lyria 3 en Vertex, y
+    la primera generacion real volvio HTTP 200 sin ningun candidato — la
+    cancion no existio y el error solo decia "sin respuesta". La forma que
+    si genera es la de la otra instalacion del dueno (Drama: piezas de hasta
+    184 s con el mismo modelo y el mismo proyecto): POST a
+    v1beta1/.../interactions, el modelo dentro del cuerpo y el texto como
+    una entrada. La duracion sigue sin ser un parametro: va en el texto.
     """
     from app.providers import lyria
     from app.providers.vertex import CallLog, VertexClient
@@ -732,15 +738,20 @@ def test_lyria_se_pide_como_gemini_no_como_una_prediccion():
     resultado = lyria.generate_song(cliente, prompt="cumbia triste", duration_seconds=95)
 
     llamada = registro.all()[-1]
-    assert llamada.method == "generateContent"
-    assert llamada.payload["generationConfig"]["responseModalities"] == ["AUDIO", "TEXT"]
-    # Sin maxOutputTokens: Vertex contesta "invalid argument" si se le anade.
-    assert set(llamada.payload["generationConfig"]) == {"responseModalities"}
-    texto = llamada.payload["contents"][0]["parts"][0]["text"]
+    assert llamada.method == "interactions"
+    assert llamada.url == (
+        "https://aiplatform.googleapis.com/v1beta1/projects/mi-proyecto"
+        "/locations/global/interactions"
+    )
+    # El cuerpo es exactamente el de la referencia: modelo y una entrada de texto.
+    assert set(llamada.payload) == {"model", "input"}
+    assert llamada.payload["model"] == "lyria-3-pro-preview"
+    assert llamada.payload["input"][0]["type"] == "text"
+    texto = llamada.payload["input"][0]["text"]
     assert "95 seconds" in texto and "cumbia triste" in texto
-    # Y los trozos de audio vienen pegados, sin la cabecera RIFF repetida.
-    assert resultado.data[:4] == b"RIFF"
-    assert resultado.data.count(b"RIFF") == 1
+    # Y el audio vuelve como MP3 de las salidas, no como WAV partido en trozos.
+    assert resultado.mime_type == "audio/mpeg"
+    assert resultado.data[:2] == b"\xff\xfb"
 
 
 # --- La puerta (PRD 41) -----------------------------------------------------

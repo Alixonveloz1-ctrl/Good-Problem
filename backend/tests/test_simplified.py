@@ -142,7 +142,8 @@ def test_la_voz_cantada_viaja_palabra_por_palabra_a_lyria(client, studio):
     studio.jobs.wait_for_idle(20)
     llamadas = studio.calls.for_model_prefix("lyria")
     assert llamadas, "no se llamo a Lyria"
-    enviado = llamadas[-1].payload["contents"][0]["parts"][0]["text"]
+    # La peticion viaja por la API de interacciones: el texto va en input[0].
+    enviado = llamadas[-1].payload["input"][0]["text"]
     assert texto_voz in enviado, "la voz fija no llego entera al encargo de Lyria"
 
 

@@ -9,6 +9,17 @@ id from anywhere else in the code.
 Lyria accepts text and reference images but not reference audio, so there is no
 way to pin a sung voice. The Voice Profile is text that travels with every
 request; it is the best the MVP can do and the PRD accepts that (PRD 4).
+
+The call itself goes through the interactions API (v1beta1, "global"), in the
+exact shape the owner's Drama studio uses to generate long Lyria pieces every
+day: ``{"model": ..., "input": [{"type": "text", "text": ...}]}``, with the
+audio coming back in ``outputs[]`` as MP3. It used to go through the
+Gemini-style ``:generateContent`` route with ``responseModalities: [AUDIO]``,
+which is not the documented Lyria route in Vertex: the first real generation
+(the owner's own song, 180 s) came back HTTP 200 with no candidates at all,
+and this provider reported it as "sin respuesta" because it never looked at
+why. The dry run could not catch that — it simulated the same wrong shape the
+code expected.
 """
 
 from __future__ import annotations
@@ -51,31 +62,31 @@ def generate_song(
             f"Se pidio {duration_seconds}."
         )
 
-    # Lyria NO tiene endpoint propio y NO usa :predict. Se pide igual que un
-    # modelo de imagen de Gemini -:generateContent con responseModalities- y
-    # siempre en "global". Llamarlo como se llama a un modelo de prediccion
-    # devuelve un 404 que parece decir que el modelo no existe.
-    #
+    # La puerta es la API de interacciones, no :generateContent ni :predict:
+    # el modelo va nombrado dentro del cuerpo y el texto viaja como una
+    # entrada de texto, igual que en la instalacion hermana que si genera.
     # Y la duracion no es un parametro: se pide dentro del propio texto. El
-    # unico campo valido en generationConfig es responseModalities; anadir
-    # maxOutputTokens hace que Vertex conteste "invalid argument".
-    partes = [_con_duracion(prompt, duration_seconds, lyrics, negative_prompt)]
-    payload: dict[str, Any] = {
-        "contents": [{"role": "user", "parts": [{"text": partes[0]}]}],
-        "generationConfig": {"responseModalities": ["AUDIO", "TEXT"]},
-    }
-    if seed is not None:
-        payload["generationConfig"]["seed"] = seed
+    # texto compuesto (prompt + duracion en prosa + letra + voz fija palabra
+    # por palabra, que impone el handler) no cambia en una coma.
+    #
+    # El seed no viaja: la API de interacciones no lo acepta como campo y la
+    # referencia que funciona no lo manda. Mandar campos que la API no
+    # documenta es como se gana un "invalid argument" el dia del estreno; el
+    # seed queda registrado en la procedencia de la version, no en la llamada.
+    texto = _con_duracion(prompt, duration_seconds, lyrics, negative_prompt)
+    payload: dict[str, Any] = {"model": model_id, "input": [{"type": "text", "text": texto}]}
 
-    response = client.call(model_id, "generateContent", payload)
-    audio = _juntar_audio(response)
+    response = client.call_interactions(model_id, payload)
+    audio = _extraer_audio(response)
     if audio is None:
         raise ProviderError(
-            f"Lyria no devolvio audio ({_motivo(response)}).",
+            f"Lyria no devolvio audio: {_motivo(response)}.",
             details={"response": str(response)[:800]},
         )
     datos, mime = audio
     parameters = {"duration_seconds": duration_seconds}
+    if seed is not None:
+        parameters["seed"] = seed
 
     return AudioResult(
         data=datos,
@@ -105,39 +116,88 @@ def _con_duracion(prompt: str, segundos: int, lyrics: str, negative_prompt: str)
     return "\n\n".join(partes)
 
 
-def _juntar_audio(respuesta: dict[str, Any]) -> tuple[bytes, str] | None:
-    """El audio puede volver partido en varios trozos de la MISMA respuesta.
+def _salidas_de_audio(respuesta: dict[str, Any]) -> list[dict[str, Any]]:
+    """Every audio-looking item in an interactions response, in both shapes.
 
-    Hay que pegarlos, y si son WAV cada trozo trae su cabecera RIFF de 44 bytes:
-    se conserva la del primero y se quita en los demas, o el archivo sale
-    corrupto. Falla solo en las piezas largas, que son justo las que se parten.
+    The Drama shape is a flat ``outputs[]``; the official Lyria documentation
+    also shows ``steps[] -> content[]``. Both carry the same item:
+    ``{"type": "audio", "mime_type": "audio/mpeg", "data": "<base64>"}``.
     """
-    candidatos = respuesta.get("candidates") or []
-    if not candidatos:
+    salidas: list[dict[str, Any]] = []
+    for salida in respuesta.get("outputs") or []:
+        if isinstance(salida, dict):
+            salidas.append(salida)
+    for paso in respuesta.get("steps") or []:
+        if not isinstance(paso, dict):
+            continue
+        for contenido in paso.get("content") or []:
+            if isinstance(contenido, dict):
+                salidas.append(contenido)
+    return [s for s in salidas if s.get("type") == "audio"]
+
+
+def _extraer_audio(respuesta: dict[str, Any]) -> tuple[bytes, str] | None:
+    """The song, if the interaction brought one.
+
+    An interaction that did not complete has no song even if something
+    audio-shaped came back — that is the working reference's rule too. And
+    the bytes decide the format, not the label: if the content is a WAV
+    (RIFF header) it is stored as WAV, whatever the mime claims.
+    """
+    estado = respuesta.get("status")
+    if estado is not None and estado != "completed":
         return None
-    trozos: list[bytes] = []
-    mime = ""
-    for parte in (candidatos[0].get("content") or {}).get("parts") or []:
-        datos = parte.get("inlineData") or parte.get("inline_data") or {}
-        crudo = datos.get("data")
+    for salida in _salidas_de_audio(respuesta):
+        crudo = salida.get("data")
         if not crudo:
             continue
-        tipo = datos.get("mimeType") or datos.get("mime_type") or ""
-        if tipo.startswith("image"):
+        try:
+            datos = base64.b64decode("".join(str(crudo).split()))
+        except ValueError:
             continue
-        mime = mime or tipo
-        bytes_ = base64.b64decode(crudo)
-        if trozos and len(bytes_) > 44 and bytes_[:4] == b"RIFF":
-            bytes_ = bytes_[44:]
-        trozos.append(bytes_)
-    if not trozos:
-        return None
-    return b"".join(trozos), mime or "audio/L16;codec=pcm;rate=24000"
+        if not datos:
+            continue
+        mime = salida.get("mime_type") or salida.get("mimeType") or ""
+        if datos[:4] == b"RIFF":
+            mime = "audio/wav"
+        return datos, mime or "audio/mpeg"
+    return None
 
 
 def _motivo(respuesta: dict[str, Any]) -> str:
-    """Por que no vino audio: casi siempre un filtro o un limite, y lo dice."""
-    candidatos = respuesta.get("candidates") or []
-    if not candidatos:
-        return "sin respuesta"
-    return str(candidatos[0].get("finishReason") or "sin finishReason")
+    """Por que no vino audio, dicho con lo que la respuesta trae de verdad.
+
+    Nunca un "sin respuesta" vacio: si Google bloqueo la peticion, si la
+    interaccion quedo a medias o si devolvio un error, eso viene escrito en
+    la respuesta y es lo que el dueno tiene que leer en la pantalla. La
+    primera generacion real se perdio sin saber por que porque nadie miraba
+    ``promptFeedback`` y el extracto de la respuesta se tiraba por el camino.
+    """
+    motivos: list[str] = []
+    error = respuesta.get("error")
+    if isinstance(error, dict):
+        texto = error.get("message") or error.get("status") or error.get("code")
+        if texto:
+            motivos.append(f"Google devolvio un error: {texto}")
+    elif error:
+        motivos.append(f"Google devolvio un error: {error}")
+    estado = respuesta.get("status")
+    if estado is not None and estado != "completed":
+        motivos.append(f"la interaccion quedo en estado '{estado}'")
+    feedback = respuesta.get("promptFeedback") or {}
+    if feedback.get("blockReason"):
+        motivo = f"la peticion fue bloqueada (blockReason: {feedback['blockReason']}"
+        if feedback.get("blockReasonMessage"):
+            motivo += f": {feedback['blockReasonMessage']}"
+        motivos.append(motivo + ")")
+    for candidato in respuesta.get("candidates") or []:
+        if isinstance(candidato, dict) and candidato.get("finishReason"):
+            motivos.append(f"finishReason del candidato: {candidato['finishReason']}")
+            break
+    if not motivos:
+        claves = ", ".join(sorted(respuesta.keys())) or "ninguna"
+        motivos.append(
+            "la respuesta llego sin audio y sin un motivo declarado "
+            f"(estado: {estado or 'sin estado'}; claves de la respuesta: {claves})"
+        )
+    return "; ".join(motivos)

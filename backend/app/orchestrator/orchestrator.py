@@ -47,7 +47,7 @@ from ..domain.pricing import (
     estimate_video,
 )
 from ..domain.registry import ModelSpec
-from ..errors import Conflict, InvalidGenerationRequest, NotFound
+from ..errors import Conflict, DomainError, InvalidGenerationRequest, NotFound
 from ..services.context import load_bible
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -260,7 +260,9 @@ class Orchestrator:
             outcome = handler(self.studio, universe_id, job)
         except Exception as exc:  # noqa: BLE001 - surfaced to the user as job.error
             logger.exception("handler_failed %s", job_id)
-            return self.studio.jobs.mark_failed(universe_id, job_id, str(exc))
+            return self.studio.jobs.mark_failed(
+                universe_id, job_id, _error_para_el_trabajo(exc)
+            )
 
         cost = outcome.cost
         return self.studio.jobs.mark_ready(
@@ -278,6 +280,26 @@ class Outcome:
 
     result: dict[str, Any]
     cost: CostEstimate | None = None
+
+
+def _error_para_el_trabajo(exc: Exception) -> str:
+    """The error stored on a failed job, with the provider's detail attached.
+
+    A failed job is all the owner sees when a generation goes wrong. Providers
+    put what Google actually answered in ``DomainError.details`` (a response
+    excerpt, an HTTP body), and this used to throw that away and store only
+    the headline — which is how a blocked Lyria request reached the screen as
+    an empty "sin respuesta" with the real reason nowhere in the system. The
+    detail now travels inside the stored error; errors that carry no detail
+    are stored exactly as before.
+    """
+    mensaje = str(exc)
+    if not isinstance(exc, DomainError) or not exc.details:
+        return mensaje
+    extracto = exc.details.get("response") or exc.details.get("body")
+    if extracto:
+        return f"{mensaje} Detalle de la respuesta de Google: {extracto}"
+    return f"{mensaje} Detalles: {exc.details}"
 
 
 def _bible_preference(bible, model_kind: ModelKind) -> tuple[str | None, str | None]:

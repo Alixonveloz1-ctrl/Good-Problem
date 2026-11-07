@@ -129,6 +129,20 @@ def _wav(seconds: int = 1, sample_rate: int = 8000) -> bytes:
     return header + frames
 
 
+def _mp3_stub(seconds: int = 1) -> bytes:
+    """Silent MP3 frames, for dry runs of the interactions API.
+
+    Each frame is a real MPEG-1 Layer III header (128 kbps, 44.1 kHz) followed
+    by a zeroed payload, which decoders read as silence. It is a stand-in,
+    like ``_video_stub``: a dry run never produces a real song, and pretending
+    otherwise would hide the difference in the stages that consume the file.
+    What matters here is the shape: Lyria hands back MP3, not WAV, so the
+    simulation must not hand back WAV either.
+    """
+    frame = b"\xff\xfb\x90\x00" + b"\x00" * 413  # 417 bytes per frame at 128 kbps
+    return frame * 38 * max(seconds, 1)
+
+
 def _video_stub(model: str, seconds: int) -> bytes:
     """Not a playable MP4. Dry runs never produce real footage, and pretending
     otherwise would hide the difference in the assembly stage."""
@@ -173,6 +187,25 @@ class VertexClient:
             f"/publishers/google/models/{model}:{method}"
         )
 
+    def interactions_url(self, model: str) -> str:
+        """The interactions API (v1beta1): the door Lyria 3 actually answers.
+
+        Not ``publishers/google/models/{model}:generateContent``: that
+        Gemini-style route is not the documented one for Lyria in Vertex, and
+        in production it answered HTTP 200 with no candidates at all — a song
+        that silently does not exist. The working shape, copied from the
+        owner's other studio that generates long Lyria pieces daily, is
+        ``POST /v1beta1/projects/{p}/locations/global/interactions`` with the
+        model named inside the body.
+        """
+        location = self.location_for(model)
+        host = (
+            "https://aiplatform.googleapis.com"
+            if location == "global"
+            else f"https://{location}-aiplatform.googleapis.com"
+        )
+        return f"{host}/v1beta1/projects/{self.project}/locations/{location}/interactions"
+
     def _token(self) -> str:
         import google.auth
         from google.auth.transport.requests import Request as AuthRequest
@@ -185,7 +218,29 @@ class VertexClient:
 
     # -- calls -------------------------------------------------------------
     def call(self, model: str, method: str, payload: dict[str, Any]) -> dict[str, Any]:
-        url = self.model_url(model, method)
+        return self._call_url(model, method, self.model_url(model, method), payload)
+
+    def call_interactions(self, model: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """One interactions-API call (Lyria). Same transport, same auth, same
+        call log as ``call`` — only the URL and the shape differ, and the quota
+        project header the working reference sends."""
+        return self._call_url(
+            model,
+            "interactions",
+            self.interactions_url(model),
+            payload,
+            extra_headers={"X-Goog-User-Project": self.project},
+        )
+
+    def _call_url(
+        self,
+        model: str,
+        method: str,
+        url: str,
+        payload: dict[str, Any],
+        *,
+        extra_headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         self.calls.record(VertexCall(model=model, method=method, url=url, payload=payload))
         if self.dry_run:
             return self._simulate(model, method, payload)
@@ -197,6 +252,7 @@ class VertexClient:
                 headers={
                     "Authorization": f"Bearer {self._token()}",
                     "Content-Type": "application/json",
+                    **(extra_headers or {}),
                 },
             )
         except httpx.HTTPError as exc:  # network level
@@ -225,27 +281,24 @@ class VertexClient:
 
     # -- dry run -----------------------------------------------------------
     def _simulate(self, model: str, method: str, payload: dict[str, Any]) -> dict[str, Any]:
+        if method == "interactions":
+            # La forma real de la API de interacciones: estado y salidas, con
+            # el audio como una salida MP3. Simular la forma vieja de
+            # candidates/inlineData fue lo que escondio el desajuste con la
+            # API real hasta la primera generacion de pago.
+            return {
+                "status": "completed",
+                "outputs": [
+                    {"type": "text", "text": "DRY RUN: no se llamo a ningun modelo."},
+                    {
+                        "type": "audio",
+                        "mime_type": "audio/mpeg",
+                        "data": base64.b64encode(_mp3_stub()).decode(),
+                    },
+                ],
+            }
         if method == "generateContent":
             modalidades = payload.get("generationConfig", {}).get("responseModalities") or []
-            if "AUDIO" in modalidades:
-                # Lyria contesta por aqui, no por :predict. Devuelve el audio en
-                # dos trozos a proposito: es como vienen las piezas largas de
-                # verdad, y pegarlos mal solo se nota en produccion.
-                trozo = _wav(seconds=2)
-                return {
-                    "candidates": [
-                        {
-                            "content": {
-                                "parts": [
-                                    {"inlineData": {"mimeType": "audio/wav",
-                                                    "data": base64.b64encode(trozo).decode()}}
-                                    for _ in range(2)
-                                ]
-                            },
-                            "finishReason": "STOP",
-                        }
-                    ]
-                }
             wants_image = "IMAGE" in modalidades
             if wants_image:
                 return {
