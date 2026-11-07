@@ -119,6 +119,40 @@ def _exigir_que_devolvio_algo(
         raise ProviderError(mensaje)
 
 
+_SECCIONES_BIBLIA = ("identity", "musical", "communication", "visual")
+
+
+def _seccion_comparable(seccion: str, datos: dict[str, Any]) -> dict[str, Any]:
+    copia = dict(datos or {})
+    if seccion == "identity":
+        # La edad aparente no cuenta como cambio ni como conservacion: no
+        # la escribe el Director, la sincroniza sync_bible_identity desde
+        # los rasgos de la ficha. Una «reescritura» que solo la moviera no
+        # habria reescrito nada, y una que la conserve no es un eco por eso.
+        copia.pop("apparent_age", None)
+    return copia
+
+
+def _biblia_sin_cambios(previa: dict[str, Any], merged: dict[str, Any]) -> bool:
+    """La red contra el eco, un nivel por encima de la guardia de vacio.
+
+    La guardia de «no devolvio nada» no basta: el Director puede devolver
+    las secciones llenas… con el texto de la Biblia que ya habia, porque
+    la recibia como canon y la transcribia. La fusion aplicaba entonces
+    valores identicos encima de si mismos y el trabajo terminaba LISTO
+    sin cambiar ni una palabra — paso tres veces en vivo. Si el conjunto
+    de secciones de contenido queda identico al que habia, no hubo
+    reescritura: es un fallo con su motivo, no un exito. La comparacion
+    es del conjunto, no campo a campo: un cambio parcial legitimo (que
+    conserve el origen, la voz o lo que sea) pasa sin problema.
+    """
+    return all(
+        _seccion_comparable(seccion, previa.get(seccion) or {})
+        == _seccion_comparable(seccion, merged.get(seccion) or {})
+        for seccion in _SECCIONES_BIBLIA
+    )
+
+
 def _apply_director_result(
     studio, universe_id: str, job: dict[str, Any], task: str, data: dict[str, Any]
 ) -> dict[str, Any]:
@@ -139,6 +173,7 @@ def _apply_director_result(
                 "El Director no devolvió la Biblia: vuelve a intentarlo."
             )
         bible = load_bible(studio.db, universe_id)
+        previa = bible.model_dump()
         merged = bible.model_dump()
         for section in ("identity", "musical", "communication"):
             if isinstance(data.get(section), dict):
@@ -165,6 +200,14 @@ def _apply_director_result(
                     **merged.get("singing_voice", {}),
                     "text": "\n".join(data["voice_profile_lines"]),
                 }
+        # Y la red contra el eco: secciones llenas pero identicas a las
+        # que ya habia no son una reescritura, son la transcripcion que
+        # dejo tres trabajos «LISTO» con la Biblia intacta. Fallo visible,
+        # con la Biblia —esta vez de verdad— intacta.
+        if _biblia_sin_cambios(previa, merged):
+            raise ProviderError(
+                "El Director devolvió la Biblia sin cambios: vuelve a intentarlo."
+            )
         merged["status"] = CanonStatus.DRAFT.value
         merged["version"] = int(merged.get("version", 1)) + 1
         from ..domain.schemas import ArtistBible

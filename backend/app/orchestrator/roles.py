@@ -25,14 +25,43 @@ Hard rules:
   image, video and music models in US English.
 """
 
-# The artist-defining tasks (the Bible itself, characters, video built on an
-# existing song) keep the coherence rule: the Bible is the artist, and quietly
-# drifting away from it would dissolve the character. The VISUAL forbidden
-# elements live here too: they protect image and video generation.
+# The artist-defining tasks (characters, video built on an existing song)
+# keep the coherence rule: the Bible is the artist, and quietly drifting
+# away from it would dissolve the character. The VISUAL forbidden elements
+# live here too: they protect image and video generation. The Bible's own
+# generation is the one exception — see _REESCRITURA_BIBLIA below.
 _COHERENCIA = """
 - Stay inside the Artist Bible and the Canon you are given. If something
   contradicts them, say so instead of silently changing the artist.
 - Respect the forbidden elements listed in the Artist Bible without exception.
+"""
+
+# The Bible's own generation is the exception in the other direction. The
+# Bible is the thing being rewritten, so handing the current one over as
+# untouchable canon — "stay inside it, treat it as ground truth" — made the
+# Director transcribe it back: three live jobs "rewrote" a real artist's
+# Bible without changing a single word. For this task the draft travels in
+# the prompt, labelled as a draft, and the order is the opposite one:
+# rebuild it.
+_REESCRITURA_BIBLIA = """
+This task REWRITES the Artist Bible; it does not guard it. The current
+Bible is not ground truth and not a canon: it travels in the prompt,
+labelled CURRENT VERSION TO REWRITE, and it is only a starting draft.
+- Rebuild the Bible. Its identity, its themes and its wording are rebuilt
+  from the artist's own concept and life story and from the craft of the
+  references, as set out in the prompt. Nothing in the draft has authority
+  just for being written there — its recurring themes and lyric themes
+  least of all: if they did not come from the artist's own story, they do
+  not survive the rewrite.
+- Returning the draft's own text, or nearly the same text with cosmetic
+  touches, is not a result. A rebuilt Bible that reads like a transcription
+  of the draft means the task was not done.
+- What stays is what the artist already IS, not what the draft happens to
+  say: the decided facts handed to you in the prompt (stage name, origin,
+  languages, the fixed singing voice, the chosen genre combination, the
+  fixed visual style) and the forbidden elements listed in the draft are
+  the artist's own and the user's own. Keep them exactly because they are
+  theirs, not because the draft contains them.
 """
 
 # Song tasks (concept, lyrics, lyrics analysis) run under a different split,
@@ -114,6 +143,7 @@ def system_instruction(
     bible_summary: str = "",
     canon: str = "",
     reparto_canciones: bool = False,
+    reescritura_biblia: bool = False,
 ) -> str:
     """Assemble a role's system instruction.
 
@@ -121,9 +151,22 @@ def system_instruction(
     split (the reference sets the form; the Bible gives the artist and never
     vetoes). Only the song tasks pass it — see TAREAS_DE_CANCION and
     director.run.
+
+    ``reescritura_biblia`` is the Bible generation's own split, and it is
+    stronger than a block swap: the thing being rewritten must not ride
+    here as canon at all, so ``bible_summary`` and ``canon`` are ignored
+    and the caller sends the current Bible in the prompt, labelled as the
+    draft it is. Only ``artist_bible`` passes it — see director.run.
     """
-    reglas = _REPARTO_CANCIONES if reparto_canciones else _COHERENCIA
+    if reescritura_biblia:
+        reglas = _REESCRITURA_BIBLIA
+    elif reparto_canciones:
+        reglas = _REPARTO_CANCIONES
+    else:
+        reglas = _COHERENCIA
     parts = [_ROLE_INSTRUCTIONS[role].strip(), _BASE.strip(), reglas.strip()]
+    if reescritura_biblia:
+        return "\n\n".join(parts)
     if bible_summary:
         parts.append(f"ARTIST BIBLE\n{bible_summary.strip()}")
     if canon:

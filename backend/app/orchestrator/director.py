@@ -120,6 +120,14 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
             "Fill every field. Be specific enough that two different generations "
             "of the same character would look like the same person."
         )
+        sections.append(
+            "Rebuild it from the artist's own concept and life story and from "
+            "the CRAFT of the references: the identity and the themes are the "
+            "artist's, born of their own story — the references teach how the "
+            "music is made, never what it is about. The decided facts of the "
+            "artist and the current draft travel further down, each labelled "
+            "as what it is."
+        )
         if brief:
             sections.append(f"USER BRIEF\n{brief}")
 
@@ -300,22 +308,117 @@ _OFICIO_NO_CONTENIDO = (
 )
 
 
+def _secciones_reescritura(studio, universe_id: str, bible) -> list[str]:
+    """El encargo de reescribir la Biblia, en dos bloques rotulados.
+
+    Primero lo que el artista ya ES: los datos decididos en sus propias
+    fichas (su nombre, su sexo, los rasgos que el usuario eligio, su
+    origen, su voz fija, sus generos, su estilo visual, sus elementos
+    prohibidos). Se conservan porque son suyos, no porque el borrador los
+    repita — y viajan aparte del borrador para que no se confundan con el.
+
+    Despues, la version vigente ROTULADA COMO BORRADOR. Antes viajaba en
+    la instruccion de sistema como canon («trátala como verdad de fondo»)
+    y el Director la transcribia tal cual: el resumen que aqui se incluye
+    es el mismo de siempre, con las referencias encuadradas como oficio,
+    pero su sitio y su rotulo son otros.
+    """
+    from ..db.repositories import CHARACTERS, Repository, universe_path
+    from ..domain import artist as artist_domain
+
+    universo = studio.db.get(universe_path(universe_id)) or {}
+    personajes = Repository(studio.db, universe_id, CHARACTERS).list(limit=50)
+    protagonista = next(
+        (c for c in personajes if c.get("role") == "lead"),
+        personajes[0] if personajes else {},
+    )
+    lineas = [
+        "THE ARTIST, AS DECIDED. These facts are set in the artist's own "
+        "sheets; keep them exactly. They stay because they are the "
+        "artist's, not because the draft below repeats them."
+    ]
+    nombre = (
+        protagonista.get("name")
+        or universo.get("name")
+        or bible.identity.stage_name
+    )
+    if nombre:
+        lineas.append(f"Stage name: {nombre}")
+    if universo.get("tagline"):
+        lineas.append(f"The universe in one line: {universo['tagline']}")
+    if protagonista.get("gender"):
+        lineas.append(f"Gender: {protagonista['gender']}")
+    for clave, valor in (protagonista.get("rasgos") or {}).items():
+        if valor not in (None, "", []):
+            lineas.append(f"Chosen trait ({clave}): {valor}")
+    if bible.identity.origin:
+        lineas.append(f"Origin: {bible.identity.origin}")
+    if bible.identity.languages:
+        lineas.append(f"Languages: {', '.join(bible.identity.languages)}")
+    generos = artist_domain.genres_text(
+        bible.music_genres, bible.music_genre_free
+    )
+    if generos:
+        lineas.append(
+            f"Genre combination chosen on the artist's sheet: {generos}"
+        )
+    voz = (bible.singing_voice.text or "").strip() or bible.voice_profile.as_prompt()
+    if voz:
+        lineas.append(f"Fixed singing voice (verbatim — it is the artist's voice):\n{voz}")
+    estilo = bible.visual.style_label or bible.visual.style_key
+    if estilo:
+        lineas.append(f"Visual style (fixed, chosen by the user): {estilo}")
+    if bible.visual.forbidden_elements:
+        lineas.append(
+            "Forbidden elements (the user's own limits for what gets "
+            "generated — carry them over unchanged): "
+            + ", ".join(bible.visual.forbidden_elements)
+        )
+    borrador = (
+        "CURRENT VERSION TO REWRITE. This is the Bible as it stands today: "
+        "a draft, not the truth. Rebuild it from the artist above and the "
+        "brief — rewrite the wording, rethink the themes from the artist's "
+        "own story, and keep only what still earns its place. Do not "
+        "transcribe it back.\n" + summarize_bible(bible, vista="biblia_artista")
+    )
+    return ["\n".join(lineas), borrador]
+
+
 def run(studio, universe_id: str, model_id: str, payload: dict[str, Any]):
     """Execute one Director task and return the raw TextResult."""
     task = payload.get("task", "")
     if task not in TASK_SCHEMAS:
         raise InvalidGenerationRequest(f"Tarea de Director desconocida: '{task}'.")
     bible = load_bible(studio.db, universe_id)
+    if task == "artist_bible":
+        # La reescritura es su propio reparto: la Biblia vigente NO viaja
+        # en la instruccion de sistema como canon (ahi el Director la
+        # transcribia), sino en el prompt, rotulada como borrador, junto a
+        # los datos que el artista ya ES. Sin resumen de Biblia y sin
+        # canon en la instruccion: nada que «respetar» palabra por palabra.
+        instruction = system_instruction(
+            TASK_ROLES[task],
+            reescritura_biblia=True,
+        )
+        prompt = build_prompt(task, payload)
+        prompt = "\n\n".join(
+            [prompt, *_secciones_reescritura(studio, universe_id, bible)]
+        )
+        if bible.inspirations:
+            prompt = f"{prompt}\n\n{_OFICIO_NO_CONTENIDO}"
+        return gemini_text.generate(
+            studio.vertex,
+            model_id,
+            system_instruction=instruction,
+            prompt=prompt,
+            schema=TASK_SCHEMAS[task],
+            temperature=float(payload.get("temperature", 0.9)),
+        )
     # Each task reads the Bible with the framing its job needs: the song
     # concept gets background-labelled themes and no artist inspirations,
-    # the Bible's own generation gets craft-only references, and the song
-    # tasks swap the censorship block for the reference/Bible split.
-    if task == "music_concept":
-        vista = "concepto_cancion"
-    elif task == "artist_bible":
-        vista = "biblia_artista"
-    else:
-        vista = "general"
+    # and the song tasks swap the censorship block for the reference/Bible
+    # split. Every other task gets the Bible as canon, as before.
+    vista = "concepto_cancion" if task == "music_concept" else "general"
     instruction = system_instruction(
         TASK_ROLES[task],
         bible_summary=summarize_bible(bible, vista=vista),
@@ -323,8 +426,6 @@ def run(studio, universe_id: str, model_id: str, payload: dict[str, Any]):
         reparto_canciones=task in TAREAS_DE_CANCION,
     )
     prompt = build_prompt(task, payload)
-    if task == "artist_bible" and bible.inspirations:
-        prompt = f"{prompt}\n\n{_OFICIO_NO_CONTENIDO}"
     return gemini_text.generate(
         studio.vertex,
         model_id,

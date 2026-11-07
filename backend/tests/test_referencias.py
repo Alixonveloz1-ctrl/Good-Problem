@@ -103,16 +103,34 @@ def test_el_concepto_ya_no_lleva_la_orden_de_censura(client, studio):
     assert "Never write notes about your own process" in instruccion
 
 
-def test_la_biblia_y_el_video_conservan_su_regla_de_coherencia(client, studio):
-    """El alcance es el de la censura tematica en canciones: las tareas que
-    definen al artista (su Biblia) conservan la regla de coherencia."""
+def test_la_coherencia_queda_fuera_de_la_biblia_y_dentro_de_las_demas(client, studio):
+    """El reparto tras el arreglo del eco (ver test_eco_biblia.py): la
+    Biblia ya NO lleva la orden de quedarse dentro de si misma — con esa
+    orden y la Biblia entregada como canon, el Director la transcribia y
+    «reescribir» no cambiaba ni una palabra. Las demas tareas que definen
+    al artista sin ser la Biblia misma (el video, los personajes) la
+    conservan intacta."""
+    from app.domain.enums import CreativeRole
+    from app.orchestrator.roles import system_instruction
+
     uid = _universo(client, studio, gender="mujer")["id"]
     client.post(f"/api/universes/{uid}/bible/generate", json={"brief": "Rap nocturno"})
     studio.jobs.wait_for_idle(20)
 
     instruccion = _instruccion(_llamada(studio, "Build a complete Artist Bible"))
-    assert "Stay inside the Artist Bible" in instruccion
-    assert "without exception" in instruccion
+    assert "Stay inside the Artist Bible" not in instruccion
+    assert "without exception" not in instruccion
+
+    # La misma funcion que usa director.run para las demas tareas: la
+    # regla de coherencia y el canon como verdad de fondo siguen ahi.
+    del_video = system_instruction(
+        CreativeRole.DIRECTOR,
+        bible_summary="Stage name: Nova",
+        canon="- character: Nova",
+    )
+    assert "Stay inside the Artist Bible" in del_video
+    assert "without exception" in del_video
+    assert "treat as ground truth" in del_video
 
 
 # --- 2. La referencia de la cancion: primera, con rango, sin duplicar -----
@@ -201,9 +219,13 @@ def test_la_biblia_solo_importa_el_oficio_de_las_referencias(client, studio):
     studio.jobs.wait_for_idle(20)
 
     llamada = _llamada(studio, "Build a complete Artist Bible")
-    prompt, instruccion = _prompt(llamada), _instruccion(llamada)
-    assert "REFERENCE CRAFT (craft only" in instruccion
-    assert "technique, flow, metrics" in instruccion
+    prompt = _prompt(llamada)
+    # El encuadre de oficio viaja ahora en el prompt, dentro del bloque del
+    # borrador a reescribir: con el arreglo del eco la Biblia vigente dejo
+    # de viajar en la instruccion de sistema como canon. El encuadre es el
+    # mismo; su sitio es otro.
+    assert "REFERENCE CRAFT (craft only" in prompt
+    assert "technique, flow, metrics" in prompt
     assert "THE REFERENCES TEACH CRAFT, NOT CONTENT" in prompt
     assert "come from the artist's own concept and brief" in prompt
 
