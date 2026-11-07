@@ -399,6 +399,104 @@ def test_master_aprobado_se_regenera_y_sigue_aprobado_y_en_uso(client, studio):
     assert len(despues.get("approval_history") or []) > historial_antes
 
 
+# --- Toda toma se apoya en el rostro ---------------------------------------
+#
+# Regla del dueno: la primera ficha, el Portrait, es la que fija la cara, y
+# TODAS las demas tomas tienen que tomarla como referencia visual para que
+# sea el mismo rostro en cada angulo. Solo con el texto, cada toma
+# reinterpretaba la cara. Lo garantiza el servidor en el payload del trabajo,
+# no el cliente.
+
+
+def _generar_toma(client, uid, char_id, toma, **extra):
+    respuesta = client.post(
+        f"/api/universes/{uid}/characters/{char_id}/master/{toma}", json=extra
+    )
+    assert respuesta.status_code == 200, respuesta.text
+    return respuesta.json()
+
+
+def _ruta_del_retrato(client, uid, char_id):
+    ficha = client.get(f"/api/universes/{uid}/characters/{char_id}").json()
+    retrato = next(s for s in ficha["master_shots"] if s["key"] == "portrait")
+    return retrato["storage_path"]
+
+
+def test_otra_toma_lleva_el_retrato_como_referencia(client, studio):
+    creado = _universo(client, studio, gender="hombre")
+    uid, char_id = creado["id"], creado["lead_character_id"]
+    _generar_retrato(client, studio, uid, char_id)
+    ruta_retrato = _ruta_del_retrato(client, uid, char_id)
+    assert ruta_retrato
+
+    # El cliente no manda ninguna referencia (asi llama hoy la vista) y aun
+    # asi el trabajo sale con el retrato como referencia: lo pone el servidor.
+    trabajo = _generar_toma(client, uid, char_id, "full_body")
+    assert trabajo["request"]["payload"]["reference_paths"] == [ruta_retrato]
+    studio.jobs.wait_for_idle(20)
+
+    ficha = client.get(f"/api/universes/{uid}/characters/{char_id}").json()
+    cuerpo = next(s for s in ficha["master_shots"] if s["key"] == "full_body")
+    assert cuerpo["storage_path"]
+
+
+def test_el_retrato_no_se_adjunta_a_si_mismo(client, studio):
+    creado = _universo(client, studio, gender="hombre")
+    uid, char_id = creado["id"], creado["lead_character_id"]
+    _generar_retrato(client, studio, uid, char_id)
+    ruta_retrato = _ruta_del_retrato(client, uid, char_id)
+
+    # Regenerar el retrato ya existiendo su imagen: el trabajo no lleva su
+    # propia ruta como referencia; el retrato nace del texto.
+    trabajo = _generar_toma(client, uid, char_id, "portrait")
+    assert ruta_retrato not in trabajo["request"]["payload"]["reference_paths"]
+    studio.jobs.wait_for_idle(20)
+
+
+def test_sin_retrato_previo_la_toma_sigue_sin_referencias(client, studio):
+    creado = _universo(client, studio, gender="hombre")
+    uid, char_id = creado["id"], creado["lead_character_id"]
+
+    # Sin retrato todavia no hay cara que copiar: la toma se genera como
+    # siempre, sin referencias y sin error.
+    trabajo = _generar_toma(client, uid, char_id, "full_body")
+    assert trabajo["request"]["payload"]["reference_paths"] == []
+    studio.jobs.wait_for_idle(20)
+    ficha = client.get(f"/api/universes/{uid}/characters/{char_id}").json()
+    cuerpo = next(s for s in ficha["master_shots"] if s["key"] == "full_body")
+    assert cuerpo["storage_path"]
+
+
+def test_el_retrato_va_primero_y_no_se_duplica(client, studio):
+    creado = _universo(client, studio, gender="hombre")
+    uid, char_id = creado["id"], creado["lead_character_id"]
+    _generar_retrato(client, studio, uid, char_id)
+    ruta_retrato = _ruta_del_retrato(client, uid, char_id)
+
+    # Si el cliente manda otra referencia, el retrato va incluido y primero.
+    _generar_toma(client, uid, char_id, "full_body")
+    studio.jobs.wait_for_idle(20)
+    ficha = client.get(f"/api/universes/{uid}/characters/{char_id}").json()
+    ruta_cuerpo = next(
+        s for s in ficha["master_shots"] if s["key"] == "full_body"
+    )["storage_path"]
+    trabajo = _generar_toma(
+        client, uid, char_id, "profile", reference_paths=[ruta_cuerpo]
+    )
+    assert trabajo["request"]["payload"]["reference_paths"] == [
+        ruta_retrato,
+        ruta_cuerpo,
+    ]
+    studio.jobs.wait_for_idle(20)
+
+    # Y si el cliente ya mando el retrato, no se duplica.
+    trabajo = _generar_toma(
+        client, uid, char_id, "profile", reference_paths=[ruta_retrato]
+    )
+    assert trabajo["request"]["payload"]["reference_paths"] == [ruta_retrato]
+    studio.jobs.wait_for_idle(20)
+
+
 def test_la_version_de_la_toma_sube_en_cada_regeneracion(client, studio):
     """La regeneracion sobrescribe la misma ruta canonica: lo unico que
     distingue la imagen nueva de la vieja es la version de la toma, que es

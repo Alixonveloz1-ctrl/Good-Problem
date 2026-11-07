@@ -239,10 +239,47 @@ def generate_master_shot(
                 "prompt": prompt,
                 "aspect_ratio": body.aspect_ratio,
                 "negative_prompt": body.negative_prompt,
-                "reference_paths": body.reference_paths,
+                "reference_paths": _con_retrato_de_referencia(
+                    character, shot_key, body.reference_paths
+                ),
             },
         )
     )
+
+
+def _ruta_del_retrato(character: dict[str, Any]) -> str | None:
+    """La ruta de la primera ficha, el Portrait, si ya tiene imagen."""
+    for shot in character.get("master_shots") or []:
+        if shot.get("key") == "portrait" and shot.get("storage_path"):
+            return shot["storage_path"]
+    return None
+
+
+def _con_retrato_de_referencia(
+    character: dict[str, Any], shot_key: str, pedidas: list[str]
+) -> list[str]:
+    """Toda toma del Master se apoya en el rostro: el Portrait va primero.
+
+    El Portrait es la primera ficha y la que fija la cara del artista. Si las
+    demas tomas se piden solo con el texto, cada una reinterpreta el rostro y
+    el artista sale distinto en cada angulo; con el retrato adjunto, el modelo
+    copia ESA cara. Lo pone el servidor y no el cliente, porque la regla es
+    «siempre»: un cliente que lo olvide no puede dejar una toma sin su
+    referencia. Si el cliente mando otras referencias, el retrato va incluido
+    y primero, sin duplicarse.
+
+    El retrato no se adjunta a si mismo: nace del texto (o de la foto subida,
+    que sigue su propio camino en ``upload_artist_photo``). Y si todavia no
+    hay retrato con imagen, no hay nada que adjuntar: la generacion sigue
+    como siempre, sin bloquear ni inventar un error nuevo.
+    """
+    referencias = list(pedidas or [])
+    if shot_key == "portrait":
+        return referencias
+    retrato = _ruta_del_retrato(character)
+    if retrato and retrato not in referencias:
+        return [retrato, *referencias]
+    return referencias
 
 
 def _shot_prompt(character: dict[str, Any], shot_key: str) -> str:
