@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { api, mediaUrl, newIdempotencyKey } from '../api/client'
 import { useAction, useResource } from '../hooks/useApi'
@@ -102,6 +102,11 @@ function CharacterSheet({
 }) {
   const action = useAction()
   const [choice, setChoice] = useState<ModelChoice | null>(null)
+  // Su nombre se escribe aqui: esta ficha es su casa, y la identidad y
+  // todo lo demas lo toman de aqui solos. Se guarda al salir del campo,
+  // como el resto de esta ficha, que no tiene boton de guardar.
+  const [nombre, setNombre] = useState(character.name ?? '')
+  useEffect(() => setNombre(character.name ?? ''), [character.id])
   const [jobId, setJobId] = useState<string | null>(null)
   const [shotKey, setShotKey] = useState('portrait')
   // Lo que no cabe en un boton: una cicatriz, un tatuaje, unas gafas.
@@ -168,6 +173,24 @@ function CharacterSheet({
   return (
     <Sheet title={character.name || 'El artista'} onClose={onClose}>
       <ErrorNote error={action.error} onDismiss={action.clearError} />
+
+      <div
+        onBlur={() => {
+          const limpio = nombre.trim()
+          if (limpio && limpio !== character.name) void guardar({ name: limpio })
+        }}
+      >
+        <Field
+          label="Su nombre"
+          value={nombre}
+          onChange={setNombre}
+          placeholder="El nombre de tu artista"
+        />
+      </div>
+      <p className="muted" style={{ margin: 0 }}>
+        Su nombre vive en esta ficha: la identidad y todo lo demás lo toman de
+        aquí solos, sin que tengas que tocarlo en ningún otro sitio.
+      </p>
 
       <ElegirGenero
         value={character.gender ?? ''}

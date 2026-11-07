@@ -133,10 +133,13 @@ def patch_character(
     ApprovalService(studio.db).record_user_action(
         universe_id, CHARACTERS, character_id, UserAction.EDIT
     )
-    if body.rasgos is not None:
-        # Los rasgos son la fuente: lo que duplican otras fichas (la edad
-        # aparente de la identidad) se actualiza en el acto, sin que el
-        # usuario tenga que ir a tocarlo a ningun otro sitio.
+    if body.rasgos is not None or body.name is not None:
+        # Los rasgos y el nombre son la fuente: lo que duplican otras
+        # fichas (la edad aparente y el nombre de la identidad) se
+        # actualiza en el acto, sin que el usuario tenga que ir a
+        # tocarlo a ningun otro sitio. El esquema ya admitia `name`;
+        # lo que faltaba era un campo para escribirlo en la ficha y
+        # esta sincronia al guardarlo.
         sync_bible_identity(studio.db, universe_id)
         updated = repo.require(character_id)
     return updated

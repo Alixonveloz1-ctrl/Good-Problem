@@ -14,7 +14,7 @@ from typing import Any
 
 from ..clock import now_iso
 from ..db.client import Database
-from ..db.repositories import CANON, CHARACTERS, Repository, doc_path
+from ..db.repositories import CANON, CHARACTERS, Repository, doc_path, universe_path
 from ..domain import artist as artist_domain
 from ..domain.enums import CanonStatus
 from ..domain.schemas import ArtistBible
@@ -48,28 +48,74 @@ def save_bible(db: Database, universe_id: str, bible: ArtistBible) -> dict[str, 
     return db.set(bible_path(universe_id), bible.model_dump())
 
 
+def _nombre_decidido_en_la_ficha(nombre_ficha: str, nombre_universo: str) -> str:
+    """El nombre de la ficha si ya es un nombre de artista de verdad.
+
+    La ficha del personaje nace con el nombre del formulario de creacion,
+    que es el del UNIVERSO: mientras la ficha diga eso, todavia no hay un
+    nombre decidido EN la ficha y esto devuelve "". Un nombre distinto
+    del universo solo puede haber llegado ahi porque alguien lo escribio
+    como nombre del artista (en su campo, desde que existe) o porque la
+    ficha adopto el de la primera Biblia (ver sync_bible_identity).
+    """
+    nombre = (nombre_ficha or "").strip()
+    if nombre and nombre != (nombre_universo or "").strip():
+        return nombre
+    return ""
+
+
+def nombre_en_su_ficha(db: Database, universe_id: str) -> str:
+    """El nombre del artista tal como vive en SU ficha, si ya lo tiene.
+
+    Es la fuente que manda para el nombre: su campo en la ficha del
+    personaje. Devuelve "" mientras la ficha lleve el nombre del
+    formulario de creacion (el del universo), porque eso no es un nombre
+    de artista decidido: es el artefacto de nacimiento.
+    """
+    characters = Repository(db, universe_id, CHARACTERS).list(limit=50)
+    lead = next(
+        (c for c in characters if c.get("role") == "lead"),
+        characters[0] if characters else None,
+    )
+    if lead is None:
+        return ""
+    universo = db.get(universe_path(universe_id)) or {}
+    return _nombre_decidido_en_la_ficha(
+        lead.get("name") or "", universo.get("name") or ""
+    )
+
+
 def sync_bible_identity(db: Database, universe_id: str) -> ArtistBible:
     """La identidad toma sus datos de las otras fichas, no se escribe a mano.
 
     Regla del estudio: cada dato vive en UNA ficha y las demas lo leen de
-    ahi. La edad del artista vive en los rasgos de su ficha (la elige el
-    usuario con el selector de edad exacta), asi que la edad aparente de la
-    identidad —y la de la propia ficha del artista— se recalcula desde esos
-    rasgos cada vez que se guardan y cada vez que se lee la Bible. Sin esto,
-    el usuario puso 21 en los rasgos y la identidad siguio diciendo 29 para
-    siempre, sin que nadie se enterara.
+    ahi. Se sincroniza lo que tiene una correspondencia inequivoca:
 
-    Solo se sincroniza lo que tiene una correspondencia inequivoca:
-
+    * ``identity.stage_name`` y ``identity.fictional_name`` <- el nombre
+      de la ficha del artista. El nombre vive y se edita ALLI (su campo
+      en el dialogo de su ficha); la identidad solo lo ensena. Mientras
+      la ficha lleve el nombre del formulario de creacion (el del
+      universo), no manda todavia: si la primera Biblia del Director ya
+      trae el nombre del artista, es la FICHA quien lo adopta de ella
+      (ver la rama de nacimiento de abajo).
     * ``identity.apparent_age`` <- ``rasgos["edad"]`` del artista, con el
-      formato de la Bible («21 años»).
-    * ``character.apparent_age`` <- el mismo valor, en la ficha del artista.
+      formato de la Bible («21 años»); y ``character.apparent_age`` <- el
+      mismo valor, en la ficha del artista. Sin esto, el usuario puso 21
+      en los rasgos y la identidad siguio diciendo 29 para siempre, sin
+      que nadie se enterara.
+    * ``musical.genre`` se SANEA, no se sincroniza de otra ficha: el
+      campo guarda la etiqueta corta del genero principal, y una
+      reescritura lo dejo una vez con el texto libre entero de «Suena
+      a» dentro. La guardia de la fusion conserva el guardado cuando lo
+      devuelto viene contaminado — pero si el GUARDADO ya era el
+      contaminado, conservarlo era conservar la contaminacion para
+      siempre. Aqui, al leer: si el guardado esta contaminado, manda la
+      etiqueta del primer genero elegido (domain.artist lo decide). La
+      eleccion de generos y el texto libre no se tocan: son del usuario
+      y alimentan «Suena a» desde sus propios campos.
 
     Y deliberadamente NO se sincroniza:
 
-    * ``identity.stage_name``: el nombre de la ficha puede ser el nombre
-      real del personaje ficticio y el artistico lo escribe el Director;
-      pisarlo desde la ficha podria borrar «K-Ronte» por otro nombre.
     * ``identity.origin`` / ``identity.languages``: no tienen fuente en
       ninguna otra ficha (los rasgos no traen origen ni idiomas); los
       escribe el Director y no hay nada con que sincronizarlos.
@@ -85,17 +131,62 @@ def sync_bible_identity(db: Database, universe_id: str) -> ArtistBible:
     )
     if lead is None:
         return bible
+    cambiado = False
+
+    # --- El nombre: su casa es la ficha del artista ---------------------
+    universo = db.get(universe_path(universe_id)) or {}
+    nombre_ficha = _nombre_decidido_en_la_ficha(
+        lead.get("name") or "", universo.get("name") or ""
+    )
+    if nombre_ficha:
+        # La ficha manda: la identidad ensena ese nombre, en sus dos
+        # formas, porque no hay ninguna otra ficha donde viva un nombre
+        # ficticio distinto — un valor distinto guardado en la Biblia
+        # seria un dato huerfano que nadie puede editar.
+        if bible.identity.stage_name != nombre_ficha:
+            bible.identity.stage_name = nombre_ficha
+            cambiado = True
+        if bible.identity.fictional_name != nombre_ficha:
+            bible.identity.fictional_name = nombre_ficha
+            cambiado = True
+    else:
+        # Nacimiento, una sola vez y en direccion contraria: la ficha
+        # todavia lleva el nombre del formulario (el del universo) y la
+        # primera Biblia del Director ya trae el nombre del artista. La
+        # ficha lo ADOPTA: desde ese momento tiene un nombre de verdad y
+        # manda ella (la rama de arriba). Sin esto, sincronizar el nombre
+        # desde la ficha habria pisado «K-Ronte» con «Verso Oscuro» en la
+        # primera lectura, porque al nacer la ficha solo tenia el nombre
+        # del proyecto.
+        guardado = (bible.identity.stage_name or "").strip()
+        if guardado and guardado != (lead.get("name") or "").strip():
+            Repository(db, universe_id, CHARACTERS).update(
+                lead["id"], {"name": guardado}
+            )
+            lead = {**lead, "name": guardado}
+
+    # --- La edad: vive en los rasgos de la ficha ------------------------
     edad = (lead.get("rasgos") or {}).get("edad")
-    if edad is None or str(edad).strip() == "":
-        return bible
-    texto = str(edad).strip()
-    aparente = texto if texto.endswith("años") else f"{texto} años"
-    if lead.get("apparent_age") != aparente:
-        Repository(db, universe_id, CHARACTERS).update(
-            lead["id"], {"apparent_age": aparente}
-        )
-    if bible.identity.apparent_age != aparente:
-        bible.identity.apparent_age = aparente
+    if edad is not None and str(edad).strip() != "":
+        texto = str(edad).strip()
+        aparente = texto if texto.endswith("años") else f"{texto} años"
+        if lead.get("apparent_age") != aparente:
+            Repository(db, universe_id, CHARACTERS).update(
+                lead["id"], {"apparent_age": aparente}
+            )
+        if bible.identity.apparent_age != aparente:
+            bible.identity.apparent_age = aparente
+            cambiado = True
+
+    # --- El genero: sanear el guardado contaminado ----------------------
+    limpio = artist_domain.etiqueta_genero_principal(
+        bible.music_genres, bible.musical.genre, bible.music_genre_free
+    )
+    if limpio != (bible.musical.genre or ""):
+        bible.musical.genre = limpio
+        cambiado = True
+
+    if cambiado:
         save_bible(db, universe_id, bible)
     return bible
 

@@ -19,10 +19,11 @@ verificados en la Biblia guardada de un artista real:
 
 Arreglos: la fusion restaura los nombres guardados y conserva el genero
 guardado si lo devuelto es el texto libre o no cabe en una etiqueta; el
-bloque decidido lleva el nombre de la identidad guardada o el de la
-ficha del personaje, el nombre del universo viaja rotulado como
-proyecto — nunca como nombre del artista — y el encargo dice que genre
-es solo la etiqueta corta.
+bloque decidido llevaba entonces el nombre de la identidad guardada o
+el de la ficha del personaje, el nombre del universo viaja rotulado
+como proyecto — nunca como nombre del artista — y el encargo dice que
+genre es solo la etiqueta corta. (La precedencia del nombre se invirtio
+despues, en test_nombre_del_artista: manda la ficha, que es su casa.)
 """
 
 from __future__ import annotations
@@ -202,6 +203,15 @@ def _llamada_biblia(studio):
     raise AssertionError("ninguna llamada de Biblia registrada")
 
 
+def _bloque_decidido(prompt: str) -> str:
+    """Solo el bloque «THE ARTIST, AS DECIDED» del prompt: el borrador
+    que viaja despues trae su propia linea «Stage name:» con el nombre
+    guardado, y la asercion es sobre el bloque, no sobre el borrador."""
+    inicio = prompt.index("THE ARTIST, AS DECIDED")
+    fin = prompt.index("CURRENT VERSION TO REWRITE")
+    return prompt[inicio:fin]
+
+
 def _renombrar_personaje(studio, uid, nombre):
     repo = Repository(studio.db, uid, CHARACTERS)
     personajes = repo.list(limit=50)
@@ -231,12 +241,15 @@ def test_el_bloque_decidido_nombra_al_artista_por_su_ficha(
     assert "NOT the artist's name" in prompt
 
 
-def test_el_nombre_artistico_guardado_manda_sobre_ficha_y_universo(
+def test_el_nombre_de_la_ficha_manda_sobre_el_guardado(
     client, studio, universe
 ):
-    """El caso de produccion: la identidad guardada dice «K-Ronte», la
-    ficha y el universo dicen otra cosa. El bloque decidido presenta
-    «K-Ronte» como el nombre del artista."""
+    """La precedencia invertida a proposito: el nombre vive en la ficha
+    del artista, asi que si la ficha dice «K-Test» y la Biblia guardada
+    dice «K-Ronte», el bloque decidido presenta el de la FICHA. Con la
+    precedencia anterior (el guardado primero), un nombre mal guardado
+    se congelaba como fuente y la ficha corregida nunca llegaba al
+    encargo: «Verso Oscuro» habria mandado para siempre."""
     uid = universe
     studio.jobs.wait_for_idle(20)
     _renombrar_personaje(studio, uid, "K-Test")
@@ -248,6 +261,6 @@ def test_el_nombre_artistico_guardado_manda_sobre_ficha_y_universo(
     studio.jobs.wait_for_idle(20)
 
     prompt = _llamada_biblia(studio)
-    assert "Stage name: K-Ronte" in prompt
-    assert "Stage name: K-Test" not in prompt
+    assert "Stage name: K-Test" in _bloque_decidido(prompt)
+    assert "Stage name: K-Ronte" not in _bloque_decidido(prompt)
     assert "Universe: Nova" in prompt

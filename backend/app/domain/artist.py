@@ -172,6 +172,45 @@ def genres_text(genres: list[str] | None, genre_free: str = "") -> str:
     return " + ".join(parts)
 
 
+def genero_contaminado(genre: str = "", genre_free: str = "") -> bool:
+    """Si un valor del campo ``genre`` NO es una etiqueta de genero.
+
+    El ``genre`` de la identidad musical guarda solo la etiqueta corta
+    del genero principal («Rap / hip-hop»). Esta contaminado si ES el
+    texto libre del usuario —la mezcla entera que se lee en «Suena a»,
+    pegada dentro del campo— o si sencillamente no cabe en una etiqueta.
+    Es la misma vara que la guardia de la fusion usa desde 4321e98,
+    escrita una sola vez aqui para que la fusion y la lectura midan igual.
+    """
+    texto = (genre or "").strip()
+    if not texto:
+        return False
+    libre = (genre_free or "").strip()
+    if libre and libre.lower() in texto.lower():
+        return True
+    return len(texto) > 80
+
+
+def etiqueta_genero_principal(
+    music_genres: list[str] | None, genre: str = "", genre_free: str = ""
+) -> str:
+    """El valor que el campo ``genre`` debe guardar.
+
+    Si el guardado no esta contaminado, es el suyo y se devuelve tal
+    cual. Si lo esta, manda la etiqueta del primer genero elegido en la
+    ficha: ese ES el genero principal del artista. La eleccion de
+    generos y el texto libre no se tocan: viven en sus propios campos y
+    alimentan «Suena a». Y si no hay generos elegidos no hay etiqueta
+    que poner: se deja lo que haya, porque inventar un genero seria peor
+    que conservar el texto.
+    """
+    if genero_contaminado(genre, genre_free):
+        if music_genres:
+            return genre_label(music_genres[0])
+        return genre or ""
+    return genre or ""
+
+
 # --- Singing voice -----------------------------------------------------------
 
 

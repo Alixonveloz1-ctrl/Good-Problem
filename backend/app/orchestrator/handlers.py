@@ -37,7 +37,12 @@ from ..ids import new_id
 from ..providers import gemini_image, lyria, veo
 from ..providers.storage import character_path, scene_path, song_path
 from ..services import approvals
-from ..services.context import load_bible, save_bible, sync_bible_identity
+from ..services.context import (
+    load_bible,
+    nombre_en_su_ficha,
+    save_bible,
+    sync_bible_identity,
+)
 from ..services.inspiration import inspiracion_utilizable
 from . import director
 from .orchestrator import Outcome
@@ -188,31 +193,43 @@ def _apply_director_result(
                 elif clave in merged.get("visual", {}):
                     visual[clave] = merged["visual"][clave]
             merged["visual"] = visual
-        # El nombre del artista no lo escribe el Director: lo decidio el
-        # usuario al crear el personaje, y la identidad guardada es su
-        # sitio. En la primera reescritura real tras el arreglo del eco,
-        # el Director devolvio como nombre artistico el nombre del
-        # UNIVERSO («Verso Oscuro» en vez de «K-Ronte») y la fusion lo
-        # pinto encima del bueno. Como el estilo visual y la voz fija:
-        # lo que ya tiene nombre puesto, se queda con su nombre.
+        # El nombre del artista no lo escribe el Director: vive en la
+        # ficha del personaje, en su campo, y la fusion restaura hacia
+        # el valor que manda — el de la ficha si ya tiene un nombre de
+        # verdad; si no (la ficha aun lleva el del formulario de
+        # creacion), el guardado en la identidad, que es el que hay.
+        # En la primera reescritura real tras el arreglo del eco, el
+        # Director devolvio como nombre artistico el nombre del UNIVERSO
+        # («Verso Oscuro» en vez de «K-Ronte») y la fusion lo pinto
+        # encima del bueno: como el estilo visual y la voz fija, lo que
+        # ya tiene nombre puesto se queda con su nombre.
+        nombre_ficha = nombre_en_su_ficha(studio.db, universe_id)
         identidad_previa = previa.get("identity") or {}
-        for clave in ("stage_name", "fictional_name"):
-            if identidad_previa.get(clave):
-                merged["identity"][clave] = identidad_previa[clave]
+        if nombre_ficha:
+            merged["identity"]["stage_name"] = nombre_ficha
+            merged["identity"]["fictional_name"] = nombre_ficha
+        else:
+            for clave in ("stage_name", "fictional_name"):
+                if identidad_previa.get(clave):
+                    merged["identity"][clave] = identidad_previa[clave]
         # El genero de la identidad musical es la etiqueta corta del
         # genero principal («Rap / hip-hop»), no la combinacion entera:
         # en esa misma reescritura volvio dentro del campo genre el texto
         # largo de «Suena a» — la mezcla libre del usuario, palabra por
-        # palabra. Si lo devuelto ES ese texto (o no cabe en una
-        # etiqueta), se conserva el genero guardado.
+        # palabra. Si lo devuelto esta contaminado (es ese texto, o no
+        # cabe en una etiqueta), se conserva el guardado SANEADO: si el
+        # guardado tambien era el contaminado —la primera reescritura lo
+        # dejo asi antes de que existiera esta guardia—, conservarlo tal
+        # cual conservaria la contaminacion para siempre; manda la
+        # etiqueta del primer genero elegido en la ficha.
         genero_devuelto = (merged.get("musical") or {}).get("genre") or ""
         texto_libre = (merged.get("music_genre_free") or "").strip()
-        genero_guardado = (previa.get("musical") or {}).get("genre") or ""
-        if genero_guardado and genero_devuelto and (
-            (texto_libre and texto_libre.lower() in genero_devuelto.lower())
-            or len(genero_devuelto) > 80
-        ):
-            merged["musical"]["genre"] = genero_guardado
+        if artist_domain.genero_contaminado(genero_devuelto, texto_libre):
+            merged["musical"]["genre"] = artist_domain.etiqueta_genero_principal(
+                previa.get("music_genres"),
+                (previa.get("musical") or {}).get("genre") or "",
+                texto_libre,
+            )
         if data.get("voice_profile_lines"):
             merged["voice_profile"] = {
                 **merged.get("voice_profile", {}),

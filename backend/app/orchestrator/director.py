@@ -16,7 +16,12 @@ from typing import Any
 from ..domain.enums import CreativeRole
 from ..errors import InvalidGenerationRequest
 from ..providers import gemini_text
-from ..services.context import load_bible, summarize_bible, summarize_canon
+from ..services.context import (
+    load_bible,
+    nombre_en_su_ficha,
+    summarize_bible,
+    summarize_canon,
+)
 from . import schemas_json as S
 from .roles import TAREAS_DE_CANCION, system_instruction
 
@@ -337,15 +342,24 @@ def _secciones_reescritura(studio, universe_id: str, bible) -> list[str]:
         "sheets; keep them exactly. They stay because they are the "
         "artist's, not because the draft below repeats them."
     ]
-    # El nombre artistico sale de la identidad guardada o de la ficha del
-    # personaje — NUNCA del nombre del universo. La cadena anterior caia
-    # al nombre del universo cuando los otros faltaban, y como la ficha
-    # del personaje nace con el nombre del formulario de creacion (el del
-    # universo), el bloque acabo presentando «Verso Oscuro» como nombre
-    # artistico y el Director lo escribio encima de «K-Ronte». El nombre
-    # del universo viaja aparte, rotulado como lo que es: el proyecto,
-    # no el artista.
-    nombre = bible.identity.stage_name or protagonista.get("name")
+    # El nombre artistico sale de la FICHA del personaje primero: es su
+    # casa — ahi se escribe, en su campo, y de ahi lo toma la identidad
+    # (sync_bible_identity). El guardado en la Biblia es el recurso
+    # cuando la ficha aun no tiene un nombre de verdad: recien creado el
+    # artista, la ficha lleva el nombre del formulario de creacion (el
+    # del universo) y el unico nombre de artista que existe es el que el
+    # Director escribio en la primera Biblia — que la ficha adopta en
+    # cuanto la Biblia se lee o se aplica (la adopcion vive en la
+    # sincronia). 4321e98 lo dejo al reves, guardado primero, y eso
+    # congelaba cualquier nombre mal guardado: el de «Verso Oscuro»
+    # pisando a «K-Ronte» se volvia la fuente y la ficha corregida
+    # nunca llegaba al encargo. El nombre del universo viaja aparte,
+    # rotulado como lo que es: el proyecto, no el artista.
+    nombre = (
+        nombre_en_su_ficha(studio.db, universe_id)
+        or bible.identity.stage_name
+        or protagonista.get("name")
+    )
     if nombre:
         lineas.append(f"Stage name: {nombre}")
         lineas.append(
