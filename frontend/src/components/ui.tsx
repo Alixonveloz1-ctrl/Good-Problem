@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { CanonStatus, JobState } from '../api/types'
+import type { JobState } from '../api/types'
 import { StudioError } from '../api/client'
 
 export function TopBar({ title, back, action }: { title: string; back?: boolean; action?: ReactNode }) {
@@ -38,23 +38,14 @@ export function Card({
   return <div className={`card ${className}`}>{children}</div>
 }
 
-export function StatusBadge({ status }: { status: CanonStatus | string | undefined }) {
-  const map: Record<string, { className: string; label: string }> = {
-    APPROVED: { className: 'approved', label: 'Aprobado' },
-    DRAFT: { className: 'draft', label: 'Borrador' },
-    REJECTED: { className: 'rejected', label: 'Rechazado' },
-    ARCHIVED: { className: '', label: 'Archivado' },
-  }
-  const entry = map[status ?? 'DRAFT'] ?? { className: '', label: status ?? '—' }
-  return <span className={`badge ${entry.className}`}>{entry.label}</span>
-}
-
 export function JobBadge({ state }: { state: JobState | string }) {
+  // Un trabajo terminado esta «Listo», sin mas: lo que genero ya esta en
+  // uso, no espera ninguna revision ni aprobacion de nadie.
   const map: Record<string, { className: string; label: string }> = {
     QUEUED: { className: 'busy', label: 'En cola' },
     PROCESSING: { className: 'busy', label: 'Generando' },
-    READY: { className: 'accent', label: 'Listo para revisar' },
-    APPROVED: { className: 'approved', label: 'Aprobado' },
+    READY: { className: 'accent', label: 'Listo' },
+    APPROVED: { className: 'accent', label: 'Listo' },
     REJECTED: { className: 'rejected', label: 'Rechazado' },
     FAILED: { className: 'rejected', label: 'Fallo' },
     CANCELLED: { className: '', label: 'Cancelado' },
@@ -69,7 +60,7 @@ export function ErrorNote({ error, onDismiss }: { error: StudioError | Error | n
   return (
     <div className="error" role="alert">
       <div className="row between">
-        <strong>{isApproval ? 'Falta aprobar algo' : 'No se pudo hacer'}</strong>
+        <strong>{isApproval ? 'Falta un paso previo' : 'No se pudo hacer'}</strong>
         {onDismiss && (
           <button className="btn small ghost" onClick={onDismiss}>
             Cerrar

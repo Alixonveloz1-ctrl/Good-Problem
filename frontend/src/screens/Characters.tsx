@@ -5,15 +5,16 @@ import { useAction, useResource } from '../hooks/useApi'
 import type { Character } from '../api/types'
 import { ModelPicker, type ModelChoice } from '../components/ModelPicker'
 import { JobWatcher } from '../components/JobWatcher'
-import { Empty, ErrorNote, Field, Loading, Sheet, StatusBadge, TopBar, DeleteButton } from '../components/ui'
+import { Empty, ErrorNote, Field, Loading, Sheet, TopBar, DeleteButton } from '../components/ui'
 import { ElegirGenero } from '../components/Genero'
 import { Rasgos, cuantosElegidos } from '../components/Rasgos'
 
 /**
  * La ficha del artista. Solo hay uno por universo: no hay reparto ni lista de
- * acompañantes, porque cada universo ES un artista. Aqui se decide como es,
- * se genera o se sube su cara (el Master) y se aprueba; esa cara aprobada es
- * la referencia que viaja en cada plano de cada videoclip.
+ * acompañantes, porque cada universo ES un artista. Aqui se decide como es
+ * y se genera o se sube su cara (el Master); esa cara, tal cual se genera,
+ * queda en uso y es la referencia que viaja en cada plano de cada videoclip.
+ * No hay nada que aprobar en ningun sitio de esta ficha.
  */
 export function CharactersScreen() {
   const { universeId = '' } = useParams()
@@ -42,7 +43,6 @@ export function CharactersScreen() {
               >
                 <div className="row between">
                   <strong>{artista.name || 'Sin nombre'}</strong>
-                  <StatusBadge status={artista.status} />
                 </div>
                 <div className="sub">{artista.appearance || 'Todavía sin descripción'}</div>
                 <div className="row between muted">
@@ -136,13 +136,6 @@ function CharacterSheet({
       ),
     )
     if (job) setJobId(job.id)
-  }
-
-  const approve = async () => {
-    await action.run(() =>
-      api.post(`/api/universes/${universeId}/characters/${character.id}/approve`),
-    )
-    await onChanged()
   }
 
   const subirFoto = async (archivo: File) => {
@@ -325,10 +318,6 @@ function CharacterSheet({
       )}
 
       <div className="muted">Ultima toma pedida: {shotKey}</div>
-
-      <button className="btn ok block" onClick={approve} disabled={action.busy}>
-        Aprobar Character Master
-      </button>
     </Sheet>
   )
 }

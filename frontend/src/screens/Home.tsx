@@ -13,8 +13,8 @@ import { ElegirEstilo, ElegirGeneros } from '../components/Seleccion'
  * No es un panel de control: es la primera cosa que se ve al abrir el teléfono,
  * y lo que tiene que contestar es "¿quiénes son mis artistas y qué dejé a
  * medias?". Por eso mandan las caras y los títulos, y lo demás —cuántos
- * trabajos hay en marcha, qué espera tu visto bueno— cabe en la línea de
- * estado de cada tarjeta en vez de abrir secciones nuevas.
+ * trabajos hay en marcha— cabe en la línea de estado de cada tarjeta en vez
+ * de abrir secciones nuevas.
  *
  * Aquí no hay barra de pestañas. Ocupa sitio y en esta pantalla no lleva a
  * ningún sitio que no esté ya delante; lo que hace falta —ajustes y salir—
@@ -195,7 +195,9 @@ export function HomeScreen() {
 
 /** Una tarjeta de artista: la cara, el nombre y por dónde va. */
 function TarjetaUniverso({ universo, datos }: { universo: UniverseCard; datos: HomeData }) {
-  const foto = mediaUrl(universo.cover_path)
+  // El retrato vigente del artista, con su marca de version: la ruta no
+  // cambia al regenerar, y sin la marca el telefono ensena la foto vieja.
+  const foto = mediaUrl(universo.cover_path, universo.cover_version)
   const señal = estado(universo, datos)
   return (
     <Link to={`/u/${universo.id}`} className="universo">
@@ -262,16 +264,12 @@ function MenuEsquina({ onClose }: { onClose: () => void }) {
 
 /** La línea de estado de una tarjeta.
  *
- * Es una sola línea, así que dice lo más urgente y se calla el resto: primero
- * lo que espera una decisión tuya, luego lo que se está generando, y al final
- * lo que hay a medias. Un "3 proyectos en proceso" tapando un "esperando tu
- * visto bueno" sería esconder justo lo único que no puede hacer la máquina.
+ * Es una sola línea, así que dice lo más urgente y se calla el resto: lo que
+ * se está generando, y luego lo que hay a medias. Nada espera tu visto
+ * bueno: lo que se genera queda en uso en el acto, así que no hay ninguna
+ * decisión pendiente que anunciar aquí.
  */
 function estado(universo: UniverseCard, datos: HomeData) {
-  const revisar = datos.pending_approvals.filter((p) => p.universe_id === universo.id).length
-  if (revisar > 0) {
-    return { tono: 'revisar', texto: plural(revisar, 'cosa espera', 'cosas esperan') + ' tu visto bueno' }
-  }
   const generando = datos.active_jobs.filter((j) => j.universe_id === universo.id).length
   if (generando > 0) {
     return { tono: 'generando', texto: plural(generando, 'cosa generándose', 'cosas generándose') }

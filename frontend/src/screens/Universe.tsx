@@ -2,7 +2,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, mediaUrl } from '../api/client'
 import { useAction, useResource } from '../hooks/useApi'
 import type { Character, Universe } from '../api/types'
-import { DeleteButton, ErrorNote, Loading, StatusBadge, TopBar } from '../components/ui'
+import { DeleteButton, ErrorNote, Loading, TopBar } from '../components/ui'
 
 /**
  * La pantalla del artista.
@@ -47,7 +47,7 @@ const PRODUCCION = [
 
 const TECNICO = [
   { to: 'jobs', label: 'En marcha' },
-  { to: 'canon', label: 'Aprobado' },
+  { to: 'canon', label: 'En uso' },
   { to: 'exports', label: 'Descargas' },
 ]
 
@@ -67,17 +67,26 @@ function Fila({ base, to, label, hint }: { base: string; to: string; label: stri
 
 /** El artista: su cara y su nombre. Nunca un secundario haciendo de artista. */
 function Retrato({ artista, nombre }: { artista: Character | null; nombre: string }) {
-  const foto = artista?.master_shots.find((toma) => toma.storage_path)
+  // Su cara es el RETRATO vigente, con su marca de version: regenerar
+  // guarda en la misma ruta, y sin la marca el telefono seguiria
+  // ensenando la foto anterior, que ya ni es la del artista.
+  const tomas = artista?.master_shots ?? []
+  const foto =
+    tomas.find((toma) => toma.key === 'portrait' && toma.storage_path) ??
+    tomas.find((toma) => toma.storage_path)
   return (
     <div className="card presenta">
       {foto ? (
-        <img className="presenta-foto" src={mediaUrl(foto.storage_path) ?? ''} alt={nombre} />
+        <img
+          className="presenta-foto"
+          src={mediaUrl(foto.storage_path, foto.version) ?? ''}
+          alt={nombre}
+        />
       ) : (
         <div className="presenta-hueco">{(nombre || '?').trim().charAt(0).toUpperCase()}</div>
       )}
       <div className="row between" style={{ width: '100%' }}>
         <h2 style={{ margin: 0 }}>{artista?.name || nombre}</h2>
-        {artista && <StatusBadge status={artista.status} />}
       </div>
     </div>
   )
@@ -183,8 +192,8 @@ export function UniverseScreen() {
 
             {/* Borrar el artista se hace desde dentro del artista, no desde la
                 portada: es donde se ve lo que se va por delante —sus canciones,
-                sus videoclips y todo lo aprobado— y donde no se roza sin
-                querer al buscar en la lista. */}
+                sus videoclips y todo lo que tiene en uso— y donde no se roza
+                sin querer al buscar en la lista. */}
             <div className="tecnico">
               <DeleteButton
                 label="Borrar este artista"

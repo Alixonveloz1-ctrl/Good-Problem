@@ -70,7 +70,7 @@ export function ModelPicker({
           {kind === 'video' && (
             <p className="muted" style={{ margin: 0 }}>
               Todos generan un plano de {seconds} segundos a partir de la imagen
-              aprobada, con el audio desactivado.
+              de la escena, con el audio desactivado.
             </p>
           )}
           {models.map((model) => (

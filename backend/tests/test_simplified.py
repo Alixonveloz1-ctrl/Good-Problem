@@ -80,7 +80,8 @@ def test_el_estilo_se_guarda_y_llega_al_master_y_a_los_planos(client, studio):
         f"/api/universes/{uid}/scenes/{escena['id']}/image",
         json={"model": "gemini-3-pro-image", "variant": "1K"},
     )
-    # Sin storyboard aprobado la imagen no sale; se aprueba y se reintenta.
+    # La imagen sale sin aprobar el storyboard: la escena existe y eso
+    # basta. (El reintento queda por si el trabajo fallara por otra cosa.)
     if trabajo.status_code != 200:
         client.post(f"/api/universes/{uid}/video-projects/vp_estilo/storyboard/approve")
         trabajo = client.post(
@@ -246,14 +247,18 @@ def test_la_foto_tambien_aporta_su_estilo(client, studio):
     assert biblia["visual"]["photo_style_description"], "no se leyo el estilo de la foto"
 
 
-def test_sin_mp4_renderizado_no_se_aprueba_el_proyecto(client, studio):
+def test_el_proyecto_esta_terminado_cuando_existe_su_mp4(client, studio):
+    """Terminado es un estado derivado, no un gesto: el proyecto esta
+    completo cuando su MP4 renderizado existe. Aprobarlo no existe; el
+    viejo endpoint queda como no-op que no marca nada."""
     creado = _universo(client, studio, gender="mujer")
     uid = creado["id"]
     cancion = client.post(f"/api/universes/{uid}/songs", json={"title": "Neon"}).json()
+    # La cancion tiene audio: eso es todo lo que el videoclip necesita de
+    # ella. Ningun estado de aprobacion interviene.
     studio.db.update(
         f"universes/{uid}/songs/{cancion['id']}",
-        {"status": CanonStatus.APPROVED.value,
-         "approved_master_path": "universes/x/song.wav"},
+        {"approved_master_path": "universes/x/song.wav"},
     )
     proyecto = client.post(
         f"/api/universes/{uid}/video-projects",
@@ -261,22 +266,24 @@ def test_sin_mp4_renderizado_no_se_aprueba_el_proyecto(client, studio):
     ).json()
     pid = proyecto["id"]
 
-    # Solo el plan de montaje (EDL), sin MP4: no se aprueba.
+    # Solo el plan de montaje (EDL), sin MP4: el proyecto NO esta terminado.
     studio.db.update(
         f"universes/{uid}/video_projects/{pid}", {"edl_path": "universes/x/edl.json"}
     )
+    estado = client.get(f"/api/universes/{uid}/video-projects/{pid}").json()
+    assert not estado.get("master_16x9_path")
     respuesta = client.post(f"/api/universes/{uid}/video-projects/{pid}/approve")
-    assert respuesta.status_code == 409
-    assert "MP4" in respuesta.json()["error"]["message"]
+    assert respuesta.status_code == 200, respuesta.text
+    assert respuesta.json()["status"] != CanonStatus.APPROVED.value
 
-    # Con el MP4 renderizado si.
+    # Con el MP4 renderizado, esta completo por el hecho de que el archivo
+    # existe, sin aprobar nada.
     studio.db.update(
         f"universes/{uid}/video_projects/{pid}",
         {"master_16x9_path": "universes/x/master_16x9.mp4"},
     )
-    respuesta = client.post(f"/api/universes/{uid}/video-projects/{pid}/approve")
-    assert respuesta.status_code == 200, respuesta.text
-    assert respuesta.json()["status"] == CanonStatus.APPROVED.value
+    estado = client.get(f"/api/universes/{uid}/video-projects/{pid}").json()
+    assert estado["master_16x9_path"] == "universes/x/master_16x9.mp4"
 
 
 @pytest.mark.parametrize(

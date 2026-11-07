@@ -3,9 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, mediaUrl, newIdempotencyKey } from '../api/client'
 import { useAction, useResource } from '../hooks/useApi'
 import type { Song } from '../api/types'
-import { ApprovalBar } from '../components/ApprovalBar'
 import { JobWatcher } from '../components/JobWatcher'
-import { Card, Empty, ErrorNote, Field, Loading, Sheet, StatusBadge, TopBar, DeleteButton } from '../components/ui'
+import { Card, Empty, ErrorNote, Field, Loading, Sheet, TopBar, DeleteButton } from '../components/ui'
 import { ElegirGeneros } from '../components/Seleccion'
 import { textoGeneros } from '../lib/catalogo'
 
@@ -66,7 +65,6 @@ export function SongsScreen() {
               <Link to={`/u/${universeId}/songs/${song.id}`} className="grow">
                 <div className="row between">
                   <strong>{song.title || 'Sin titulo'}</strong>
-                  <StatusBadge status={song.status} />
                 </div>
                 <div className="muted">{song.genre || 'sin genero'}</div>
                 <div className="muted">
@@ -157,16 +155,15 @@ export function SongScreen() {
 
   const base = `/api/universes/${universeId}/songs/${songId}`
   const concept = (data?.concept ?? {}) as Record<string, unknown>
-  const conceptApproved = concept.status === 'APPROVED'
-  const lyricsApproved = data?.lyrics_status === 'APPROVED'
+  // Ningun paso pide aprobar nada: cada paso necesita que el anterior
+  // EXISTA. Hay concepto, hay letra guardada, hay audio generado.
+  const hayConcepto = Object.keys(concept).length > 0
+  const hayLetra = Boolean((data?.lyrics ?? '').trim())
+  const tieneAudio = Boolean(data?.approved_master_path) || (data?.versions.length ?? 0) > 0
 
   return (
     <>
-      <TopBar
-        title={data?.title || 'Cancion'}
-        back
-        action={data && <StatusBadge status={data.status} />}
-      />
+      <TopBar title={data?.title || 'Cancion'} back />
       <main className="screen">
         {loading && !data && <Loading />}
         <ErrorNote error={error ?? action.error} onDismiss={action.clearError} />
@@ -227,7 +224,6 @@ export function SongScreen() {
             <Card>
               <div className="row between">
                 <h3>1 · Concepto musical</h3>
-                <StatusBadge status={(concept.status as string) ?? 'DRAFT'} />
               </div>
               <Field
                 label="Idea"
@@ -261,16 +257,6 @@ export function SongScreen() {
                 >
                   Pedir propuesta
                 </button>
-                <button
-                  className="btn ok"
-                  disabled={action.busy}
-                  onClick={async () => {
-                    await action.run(() => api.post(`${base}/concept/approve`))
-                    await reload()
-                  }}
-                >
-                  Aprobar concepto
-                </button>
               </div>
               {Object.entries(concept)
                 .filter(([key, value]) => key !== 'status' && value)
@@ -286,7 +272,6 @@ export function SongScreen() {
             <Card>
               <div className="row between">
                 <h3>2 · Letra</h3>
-                <StatusBadge status={data.lyrics_status} />
               </div>
               <Field label="Letra" value={lyrics} onChange={setLyrics} multiline />
               <div className="btn-grid">
@@ -317,7 +302,7 @@ export function SongScreen() {
                 </button>
                 <button
                   className="btn"
-                  disabled={action.busy || !conceptApproved}
+                  disabled={action.busy || !hayConcepto}
                   onClick={() =>
                     run(() =>
                       api.post(`${base}/lyrics/generate`, {
@@ -328,20 +313,11 @@ export function SongScreen() {
                 >
                   Que la escriba el Director
                 </button>
-                <button
-                  className="btn ok"
-                  disabled={action.busy || !lyrics.trim()}
-                  onClick={async () => {
-                    await action.run(() => api.post(`${base}/lyrics/approve`))
-                    await reload()
-                  }}
-                >
-                  Aprobar letra
-                </button>
               </div>
-              {!conceptApproved && (
+              {!hayConcepto && (
                 <div className="muted">
-                  El Director escribe la letra despues de que apruebes el concepto.
+                  El Director escribe la letra a partir de la propuesta de concepto: pidela
+                  primero, en la tarjeta de arriba.
                 </div>
               )}
             </Card>
@@ -359,7 +335,7 @@ export function SongScreen() {
               </p>
               <button
                 className="btn primary block"
-                disabled={action.busy || !lyricsApproved}
+                disabled={action.busy || !hayLetra}
                 onClick={() =>
                   run(() =>
                     api.post(`${base}/generate`, {
@@ -371,8 +347,11 @@ export function SongScreen() {
               >
                 Generar cancion · $0,08
               </button>
-              {!lyricsApproved && (
-                <div className="muted">Lyria no se llama hasta que la letra este aprobada.</div>
+              {!hayLetra && (
+                <div className="muted">
+                  Lyria canta sobre la letra guardada: escribe la tuya o pide que la escriba el
+                  Director, y guardala.
+                </div>
               )}
             </Card>
 
@@ -387,83 +366,77 @@ export function SongScreen() {
               />
             )}
 
-            {/* 4. Versions */}
+            {/* 4. El audio vigente. Solo se ensena la version actual: las
+                anteriores quedaron sustituidas al regenerar, y ensenarlas
+                seria ruido. */}
             {data.versions.length > 0 && (
               <>
-                <div className="section-title">Versiones</div>
-                <div className="list">
-                  {data.versions.map((version) => (
-                    <Card key={version.version}>
+                <div className="section-title">Su audio</div>
+                {(() => {
+                  const actual =
+                    data.versions.find((v) => v.version === data.approved_version) ??
+                    data.versions[data.versions.length - 1]
+                  return (
+                    <Card key={actual.version}>
                       <div className="row between">
-                        <strong>Version {version.version}</strong>
-                        <StatusBadge status={version.status} />
+                        <strong>Version {actual.version} · la actual</strong>
                       </div>
-                      {version.url && (
-                        <audio controls preload="none" src={version.url} style={{ width: '100%' }} />
+                      {actual.url && (
+                        <audio controls preload="none" src={actual.url} style={{ width: '100%' }} />
                       )}
-                      <div className="muted mono">{version.model}</div>
-                      <button
-                        className="btn ok block"
-                        disabled={action.busy}
-                        onClick={async () => {
-                          await action.run(() =>
-                            api.post(`${base}/versions/${version.version}/approve`),
-                          )
-                          await reload()
-                        }}
-                      >
-                        Aprobar como master
-                      </button>
+                      <div className="muted mono">{actual.model}</div>
+                      <div className="muted">
+                        Es el audio que usa su videoclip y su descarga. Si no te gusta, genera
+                        otra vez y la nueva la sustituye.
+                      </div>
                     </Card>
-                  ))}
-                </div>
+                  )
+                })()}
               </>
             )}
 
-            <ApprovalBar
-              status={data.status}
-              busy={action.busy}
-              onRegenerate={
-                lyricsApproved
-                  ? () =>
-                      run(() =>
-                        api.post(`${base}/generate`, {
-                          idempotency_key: newIdempotencyKey('song'),
-                        }),
-                      )
-                  : undefined
-              }
-              onReject={async () => {
-                await action.run(() => api.post(`${base}/reject`))
-                await reload()
-              }}
-              extra={
-                data.status === 'APPROVED' ? (
-                  <button
-                    className="btn primary block"
-                    onClick={async () => {
-                      if (data.video_project_id) {
-                        navigate(`/u/${universeId}/projects/${data.video_project_id}`)
-                        return
-                      }
-                      const project = await action.run(() =>
-                        api.post<{ id: string }>(`/api/universes/${universeId}/video-projects`, {
-                          song_id: songId,
-                          title: data.title,
-                        }),
-                      )
-                      if (project) navigate(`/u/${universeId}/projects/${project.id}`)
-                    }}
-                  >
-                    {data.video_project_id ? 'Ir al videoclip' : 'Empezar el videoclip'}
-                  </button>
-                ) : (
-                  <div className="muted">
-                    Una cancion rechazada no desencadena el videoclip.
-                  </div>
-                )
-              }
-            />
+            <div className="btn-grid">
+              {hayLetra && (
+                <button
+                  className="btn"
+                  disabled={action.busy}
+                  onClick={() =>
+                    run(() =>
+                      api.post(`${base}/generate`, {
+                        idempotency_key: newIdempotencyKey('song'),
+                      }),
+                    )
+                  }
+                >
+                  Regenerar cancion
+                </button>
+              )}
+              {tieneAudio ? (
+                <button
+                  className="btn primary"
+                  disabled={action.busy}
+                  onClick={async () => {
+                    if (data.video_project_id) {
+                      navigate(`/u/${universeId}/projects/${data.video_project_id}`)
+                      return
+                    }
+                    const project = await action.run(() =>
+                      api.post<{ id: string }>(`/api/universes/${universeId}/video-projects`, {
+                        song_id: songId,
+                        title: data.title,
+                      }),
+                    )
+                    if (project) navigate(`/u/${universeId}/projects/${project.id}`)
+                  }}
+                >
+                  {data.video_project_id ? 'Ir al videoclip' : 'Empezar el videoclip'}
+                </button>
+              ) : (
+                <div className="muted">
+                  Cuando generes la cancion, desde aqui mismo podras montar su videoclip.
+                </div>
+              )}
+            </div>
 
             {data.cover_path && (
               <img className="media square" src={mediaUrl(data.cover_path) ?? ''} alt="Portada" />

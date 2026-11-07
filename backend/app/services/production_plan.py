@@ -49,10 +49,8 @@ def build(
     reused = [s for s in scenes if s.get("reuses_scene_id")]
     to_generate = [s for s in scenes if not s.get("reuses_scene_id")]
 
-    images_needed = sum(
-        1 for s in to_generate if s.get("image_status") != CanonStatus.APPROVED.value
-    )
-    clips_needed = sum(1 for s in to_generate if s.get("clip_status") != CanonStatus.APPROVED.value)
+    images_needed = sum(1 for s in to_generate if not s.get("image_id"))
+    clips_needed = sum(1 for s in to_generate if not s.get("clip_id"))
 
     registry = studio.registry
     registry.require_active(inputs.image_model, ModelKind.IMAGE)

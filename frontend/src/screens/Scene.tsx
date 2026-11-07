@@ -5,7 +5,7 @@ import { useAction, useResource } from '../hooks/useApi'
 import type { Scene } from '../api/types'
 import { JobWatcher } from '../components/JobWatcher'
 import { ModelPicker, type ModelChoice } from '../components/ModelPicker'
-import { Card, ErrorNote, Field, Loading, StatusBadge, TopBar } from '../components/ui'
+import { Card, ErrorNote, Field, Loading, TopBar } from '../components/ui'
 
 interface SceneDetail extends Scene {
   image: { url: string; model: string; variant: string } | null
@@ -36,15 +36,11 @@ export function SceneScreen() {
     if (job) setJobId(job.id)
   }
 
-  const imageApproved = data?.image_status === 'APPROVED'
+  const tieneImagen = Boolean(data?.image)
 
   return (
     <>
-      <TopBar
-        title={data ? `Escena ${data.index + 1}` : 'Escena'}
-        back
-        action={data && <StatusBadge status={data.status} />}
-      />
+      <TopBar title={data ? `Escena ${data.index + 1}` : 'Escena'} back />
       <main className="screen">
         {loading && !data && <Loading />}
         <ErrorNote error={error ?? action.error} onDismiss={action.clearError} />
@@ -78,7 +74,7 @@ export function SceneScreen() {
               )}
               {data.reuses_scene_id && (
                 <div className="notice">
-                  El Director propuso reutilizar una toma ya aprobada. {data.reuse_note}
+                  El Director propuso reutilizar una toma ya generada. {data.reuse_note}
                   <button
                     className="btn small block"
                     style={{ marginTop: 8 }}
@@ -103,7 +99,6 @@ export function SceneScreen() {
             <Card>
               <div className="row between">
                 <h3>1 · Imagen de referencia</h3>
-                <StatusBadge status={data.image_status} />
               </div>
               {data.image ? (
                 <img className="media wide" src={data.image.url} alt={`Escena ${data.index + 1}`} />
@@ -134,26 +129,10 @@ export function SceneScreen() {
                 >
                   {data.image ? 'Regenerar' : 'Generar imagen'}
                 </button>
-                <button
-                  className="btn ok"
-                  disabled={action.busy || !data.image}
-                  onClick={async () => {
-                    await action.run(() => api.post(`${base}/image/approve`))
-                    await reload()
-                  }}
-                >
-                  Aprobar y bloquear
-                </button>
-                <button
-                  className="btn danger"
-                  disabled={action.busy || !data.image}
-                  onClick={async () => {
-                    await action.run(() => api.post(`${base}/image/reject`))
-                    await reload()
-                  }}
-                >
-                  Rechazar
-                </button>
+              </div>
+              <div className="muted">
+                La imagen que se genera queda en uso tal cual: es la que recibe Veo. Si no te
+                gusta, regenera y la nueva la sustituye.
               </div>
             </Card>
 
@@ -161,7 +140,6 @@ export function SceneScreen() {
             <Card>
               <div className="row between">
                 <h3>2 · Clip con Veo</h3>
-                <StatusBadge status={data.clip_status} />
               </div>
               {data.clip ? (
                 <video className="media wide" controls preload="none" src={data.clip.url} />
@@ -182,7 +160,7 @@ export function SceneScreen() {
               <div className="btn-grid">
                 <button
                   className="btn primary"
-                  disabled={action.busy || !imageApproved}
+                  disabled={action.busy || !tieneImagen}
                   onClick={() =>
                     run(() =>
                       api.post(`${base}/clip`, {
@@ -196,30 +174,10 @@ export function SceneScreen() {
                 >
                   {data.clip ? 'Regenerar clip' : 'Generar clip'}
                 </button>
-                <button
-                  className="btn ok"
-                  disabled={action.busy || !data.clip}
-                  onClick={async () => {
-                    await action.run(() => api.post(`${base}/clip/approve`))
-                    await reload()
-                  }}
-                >
-                  Aprobar clip
-                </button>
-                <button
-                  className="btn danger"
-                  disabled={action.busy || !data.clip}
-                  onClick={async () => {
-                    await action.run(() => api.post(`${base}/clip/reject`))
-                    await reload()
-                  }}
-                >
-                  Rechazar
-                </button>
               </div>
-              {!imageApproved && (
+              {!tieneImagen && (
                 <div className="muted">
-                  Una escena no entra a video hasta que su imagen este aprobada.
+                  Genera primero la imagen de referencia de esta escena: Veo parte de ella.
                 </div>
               )}
             </Card>

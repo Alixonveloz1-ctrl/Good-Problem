@@ -12,7 +12,6 @@ import {
   ErrorNote,
   Loading,
   Sheet,
-  StatusBadge,
   TopBar,
 } from '../components/ui'
 
@@ -33,7 +32,7 @@ export function ProjectsScreen() {
         {data && data.length === 0 && (
           <Empty
             title="Sin videoclips"
-            hint="Un videoclip arranca desde una cancion aprobada, en la pantalla de la cancion."
+            hint="Un videoclip arranca desde una cancion con su audio generado, en la pantalla de la cancion."
           />
         )}
         <div className="list">
@@ -42,7 +41,10 @@ export function ProjectsScreen() {
               <Link to={`/u/${universeId}/projects/${project.id}`} className="grow">
                 <div className="row between">
                   <strong>{project.title || 'Sin titulo'}</strong>
-                  <StatusBadge status={project.status} />
+                  {/* Terminado no se aprueba: es tener el MP4 o no tenerlo. */}
+                  <span className="muted">
+                    {project.master_16x9_path ? 'MP4 listo' : 'En curso'}
+                  </span>
                 </div>
                 <div className="muted">{project.video_type}</div>
               </Link>
@@ -82,15 +84,18 @@ export function ProjectScreen() {
 
   const scenes = data?.scenes ?? []
   const generated = scenes.filter((scene) => !scene.reuses_scene_id)
-  const storyApproved = (data?.story as { status?: string })?.status === 'APPROVED'
-  const storyboardApproved = data?.storyboard_status === 'APPROVED'
+  // El storyboard se pide cuando la historia EXISTE; nada se aprueba.
+  const hayHistoria =
+    Boolean((data?.story as { premise?: string })?.premise) || Boolean(data?.concept)
 
   return (
     <>
       <TopBar
         title={data?.title || 'Videoclip'}
         back
-        action={data && <StatusBadge status={data.status} />}
+        action={
+          data?.master_16x9_path ? <span className="badge approved">MP4 listo</span> : undefined
+        }
       />
       <main className="screen">
         {loading && !data && <Loading />}
@@ -157,16 +162,6 @@ export function ProjectScreen() {
                   <div>{data.location_notes}</div>
                 </div>
               )}
-              <button
-                className="btn ok block"
-                disabled={action.busy || storyApproved}
-                onClick={async () => {
-                  await action.run(() => api.post(`${base}/story/approve`))
-                  await reload()
-                }}
-              >
-                {storyApproved ? 'Historia aprobada' : 'Aprobar historia'}
-              </button>
             </Card>
 
             <Card>
@@ -180,7 +175,7 @@ export function ProjectScreen() {
               </p>
               <button
                 className="btn block"
-                disabled={action.busy || !storyApproved}
+                disabled={action.busy || !hayHistoria}
                 onClick={() =>
                   run(() =>
                     api.post(`${base}/storyboard`, { idempotency_key: newIdempotencyKey('sb') }),
@@ -189,21 +184,16 @@ export function ProjectScreen() {
               >
                 Pedir storyboard
               </button>
+              {!hayHistoria && (
+                <div className="muted">
+                  Pide primero la propuesta del Director, en la tarjeta de Historia.
+                </div>
+              )}
               {data.storyboard_notes && <div className="notice">{data.storyboard_notes}</div>}
               <div className="row between muted">
                 <span>{scenes.length} escenas</span>
                 <span>{scenes.length - generated.length} reutilizadas</span>
               </div>
-              <button
-                className="btn ok block"
-                disabled={action.busy || scenes.length === 0 || storyboardApproved}
-                onClick={async () => {
-                  await action.run(() => api.post(`${base}/storyboard/approve`))
-                  await reload()
-                }}
-              >
-                {storyboardApproved ? 'Storyboard aprobado' : 'Aprobar storyboard'}
-              </button>
             </Card>
 
             <button className="btn block" onClick={() => setPlanOpen(true)}>
@@ -228,9 +218,9 @@ export function ProjectScreen() {
             <Card>
               <h3>Ensamblaje</h3>
               <p className="muted" style={{ margin: 0 }}>
-                El master usa siempre el audio aprobado. La version 9:16 se deriva del master por
-                reencuadre y no cuesta nada generar. El Editor decide como se corta el videoclip
-                a partir del storyboard y de la cancion.
+                El master usa siempre el audio actual de la cancion. La version 9:16 se deriva del
+                master por reencuadre y no cuesta nada generar. El Editor decide como se corta el
+                videoclip a partir del storyboard y de la cancion.
               </p>
               <button
                 className="btn primary block"
@@ -337,11 +327,11 @@ function SceneRow({ scene, onOpen }: { scene: Scene; onOpen: () => void }) {
       </div>
       <div className="sub">{scene.action || scene.reuse_note}</div>
       <div className="row wrap">
-        <span className={`badge ${scene.image_status === 'APPROVED' ? 'approved' : 'draft'}`}>
-          Imagen {scene.image_status === 'APPROVED' ? 'ok' : 'pendiente'}
+        <span className={`badge ${scene.image_id ? 'approved' : 'draft'}`}>
+          {scene.image_id ? 'Imagen lista' : 'Sin imagen'}
         </span>
-        <span className={`badge ${scene.clip_status === 'APPROVED' ? 'approved' : 'draft'}`}>
-          Clip {scene.clip_status === 'APPROVED' ? 'ok' : 'pendiente'}
+        <span className={`badge ${scene.clip_id ? 'approved' : 'draft'}`}>
+          {scene.clip_id ? 'Clip listo' : 'Sin clip'}
         </span>
       </div>
     </Card>

@@ -112,7 +112,7 @@ def build_edl(studio, universe_id: str, project_id: str, *, captions: bool = Fal
     edl = EditDecisionList(
         project_id=project_id,
         song_id=song["id"],
-        master_audio_path=song["approved_master_path"],
+        master_audio_path=approvals.current_audio_path(song),
     )
     cursor = 0.0
     for scene in scenes:

@@ -37,7 +37,7 @@ from ..ids import new_id
 from ..providers import gemini_image, lyria, veo
 from ..providers.storage import character_path, scene_path, song_path
 from ..services import approvals
-from ..services.context import load_bible, save_bible
+from ..services.context import load_bible, save_bible, sync_bible_identity
 from . import director
 from .orchestrator import Outcome
 
@@ -138,6 +138,10 @@ def _apply_director_result(
         from ..domain.schemas import ArtistBible
 
         save_bible(studio.db, universe_id, ArtistBible.model_validate(merged))
+        # La identidad que el Director reescribe toma enseguida los datos
+        # que viven en otras fichas (la edad, de los rasgos): reescribirla
+        # no puede resucitar un dato viejo.
+        sync_bible_identity(studio.db, universe_id)
         return {"entity": "artist_bible", "id": "current"}
 
     if task in {"music_concept", "lyrics_analysis"}:
@@ -156,7 +160,8 @@ def _apply_director_result(
             "interpretation": data.get("interpretation")
             or data.get("proposed_interpretation", ""),
             "visual_concept": data.get("visual_concept", ""),
-            "status": CanonStatus.DRAFT.value,
+            # El concepto recien escrito es el que vale: nace en uso.
+            "status": CanonStatus.APPROVED.value,
         }
         repo.update(
             target_id,
@@ -188,7 +193,9 @@ def _apply_director_result(
             {
                 "lyrics": data.get("lyrics", ""),
                 "lyrics_author": author,
-                "lyrics_status": CanonStatus.DRAFT.value,
+                # La letra recien escrita es la que vale: nace en uso y
+                # Lyria puede llamarse con ella sin aprobar nada.
+                "lyrics_status": CanonStatus.APPROVED.value,
                 "title": data.get("title") or song.get("title", ""),
             },
         )
@@ -202,9 +209,9 @@ def _apply_director_result(
                 "title": data.get("title", ""),
                 "video_type": data.get("video_type", "narrative"),
                 "concept": data.get("concept", ""),
-                "story": {**(data.get("story") or {}), "status": CanonStatus.DRAFT.value},
+                "story": {**(data.get("story") or {}), "status": CanonStatus.APPROVED.value},
                 # Wardrobe and locations are text inside this proposal now,
-                # approved together with the story. There are no wardrobe or
+                # in use together with the story. There are no wardrobe or
                 # location sections any more.
                 "wardrobe_notes": data.get("wardrobe_notes", ""),
                 "location_notes": data.get("location_notes", ""),
@@ -265,9 +272,12 @@ def _apply_storyboard(
     lead_id = (project.get("character_ids") or [None])[0]
 
     scenes_repo = _repo(studio, universe_id, SCENES)
+    # Un storyboard nuevo SUSTITUYE al anterior entero, escenas viejas
+    # incluidas: lo que esta actualmente es lo que vale, y dejar las escenas
+    # de la version anterior conviviendo con las nuevas mezclaria dos
+    # montajes distintos en el mismo proyecto.
     for old in scenes_repo.list(where={"project_id": project_id}):
-        if old.get("status") != CanonStatus.APPROVED.value:
-            scenes_repo.delete(old["id"])
+        scenes_repo.delete(old["id"])
 
     created: list[dict[str, Any]] = []
     index_to_id: dict[int, str] = {}
@@ -307,14 +317,15 @@ def _apply_storyboard(
                 "reuse_note": raw.get("reuse_note", ""),
                 "image_prompt": raw.get("image_prompt", ""),
                 "video_prompt": raw.get("video_prompt", ""),
-                "status": CanonStatus.DRAFT.value,
+                # El storyboard recien hecho es el que vale: nace en uso.
+                "status": CanonStatus.APPROVED.value,
             },
         )
         created.append(scene)
 
     _repo(studio, universe_id, VIDEO_PROJECTS).update(
         project_id,
-        {"storyboard_status": CanonStatus.DRAFT.value, "storyboard_notes": data.get("notes", "")},
+        {"storyboard_status": CanonStatus.APPROVED.value, "storyboard_notes": data.get("notes", "")},
     )
     reused = sum(1 for s in created if s.get("reuses_scene_id"))
     logger.info(
@@ -407,8 +418,10 @@ def _store_image(studio, universe_id, job, purpose, payload, result, reference_p
                 "references": reference_paths,
                 "parameters": result.parameters,
                 "version": version,
-                "status": CanonStatus.DRAFT.value,
-                "locked": False,
+                # La imagen recien generada es la de la escena: nace en uso
+                # y es la que Veo recibe, sin aprobarla ni bloquearla a mano.
+                "status": CanonStatus.APPROVED.value,
+                "locked": True,
                 "job_id": job["id"],
                 "provenance": {
                     "parent_id": target_id,
@@ -423,7 +436,7 @@ def _store_image(studio, universe_id, job, purpose, payload, result, reference_p
             },
         )
         _repo(studio, universe_id, SCENES).update(
-            target_id, {"image_id": image["id"], "image_status": CanonStatus.DRAFT.value}
+            target_id, {"image_id": image["id"], "image_status": CanonStatus.APPROVED.value}
         )
         return stored, image
 
@@ -509,8 +522,8 @@ def handle_music(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
     repo = _repo(studio, universe_id, SONGS)
     song = repo.require(song_id)
 
-    # Lyria is not called until the lyrics are approved (PRD 14).
-    approvals.assert_lyrics_approved(studio.db, universe_id, song_id)
+    # Lyria se llama cuando la cancion tiene letra: esa es la condicion.
+    approvals.assert_lyrics_ready(studio.db, universe_id, song_id)
 
     bible = load_bible(studio.db, universe_id)
     voice_lines = song.get("voice_profile", {}).get("lines") or bible.voice_profile.lines
@@ -535,7 +548,12 @@ def handle_music(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
         result.mime_type,
     )
     cost = estimate_song(studio.registry, attempts=1)
+    # La version recien generada ES la cancion: queda como master vigente en
+    # el acto y las anteriores pasan a archivo. Regenerar sustituye; nadie
+    # aprueba nada para que el videoclip o la descarga la puedan usar.
     versions = list(song.get("versions") or [])
+    for anterior in versions:
+        anterior["status"] = CanonStatus.ARCHIVED.value
     versions.append(
         {
             "version": version,
@@ -545,7 +563,7 @@ def handle_music(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
             "model": result.model,
             "parameters": result.parameters,
             "cost_usd": round(cost.amount_usd, 4),
-            "status": CanonStatus.DRAFT.value,
+            "status": CanonStatus.APPROVED.value,
             "created_at": now_iso(),
         }
     )
@@ -558,7 +576,9 @@ def handle_music(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
             "requested_duration_seconds": duration,
             "voice_profile": {"lines": voice_lines},
             "cost_usd": round(float(song.get("cost_usd", 0.0)) + cost.amount_usd, 4),
-            "status": CanonStatus.DRAFT.value,
+            "status": CanonStatus.APPROVED.value,
+            "approved_version": version,
+            "approved_master_path": stored.path,
         },
     )
     return Outcome(
@@ -671,7 +691,7 @@ def handle_video(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
     scene = scenes.require(scene_id)
 
     approvals.assert_scene_not_reused(scene)
-    approvals.assert_scene_image_locked(studio.db, universe_id, scene_id)
+    approvals.assert_scene_image_ready(studio.db, universe_id, scene_id)
 
     image_doc = _repo(studio, universe_id, IMAGES).require(scene["image_id"])
     source_bytes = studio.storage.read_bytes(image_doc["storage_path"])
@@ -739,8 +759,10 @@ def handle_video(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
             "references": reference_paths,
             "parameters": operation.parameters,
             "version": version,
-            "status": CanonStatus.DRAFT.value,
-            "locked": False,
+            # El clip recien generado es el de la escena: nace en uso y es
+            # el que monta el ensamblaje, sin aprobarlo a mano.
+            "status": CanonStatus.APPROVED.value,
+            "locked": True,
             "cost_usd": round(cost.amount_usd, 4),
             "job_id": job["id"],
             "provenance": {
@@ -760,7 +782,7 @@ def handle_video(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
         scene_id,
         {
             "clip_id": clip["id"],
-            "clip_status": CanonStatus.DRAFT.value,
+            "clip_status": CanonStatus.APPROVED.value,
             "cost_usd": round(float(scene.get("cost_usd", 0.0)) + cost.amount_usd, 4),
         },
     )

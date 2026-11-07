@@ -1,4 +1,10 @@
-"""Nothing critical advances without a human (PRD 3, 36)."""
+"""Lo que un paso necesita del anterior es que EXISTA, no que este aprobado.
+
+Regla del estudio, corregida por su dueno: no hay aprobaciones. Lo generado
+nace en uso y ningun estado bloquea el paso siguiente. Las condiciones que
+quedan son de existencia —la cancion tiene audio, la cancion tiene letra, la
+escena tiene imagen— y estas pruebas las fijan.
+"""
 
 from __future__ import annotations
 
@@ -10,47 +16,80 @@ from app.domain.enums import CanonStatus
 from app.errors import ApprovalRequired, Conflict
 
 
-def _song(client, uid, *, approved: bool):
+def _song(client, uid, *, with_lyrics: bool):
     song = client.post(f"/api/universes/{uid}/songs", json={"title": "Neon"}).json()
-    if approved:
+    if with_lyrics:
         client.put(
             f"/api/universes/{uid}/songs/{song['id']}/lyrics",
             json={"lyrics": "[Verse]\nx", "author": "user"},
         )
-        client.post(f"/api/universes/{uid}/songs/{song['id']}/lyrics/approve")
     return song
 
 
-def test_a_rejected_song_does_not_trigger_a_video(client, universe):
-    song = _song(client, universe, approved=True)
-    client.post(f"/api/universes/{universe}/songs/{song['id']}/reject")
+def test_a_song_without_audio_does_not_trigger_a_video(client, universe):
+    """Sin audio generado no hay nada sobre lo que montar el videoclip."""
+    song = _song(client, universe, with_lyrics=True)
     response = client.post(
         f"/api/universes/{universe}/video-projects", json={"song_id": song["id"]}
     )
     assert response.status_code == 409
-    assert "aprobada" in response.json()["error"]["message"]
+    assert "audio" in response.json()["error"]["message"]
 
 
-def test_lyria_is_not_called_before_the_lyrics_are_approved(client, universe):
-    song = _song(client, universe, approved=False)
+def test_a_generated_song_triggers_its_video_without_approving_anything(
+    client, studio, universe
+):
+    """La cancion recien generada ya es la vigente: su videoclip arranca sin
+    aprobar la letra, sin aprobar la version y sin aprobar la cancion. Y el
+    viejo gesto de rechazar ya no bloquea nada."""
+    song = _song(client, universe, with_lyrics=True)
+    client.post(f"/api/universes/{universe}/songs/{song['id']}/generate", json={})
+    studio.jobs.wait_for_idle(30)
+    generada = client.get(f"/api/universes/{universe}/songs/{song['id']}").json()
+    assert generada["approved_master_path"], "la version generada no quedo como master"
+
+    client.post(f"/api/universes/{universe}/songs/{song['id']}/reject")
+    response = client.post(
+        f"/api/universes/{universe}/video-projects", json={"song_id": song["id"]}
+    )
+    assert response.status_code == 200, response.text
+
+
+def test_lyria_is_not_called_before_there_are_lyrics(client, universe):
+    song = _song(client, universe, with_lyrics=False)
     response = client.post(f"/api/universes/{universe}/songs/{song['id']}/generate", json={})
     assert response.status_code == 409
-    assert response.json()["error"]["code"] == "approval_required"
+    assert "letra" in response.json()["error"]["message"]
 
 
-def test_images_wait_for_an_approved_storyboard(client, studio, universe):
+def test_images_do_not_wait_for_any_storyboard_approval(client, studio, universe):
+    """La escena existe porque hay storyboard: eso basta para su imagen."""
     scene = _scene_without_storyboard(studio, universe)
     response = client.post(
         f"/api/universes/{universe}/scenes/{scene['id']}/image", json={"prompt": "x"}
     )
-    assert response.status_code == 409
+    assert response.status_code == 200, response.text
 
 
-def test_veo_waits_for_a_locked_image(client, studio, universe):
+def test_veo_waits_for_the_reference_image(client, studio, universe):
     scene = _scene_without_storyboard(studio, universe)
     response = client.post(f"/api/universes/{universe}/scenes/{scene['id']}/clip", json={})
     assert response.status_code == 409
     assert "imagen de referencia" in response.json()["error"]["message"]
+
+    # Con la imagen generada —sin aprobarla ni bloquearla a mano— el clip
+    # ya puede pedirse.
+    studio.db.set(
+        f"universes/{universe}/images/img_1",
+        {"id": "img_1", "universe_id": universe, "storage_path": "x.png",
+         "status": CanonStatus.DRAFT.value, "locked": False},
+    )
+    studio.db.update(
+        f"universes/{universe}/scenes/{scene['id']}",
+        {"image_id": "img_1", "image_status": CanonStatus.DRAFT.value},
+    )
+    response = client.post(f"/api/universes/{universe}/scenes/{scene['id']}/clip", json={})
+    assert response.status_code == 200, response.text
 
 
 def test_a_reused_take_is_not_generated_again(client, studio, universe):

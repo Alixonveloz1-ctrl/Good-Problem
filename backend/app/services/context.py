@@ -36,6 +36,58 @@ def save_bible(db: Database, universe_id: str, bible: ArtistBible) -> dict[str, 
     return db.set(bible_path(universe_id), bible.model_dump())
 
 
+def sync_bible_identity(db: Database, universe_id: str) -> ArtistBible:
+    """La identidad toma sus datos de las otras fichas, no se escribe a mano.
+
+    Regla del estudio: cada dato vive en UNA ficha y las demas lo leen de
+    ahi. La edad del artista vive en los rasgos de su ficha (la elige el
+    usuario con el selector de edad exacta), asi que la edad aparente de la
+    identidad —y la de la propia ficha del artista— se recalcula desde esos
+    rasgos cada vez que se guardan y cada vez que se lee la Bible. Sin esto,
+    el usuario puso 21 en los rasgos y la identidad siguio diciendo 29 para
+    siempre, sin que nadie se enterara.
+
+    Solo se sincroniza lo que tiene una correspondencia inequivoca:
+
+    * ``identity.apparent_age`` <- ``rasgos["edad"]`` del artista, con el
+      formato de la Bible («21 años»).
+    * ``character.apparent_age`` <- el mismo valor, en la ficha del artista.
+
+    Y deliberadamente NO se sincroniza:
+
+    * ``identity.stage_name``: el nombre de la ficha puede ser el nombre
+      real del personaje ficticio y el artistico lo escribe el Director;
+      pisarlo desde la ficha podria borrar «K-Ronte» por otro nombre.
+    * ``identity.origin`` / ``identity.languages``: no tienen fuente en
+      ninguna otra ficha (los rasgos no traen origen ni idiomas); los
+      escribe el Director y no hay nada con que sincronizarlos.
+    * ``singing_voice.apparent_age``: es la edad que SE OYE en la voz, un
+      dato artistico distinto de la edad de la persona, con su propio
+      editor en la pantalla de Identidad.
+    """
+    bible = load_bible(db, universe_id)
+    characters = Repository(db, universe_id, CHARACTERS).list(limit=50)
+    lead = next(
+        (c for c in characters if c.get("role") == "lead"),
+        characters[0] if characters else None,
+    )
+    if lead is None:
+        return bible
+    edad = (lead.get("rasgos") or {}).get("edad")
+    if edad is None or str(edad).strip() == "":
+        return bible
+    texto = str(edad).strip()
+    aparente = texto if texto.endswith("años") else f"{texto} años"
+    if lead.get("apparent_age") != aparente:
+        Repository(db, universe_id, CHARACTERS).update(
+            lead["id"], {"apparent_age": aparente}
+        )
+    if bible.identity.apparent_age != aparente:
+        bible.identity.apparent_age = aparente
+        save_bible(db, universe_id, bible)
+    return bible
+
+
 def summarize_bible(bible: ArtistBible) -> str:
     """A compact rendering that fits comfortably in a system instruction."""
     identity = bible.identity

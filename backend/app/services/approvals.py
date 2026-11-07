@@ -1,15 +1,18 @@
-"""The approval gates (PRD 3, 36, and the stage rules scattered through 14-31).
+"""The preconditions a generation call has to pass, kept in one file.
 
-"La IA propone y produce. El usuario decide." In code that means a small number
-of preconditions that generation calls have to pass, kept in one file so they
-can be read as a list:
+Regla del estudio, corregida por su dueno: NO hay aprobaciones. Lo que se
+genera nace en uso y lo que esta actualmente ES lo valido, sin gestos de
+aprobar ni estados que bloqueen. Por eso ninguna condicion de este archivo
+mira un estado de aprobacion: la condicion valida es que EXISTA la version
+actual de lo que el paso siguiente necesita.
 
-* a rejected song does not trigger a music video (PRD 14);
-* mass image generation waits for an approved storyboard (PRD 23);
-* a scene does not reach Veo until its image is approved and locked (PRD 24);
-* assembly waits for approved clips and an approved master audio (PRD 31);
-* a scene the Director marked as reused is not generated again unless the user
-  forces it (PRD 23).
+* un videoclip arranca cuando la cancion tiene audio generado;
+* Lyria se llama cuando la cancion tiene letra escrita;
+* una escena entra a Veo cuando tiene su imagen de referencia generada;
+* el montaje espera a que cada escena tenga su clip y la cancion su audio;
+* una escena que el Director marco como reutilizada no se genera otra vez
+  salvo que el usuario fuerce una toma nueva (esto no es aprobacion: es no
+  pagar dos veces por la misma toma).
 """
 
 from __future__ import annotations
@@ -43,56 +46,71 @@ def is_approved(doc: dict[str, Any] | None, field: str = "status") -> bool:
 # --- Preconditions ---------------------------------------------------------
 
 
-def assert_song_approved(db: Database, universe_id: str, song_id: str) -> dict[str, Any]:
+def current_audio_path(song: dict[str, Any] | None) -> str | None:
+    """El audio vigente de una cancion: el de su version actual.
+
+    Al generarse, la ultima version queda como la vigente (eso lo hace el
+    handler de musica en el acto); ``approved_master_path`` es el campo
+    historico donde esa ruta vive, y si un documento antiguo solo tuviera
+    versiones, manda la ultima.
+    """
+    if not song:
+        return None
+    if song.get("approved_master_path"):
+        return song["approved_master_path"]
+    for version in reversed(song.get("versions") or []):
+        if version.get("audio_path"):
+            return version["audio_path"]
+    return None
+
+
+def assert_song_ready(db: Database, universe_id: str, song_id: str) -> dict[str, Any]:
+    """La cancion puede alimentar un videoclip cuando TIENE audio.
+
+    Nada de aprobada: generada. Si todavia no hay version con audio, lo que
+    falta es generarla, no aprobarla.
+    """
     song = db.get(doc_path(universe_id, SONGS, song_id))
     if song is None:
         raise NotFound(f"La cancion {song_id} no existe.")
-    if not is_approved(song):
-        raise ApprovalRequired(
-            "El videoclip no arranca hasta que la cancion este aprobada. "
-            f"Estado actual: {_status(song)}."
+    if not current_audio_path(song):
+        raise Conflict(
+            "El videoclip no arranca todavia: la cancion aun no tiene audio "
+            "generado. Genera primero la cancion."
         )
-    if not song.get("approved_master_path"):
-        raise ApprovalRequired("La cancion esta aprobada pero no tiene master de audio.")
     return song
 
 
-def assert_lyrics_approved(db: Database, universe_id: str, song_id: str) -> dict[str, Any]:
+def assert_lyrics_ready(db: Database, universe_id: str, song_id: str) -> dict[str, Any]:
+    """Lyria se llama cuando la cancion TIENE letra, escrita o generada."""
     song = db.get(doc_path(universe_id, SONGS, song_id))
     if song is None:
         raise NotFound(f"La cancion {song_id} no existe.")
-    if song.get("lyrics_status") != CanonStatus.APPROVED.value:
-        raise ApprovalRequired(
-            "Lyria no se llama hasta que la letra este aprobada. "
-            f"Estado actual: {song.get('lyrics_status', 'DRAFT')}."
+    if not (song.get("lyrics") or "").strip():
+        raise Conflict(
+            "La cancion todavia no tiene letra. Escribela o pide que la "
+            "escriba el Director antes de generar la musica."
         )
     return song
 
 
-def assert_storyboard_approved(db: Database, universe_id: str, project_id: str) -> dict[str, Any]:
-    project = db.get(doc_path(universe_id, VIDEO_PROJECTS, project_id))
-    if project is None:
-        raise NotFound(f"El proyecto {project_id} no existe.")
-    if project.get("storyboard_status") != CanonStatus.APPROVED.value:
-        raise ApprovalRequired(
-            "El storyboard tiene que estar aprobado antes de la generacion masiva de imagenes."
-        )
-    return project
+def assert_scene_image_ready(db: Database, universe_id: str, scene_id: str) -> dict[str, Any]:
+    """Una escena entra a Veo cuando TIENE su imagen de referencia.
 
-
-def assert_scene_image_locked(db: Database, universe_id: str, scene_id: str) -> dict[str, Any]:
+    La imagen vigente es la ultima generada: no hay que aprobarla ni
+    bloquearla para que Veo la reciba.
+    """
     scene = db.get(doc_path(universe_id, SCENES, scene_id))
     if scene is None:
         raise NotFound(f"La escena {scene_id} no existe.")
-    if scene.get("image_status") != CanonStatus.APPROVED.value or not scene.get("image_id"):
-        raise ApprovalRequired(
-            "Una escena no entra a video hasta que su imagen de referencia este aprobada."
+    if not scene.get("image_id"):
+        raise Conflict(
+            "Una escena no entra a video hasta que tenga su imagen de "
+            "referencia generada."
         )
     image = db.get(doc_path(universe_id, IMAGES, scene["image_id"]))
     if image is None:
-        raise NotFound("La imagen aprobada de la escena no existe.")
-    if not image.get("locked"):
-        raise ApprovalRequired("La imagen de la escena esta aprobada pero no bloqueada.")
+        raise NotFound("La imagen de referencia de la escena no existe.")
     return scene
 
 
@@ -108,7 +126,7 @@ def assert_ready_for_assembly(db: Database, universe_id: str, project_id: str) -
     project = db.get(doc_path(universe_id, VIDEO_PROJECTS, project_id))
     if project is None:
         raise NotFound(f"El proyecto {project_id} no existe.")
-    assert_song_approved(db, universe_id, project["song_id"])
+    assert_song_ready(db, universe_id, project["song_id"])
     scenes = Repository(db, universe_id, SCENES).list(
         where={"project_id": project_id}, order_by="index", descending=False
     )
@@ -117,12 +135,12 @@ def assert_ready_for_assembly(db: Database, universe_id: str, project_id: str) -
     pending = [
         scene["index"]
         for scene in scenes
-        if not scene.get("reuses_scene_id")
-        and scene.get("clip_status") != CanonStatus.APPROVED.value
+        if not scene.get("reuses_scene_id") and not scene.get("clip_id")
     ]
     if pending:
         raise ApprovalRequired(
-            f"Faltan clips aprobados en las escenas {pending}.",
+            f"Faltan clips en las escenas {pending}: genera primero el clip "
+            "de cada escena.",
             details={"pending_scenes": pending},
         )
     return project

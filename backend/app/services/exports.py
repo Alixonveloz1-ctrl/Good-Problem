@@ -25,6 +25,7 @@ from ..domain.enums import CanonStatus
 from ..errors import Conflict
 from ..ids import new_id, slugify
 from ..providers.storage import export_path, song_path
+from .approvals import current_audio_path
 
 logger = logging.getLogger("aaus.exports")
 
@@ -34,8 +35,10 @@ MAX_ZIP_BYTES = 200 * 1024 * 1024
 def build_package(studio, universe_id: str, song_id: str) -> dict[str, Any]:
     universe = studio.orchestrator.require_universe(universe_id)
     song = Repository(studio.db, universe_id, SONGS).require(song_id)
-    if song.get("status") != CanonStatus.APPROVED.value:
-        raise Conflict("Solo se exportan canciones aprobadas.")
+    if not current_audio_path(song):
+        raise Conflict(
+            "La cancion todavia no tiene audio generado: no hay nada que exportar."
+        )
 
     artist = slugify(universe.get("name") or universe_id).upper()
     song_folder = slugify(song.get("title") or song_id).upper()
@@ -151,7 +154,7 @@ def _audio_masters(studio, universe_id: str, song: dict[str, Any]) -> dict[str, 
     from ..assembly import ffmpeg_cmds as cmds
     from ..assembly.engine import ffmpeg_available
 
-    original = song.get("approved_master_path")
+    original = current_audio_path(song)
     if not original:
         return {}
     es_wav = str(original).lower().endswith(".wav")

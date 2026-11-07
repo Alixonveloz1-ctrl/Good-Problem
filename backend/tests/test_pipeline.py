@@ -43,8 +43,9 @@ def test_full_production_from_a_phone(client, studio):
                "singing_style": "Intima"})
     _run(client, studio, "post", f"/api/universes/{uid}/bible/approve")
 
-    # 4-5. Character Master y aprobacion. El artista ya existe: nacio con el
-    # universo, y es el unico personaje posible.
+    # 4-5. Character Master. El artista ya existe: nacio con el universo, y
+    # es el unico personaje posible. La llamada a aprobar es hoy un no-op de
+    # compatibilidad: la imagen generada ya nacio aprobada y en uso.
     character = client.get(f"/api/universes/{uid}/characters").json()[0]
     assert character["id"] == universe["lead_character_id"]
     _run(client, studio, "post",
@@ -76,7 +77,8 @@ def test_full_production_from_a_phone(client, studio):
          json={"lyrics": "[Verse 1]\nLuces de neon", "author": "user"})
     _run(client, studio, "post", f"/api/universes/{uid}/songs/{sid}/lyrics/analyze", json={})
 
-    # 11. Aprobar letra.
+    # 11. La letra guardada ya es la que vale (la llamada a aprobar es un
+    # no-op de compatibilidad).
     _run(client, studio, "post", f"/api/universes/{uid}/songs/{sid}/lyrics/approve")
 
     # 12. Generar cancion con Lyria 3 Pro a la duracion pedida.
@@ -85,7 +87,8 @@ def test_full_production_from_a_phone(client, studio):
     assert music_job["model"] == "lyria-3-pro-preview"
     assert music_job["result"]["duration_seconds"] == 150
 
-    # 15. Aprobar cancion.
+    # 15. La version generada ya es el master: el handler la dejo vigente
+    # al generarla, y la vieja llamada a aprobarla no cambia nada.
     approved_song = _run(client, studio, "post",
                          f"/api/universes/{uid}/songs/{sid}/versions/1/approve")
     assert approved_song["approved_master_path"]
@@ -96,7 +99,7 @@ def test_full_production_from_a_phone(client, studio):
     pid = project["id"]
     _run(client, studio, "post", f"/api/universes/{uid}/video-projects/{pid}/concept", json={})
 
-    # 17. Aprobar historia.
+    # 17. La historia escrita ya es la que vale (aprobarla es un no-op).
     studio.db.update(
         f"universes/{uid}/video_projects/{pid}",
         {"story": {"premise": "Una noche", "status": CanonStatus.DRAFT.value}},
@@ -116,7 +119,8 @@ def test_full_production_from_a_phone(client, studio):
     generated = [s for s in scenes if not s["reuses_scene_id"]]
     assert len(generated) == 2, "una toma se reutiliza"
 
-    # 21-24. Imagenes de escena, con eleccion de modelo, y aprobacion.
+    # 21-24. Imagenes de escena, con eleccion de modelo. Nacen en uso: la
+    # llamada a aprobar cada una es un no-op de compatibilidad.
     for index, scene in enumerate(generated):
         model = "gemini-3.1-flash-image" if index == 0 else "gemini-3-pro-image"
         image_job = _run(client, studio, "post",
@@ -125,7 +129,7 @@ def test_full_production_from_a_phone(client, studio):
         assert image_job["model"] == model  # 22. cambiar el modelo en una generacion concreta
         _run(client, studio, "post", f"/api/universes/{uid}/scenes/{scene['id']}/image/approve")
 
-    # 25-29. Clips con Veo, cambio de modelo y aprobacion.
+    # 25-29. Clips con Veo y cambio de modelo. Nacen en uso, como las imagenes.
     for index, scene in enumerate(generated):
         model = "veo-3.1-fast-generate-001" if index == 0 else "veo-3.1-lite-generate-001"
         clip_job = _run(client, studio, "post",
@@ -150,11 +154,15 @@ def test_full_production_from_a_phone(client, studio):
     assert assembly["result"]["clips"] == 3
     assert assembly["result"]["reused"] == 1
 
-    # 33. Sin MP4 renderizado no hay proyecto que aprobar: en seco el montaje
-    # solo produce el plan (EDL), y un plan no es un videoclip terminado.
+    # 33. No hay proyecto que aprobar: esta terminado cuando su MP4 existe.
+    # En seco el montaje solo produce el plan (EDL), asi que el proyecto
+    # sigue sin master, y el viejo endpoint de aprobar es un no-op que no
+    # lo da por terminado ni marca nada.
     sin_render = client.post(f"/api/universes/{uid}/video-projects/{pid}/approve")
-    assert sin_render.status_code == 409
-    assert "MP4" in sin_render.json()["error"]["message"]
+    assert sin_render.status_code == 200
+    proyecto = client.get(f"/api/universes/{uid}/video-projects/{pid}").json()
+    assert not proyecto.get("master_16x9_path")
+    assert proyecto["status"] != CanonStatus.APPROVED.value
 
     # 35. El estudio no lleva cuentas: el gasto se mira en Google Cloud. Lo que
     # si queda es lo que costo cada pieza, como parte de su procedencia (PRD 46).

@@ -47,6 +47,26 @@ body,
   height: 100%;
 }
 
+/* La pagina nunca es mas ancha que la pantalla.
+ *
+ * En el iPhone la pantalla de Identidad se podia mover para los lados y
+ * dejaba un espacio vacio a la derecha: un bloque de texto sin doblar
+ * estiraba todo el documento, y el documento entero se volvia desplazable
+ * en horizontal. La causa se arregla en cada bloque (ningun texto puede
+ * desbordar su caja), y esto es la red de seguridad: pase lo que pase
+ * dentro, la raiz no crece mas que la pantalla. Se usa `clip` y no
+ * `hidden` porque `clip` no convierte la raiz en un contenedor de scroll
+ * y no rompe la cabecera fija. */
+html,
+body {
+  overflow-x: clip;
+}
+
+img,
+video {
+  max-width: 100%;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -113,6 +133,8 @@ select {
 
 .screen {
   flex: 1;
+  width: 100%;
+  min-width: 0;
   padding: 16px 16px calc(var(--safe-bottom) + 96px);
   display: flex;
   flex-direction: column;
@@ -168,6 +190,10 @@ select {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* Una tarjeta es una columna flexible: sin esto, un hijo con una linea
+     muy larga (una URL, un texto sin espacios) la empuja mas ancha que la
+     pantalla en vez de doblarse dentro. */
+  min-width: 0;
 }
 
 .card.tappable {
@@ -230,6 +256,9 @@ select {
 .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
+  /* Los identificadores de modelo y las rutas no tienen espacios: sin
+     esto no tienen por donde doblarse y desbordan su tarjeta. */
+  overflow-wrap: anywhere;
 }
 
 pre.block.wrap {
@@ -247,11 +276,36 @@ pre.block {
   background: var(--bg-sunken);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  overflow-x: auto;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
   line-height: 1.6;
-  white-space: pre;
+  /* Antes: `white-space: pre` con scroll horizontal. Una linea larga
+     obligaba a desplazar el bloque —o la pagina entera— para leerla. Los
+     textos de esta app se leen en un telefono: se doblan, siempre. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow-x: visible;
+}
+
+/* El texto fijo que viaja a Lyria, tal cual, en la pantalla de Identidad.
+ *
+ * Se pintaba con la clase `prompt` sin que existiera ninguna regla para
+ * ella: quedaba el <pre> desnudo del navegador, con lineas larguisimas que
+ * se salian por la derecha, estiraban toda la pagina y la dejaban
+ * desplazable para los lados. Ahora es un bloque como los demas, y su
+ * texto se dobla dentro de su caja. */
+.prompt {
+  margin: 0;
+  padding: 12px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 /* --- Buttons ------------------------------------------------------------ */
@@ -329,6 +383,7 @@ pre.block {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .field label {
@@ -340,6 +395,12 @@ pre.block {
 .field input,
 .field textarea,
 .field select {
+  /* Al 100% de su caja y sin ancho minimo propio: un campo con un texto
+     largo («Estilo de cantar», «O escribe tu mezcla») cortaba su contenido
+     por la derecha porque el control crecia con el texto en vez de
+     quedarse dentro de la tarjeta. */
+  width: 100%;
+  min-width: 0;
   min-height: var(--tap);
   padding: 12px 14px;
   border: 1px solid var(--line);
@@ -722,18 +783,17 @@ video {
 
 .chips {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  overflow-x: auto;
   padding-bottom: 2px;
-  scrollbar-width: none;
-}
-
-.chips::-webkit-scrollbar {
-  display: none;
+  /* Antes era una fila con scroll horizontal: con muchos estilos o
+     generos la fila empujaba el ancho y habia que andarla de lado. Las
+     opciones se doblan a la linea siguiente, como en cualquier lista de
+     botones de un telefono. */
 }
 
 .chip {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   min-height: 38px;
   padding: 0 14px;
   border-radius: 999px;
@@ -741,7 +801,8 @@ video {
   background: var(--bg-raised);
   font-size: 14px;
   font-weight: 500;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
 }
 
 .chip.active {

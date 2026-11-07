@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAction, useResource } from '../hooks/useApi'
 import type { ExportPackage, Registry, Song } from '../api/types'
-import { Card, Empty, ErrorNote, Loading, StatusBadge, TopBar } from '../components/ui'
+import { Card, Empty, ErrorNote, Loading, TopBar } from '../components/ui'
 
 export function CanonScreen() {
   const { universeId = '' } = useParams()
@@ -12,21 +12,21 @@ export function CanonScreen() {
   >(`/api/universes/${universeId}/canon`)
   return (
     <>
-      <TopBar title="Aprobado" back />
+      <TopBar title="En uso" back />
       <main className="screen">
         {loading && !data && <Loading />}
         <ErrorNote error={error} />
         <p className="muted" style={{ margin: 0 }}>
-          Lo que apruebas queda fijado, y a partir de ahí viaja como referencia en todo lo que se
-          genere después. Es lo que hace que el artista sea siempre el mismo.
+          Esto es lo que esta en uso ahora, y viaja como referencia en todo lo que se genere
+          despues. Es lo que hace que el artista sea siempre el mismo. Nada entro aqui a mano:
+          cada cosa entro sola, en el momento en que se genero.
         </p>
-        {data && data.length === 0 && <Empty title="Todavía no has aprobado nada" />}
+        {data && data.length === 0 && <Empty title="Todavia no hay material en uso" />}
         <div className="list">
           {(data ?? []).map((entry) => (
             <Card key={entry.id}>
               <div className="row between">
                 <strong>{entry.label || entry.entity_type}</strong>
-                <StatusBadge status={entry.status} />
               </div>
               <div className="muted">{entry.entity_type}</div>
               {entry.note && <div className="sub">{entry.note}</div>}
@@ -44,7 +44,11 @@ export function ExportsScreen() {
   const songs = useResource<Song[]>(`/api/universes/${universeId}/songs`)
   const action = useAction()
 
-  const approvedSongs = (songs.data ?? []).filter((song) => song.status === 'APPROVED')
+  // Se exporta lo que tiene audio generado: esa es la condicion, no un
+  // estado de aprobacion.
+  const cancionesConAudio = (songs.data ?? []).filter(
+    (song) => song.approved_master_path || song.versions.length > 0,
+  )
 
   return (
     <>
@@ -56,12 +60,15 @@ export function ExportsScreen() {
           Todo se descarga desde el iPhone, listo para subir a mano.
         </p>
 
-        {approvedSongs.length === 0 && (
-          <Empty title="Nada que exportar" hint="Solo se exportan canciones aprobadas." />
+        {cancionesConAudio.length === 0 && (
+          <Empty
+            title="Nada que exportar"
+            hint="Se exportan las canciones que ya tienen audio generado."
+          />
         )}
 
         <div className="list">
-          {approvedSongs.map((song) => (
+          {cancionesConAudio.map((song) => (
             <Card key={song.id}>
               <strong>{song.title}</strong>
               <button

@@ -1,10 +1,15 @@
 """Video pre-production, images, clips and assembly (PRD 21-31).
 
-The order is fixed and every step is gated:
+The order is fixed, and each step only needs the previous one to EXIST —
+there are no approvals anywhere:
 
-    song approved -> video concept (with its wardrobe and locations written
-    inside it) -> story approved -> storyboard approved -> scene images
-    approved and locked -> Veo clips approved -> assembly -> 16:9 and 9:16.
+    song with generated audio -> video concept (with its wardrobe and
+    locations written inside it) -> story -> storyboard -> scene images ->
+    Veo clips -> assembly -> 16:9 and 9:16.
+
+Whatever was generated last is what is in use. A project is complete when
+its rendered MP4 exists: that is a fact about the file, not a user gesture.
+The old approve endpoints stay as harmless no-ops for compatibility.
 
 The only character is the artist: the project takes them automatically when
 it is created. There is no casting step.
@@ -104,8 +109,8 @@ class AssembleIn(BaseModel):
 def create_project(
     owner: OwnerDep, studio: StudioDep, universe_id: str, body: ProjectIn
 ) -> dict[str, Any]:
-    """Requires an approved song: a rejected song does not trigger a video."""
-    song = rules.assert_song_approved(studio.db, universe_id, body.song_id)
+    """Requires a song with generated audio: the video is cut over it."""
+    song = rules.assert_song_ready(studio.db, universe_id, body.song_id)
     # El unico personaje posible es el artista: entra solo, sin paso de
     # reparto. Sin el, el storyboard no tendria a quien retratar.
     artista = next(
@@ -173,13 +178,12 @@ def get_project(
 
 def _stage_summary(studio, universe_id: str, project: dict, scenes: list[dict]) -> list[dict]:
     """What the production rail shows: status, model in use and accumulated cost
-    per stage (PRD 38)."""
+    per stage (PRD 38). A stage is done when its material EXISTS — nothing
+    here waits for an approval that no longer exists."""
     song = Repository(studio.db, universe_id, SONGS).get(project["song_id"]) or {}
     generated = [s for s in scenes if not s.get("reuses_scene_id")]
-    images_done = sum(
-        1 for s in generated if s.get("image_status") == CanonStatus.APPROVED.value
-    )
-    clips_done = sum(1 for s in generated if s.get("clip_status") == CanonStatus.APPROVED.value)
+    images_done = sum(1 for s in generated if s.get("image_id"))
+    clips_done = sum(1 for s in generated if s.get("clip_id"))
     def status_of(done: bool, started: bool) -> str:
         if done:
             return StageStatus.APPROVED.value
@@ -189,18 +193,17 @@ def _stage_summary(studio, universe_id: str, project: dict, scenes: list[dict]) 
         {"key": StageKey.CONCEPT.value, "label": "Concepto",
          "status": status_of(bool(project.get("concept")), True), "detail": ""},
         {"key": StageKey.MUSIC.value, "label": "Musica",
-         "status": status_of(song.get("status") == CanonStatus.APPROVED.value, True),
+         "status": status_of(bool(rules.current_audio_path(song)), True),
          "detail": song.get("title", "")},
         {"key": StageKey.STORY.value, "label": "Historia",
          "status": status_of(
-             (project.get("story") or {}).get("status") == CanonStatus.APPROVED.value,
-             bool((project.get("story") or {}).get("premise"))),
+             bool((project.get("story") or {}).get("premise")),
+             bool((project.get("story") or {}).get("premise") or project.get("concept"))),
          "detail": ""},
         {"key": StageKey.CHARACTERS.value, "label": "Artista",
          "status": status_of(bool(project.get("character_ids")), True), "detail": ""},
         {"key": StageKey.STORYBOARD.value, "label": "Storyboard",
-         "status": status_of(
-             project.get("storyboard_status") == CanonStatus.APPROVED.value, bool(scenes)),
+         "status": status_of(bool(scenes), bool(scenes)),
          "detail": f"{len(scenes)} escenas, {len(scenes) - len(generated)} reutilizadas"},
         {"key": StageKey.IMAGES.value, "label": "Imagenes",
          "status": status_of(bool(generated) and images_done == len(generated), images_done > 0),
@@ -247,7 +250,7 @@ def propose_video_concept(
     owner: OwnerDep, studio: StudioDep, universe_id: str, project_id: str, body: DirectorIn
 ) -> dict[str, Any]:
     project = _projects(studio, universe_id).require(project_id)
-    song = rules.assert_song_approved(studio.db, universe_id, project["song_id"])
+    song = rules.assert_song_ready(studio.db, universe_id, project["song_id"])
     return studio.orchestrator.submit(
         GenerationRequest(
             universe_id=universe_id,
@@ -277,12 +280,8 @@ def propose_video_concept(
 def approve_story(
     owner: OwnerDep, studio: StudioDep, universe_id: str, project_id: str
 ) -> dict[str, Any]:
-    repo = _projects(studio, universe_id)
-    project = repo.require(project_id)
-    story = {**(project.get("story") or {}), "status": CanonStatus.APPROVED.value}
-    if not story.get("premise"):
-        raise Conflict("No hay historia que aprobar todavia.")
-    return repo.update(project_id, {"story": story})
+    """Compatibilidad: la historia generada ya esta en uso. No-op."""
+    return _projects(studio, universe_id).require(project_id)
 
 
 @router.post("/video-projects/{project_id}/storyboard")
@@ -291,8 +290,11 @@ def propose_storyboard(
 ) -> dict[str, Any]:
     project = _projects(studio, universe_id).require(project_id)
     song = Repository(studio.db, universe_id, SONGS).require(project["song_id"])
-    if (project.get("story") or {}).get("status") != CanonStatus.APPROVED.value:
-        raise Conflict("Aprueba la historia antes de pedir el storyboard.")
+    if not (project.get("story") or {}).get("premise") and not project.get("concept"):
+        raise Conflict(
+            "Pide primero la propuesta del Director: el storyboard se "
+            "escribe a partir de su historia."
+        )
     context = load_scene_context(
         studio.db,
         universe_id,
@@ -330,19 +332,9 @@ def propose_storyboard(
 def approve_storyboard(
     owner: OwnerDep, studio: StudioDep, universe_id: str, project_id: str
 ) -> dict[str, Any]:
-    """Mass image generation does not start before this (PRD 23)."""
-    repo = _projects(studio, universe_id)
-    repo.require(project_id)
-    scenes = _scenes(studio, universe_id).list(where={"project_id": project_id})
-    if not scenes:
-        raise Conflict("No hay storyboard que aprobar.")
-    for scene in scenes:
-        _scenes(studio, universe_id).update(scene["id"], {"status": CanonStatus.APPROVED.value})
-    updated = repo.update(project_id, {"storyboard_status": CanonStatus.APPROVED.value})
-    ApprovalService(studio.db).record_user_action(
-        universe_id, VIDEO_PROJECTS, project_id, UserAction.APPROVE
-    )
-    return updated
+    """Compatibilidad: el storyboard generado ya esta en uso y las imagenes
+    se pueden generar en cuanto las escenas existen. No-op."""
+    return _projects(studio, universe_id).require(project_id)
 
 
 # --- Production plan -------------------------------------------------------
@@ -448,7 +440,8 @@ def generate_scene_image(
     """Images are mandatory before Veo (PRD 24), and the model is chosen here,
     per generation."""
     scene = _scenes(studio, universe_id).require(scene_id)
-    rules.assert_storyboard_approved(studio.db, universe_id, scene["project_id"])
+    # La escena existe porque hay storyboard: eso es todo lo que hace
+    # falta. No hay storyboard que aprobar antes de generar sus imagenes.
     rules.assert_scene_not_reused(scene)
 
     context = load_scene_context(
@@ -485,27 +478,19 @@ def generate_scene_image(
 def approve_scene_image(
     owner: OwnerDep, studio: StudioDep, universe_id: str, scene_id: str
 ) -> dict[str, Any]:
-    """Approve locks the image. A locked image is what Veo receives (PRD 24)."""
-    scenes = _scenes(studio, universe_id)
-    scene = scenes.require(scene_id)
-    image_id = scene.get("image_id")
-    if not image_id:
-        raise Conflict("La escena no tiene imagen que aprobar.")
-    service = ApprovalService(studio.db)
-    service.approve(universe_id, IMAGES, image_id, locked=True)
-    service.record_user_action(universe_id, IMAGES, image_id, UserAction.APPROVE)
-    return scenes.update(scene_id, {"image_status": CanonStatus.APPROVED.value})
+    """Compatibilidad: la imagen generada ya es la que Veo recibe (PRD 24).
+
+    Nace en uso al generarse; no hay que aprobarla ni bloquearla. No-op.
+    """
+    return _scenes(studio, universe_id).require(scene_id)
 
 
 @router.post("/scenes/{scene_id}/image/reject")
 def reject_scene_image(
     owner: OwnerDep, studio: StudioDep, universe_id: str, scene_id: str
 ) -> dict[str, Any]:
-    scenes = _scenes(studio, universe_id)
-    scene = scenes.require(scene_id)
-    if scene.get("image_id"):
-        ApprovalService(studio.db).reject(universe_id, IMAGES, scene["image_id"], locked=False)
-    return scenes.update(scene_id, {"image_status": CanonStatus.REJECTED.value})
+    """Compatibilidad: si la imagen no gusta, se regenera y sustituye. No-op."""
+    return _scenes(studio, universe_id).require(scene_id)
 
 
 @router.post("/scenes/{scene_id}/clip")
@@ -516,7 +501,7 @@ def generate_scene_clip(
     generated: the option does not exist on any screen (PRD 26)."""
     scene = _scenes(studio, universe_id).require(scene_id)
     rules.assert_scene_not_reused(scene)
-    rules.assert_scene_image_locked(studio.db, universe_id, scene_id)
+    rules.assert_scene_image_ready(studio.db, universe_id, scene_id)
     context = load_scene_context(
         studio.db,
         universe_id,
@@ -547,26 +532,16 @@ def generate_scene_clip(
 def approve_scene_clip(
     owner: OwnerDep, studio: StudioDep, universe_id: str, scene_id: str
 ) -> dict[str, Any]:
-    scenes = _scenes(studio, universe_id)
-    scene = scenes.require(scene_id)
-    clip_id = scene.get("clip_id")
-    if not clip_id:
-        raise Conflict("La escena no tiene clip que aprobar.")
-    service = ApprovalService(studio.db)
-    service.approve(universe_id, VIDEOS, clip_id, locked=True)
-    service.record_user_action(universe_id, VIDEOS, clip_id, UserAction.APPROVE)
-    return scenes.update(scene_id, {"clip_status": CanonStatus.APPROVED.value})
+    """Compatibilidad: el clip generado ya es el que monta el ensamblaje. No-op."""
+    return _scenes(studio, universe_id).require(scene_id)
 
 
 @router.post("/scenes/{scene_id}/clip/reject")
 def reject_scene_clip(
     owner: OwnerDep, studio: StudioDep, universe_id: str, scene_id: str
 ) -> dict[str, Any]:
-    scenes = _scenes(studio, universe_id)
-    scene = scenes.require(scene_id)
-    if scene.get("clip_id"):
-        ApprovalService(studio.db).reject(universe_id, VIDEOS, scene["clip_id"], locked=False)
-    return scenes.update(scene_id, {"clip_status": CanonStatus.REJECTED.value})
+    """Compatibilidad: si el clip no gusta, se regenera y sustituye. No-op."""
+    return _scenes(studio, universe_id).require(scene_id)
 
 
 # --- Assembly --------------------------------------------------------------
@@ -595,21 +570,12 @@ def assemble(
 def approve_project(
     owner: OwnerDep, studio: StudioDep, universe_id: str, project_id: str
 ) -> dict[str, Any]:
-    project = _projects(studio, universe_id).require(project_id)
-    if not project.get("master_16x9_path"):
-        # Un plan de montaje (EDL) sin el MP4 renderizado no es un videoclip
-        # terminado: aprobarlo dejaba proyectos "acabados" que no se podian
-        # descargar ni publicar.
-        raise Conflict(
-            "Todavia no hay MP4 final renderizado. Monta el videoclip antes de aprobarlo."
-        )
-    service = ApprovalService(studio.db)
-    updated = service.approve(universe_id, VIDEO_PROJECTS, project_id)
-    service.save_to_canon(
-        universe_id,
-        entity_type="video_project",
-        entity_id=project_id,
-        label=project.get("title", ""),
-        storage_path=project.get("master_16x9_path"),
-    )
-    return updated
+    """Compatibilidad: un proyecto no se aprueba, se termina.
+
+    Estar terminado es un estado derivado: el proyecto esta completo cuando
+    su MP4 final renderizado existe (``master_16x9_path``), porque un plan
+    de montaje (EDL) sin MP4 no es un videoclip descargable. Ningun gesto
+    del usuario cambia eso, asi que este endpoint es un no-op que devuelve
+    el proyecto tal cual esta.
+    """
+    return _projects(studio, universe_id).require(project_id)

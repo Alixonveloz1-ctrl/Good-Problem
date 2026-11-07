@@ -24,9 +24,10 @@ from ..domain.schemas import MASTER_SHOTS, ArtistBible, Inspiration, SingingVoic
 from ..errors import InvalidGenerationRequest, NotFound
 from ..ids import new_id
 from ..orchestrator.orchestrator import GenerationRequest
+from ..services import approvals as approval_rules
 from ..services import inspiration as inspiration_service
 from ..services.approvals import ApprovalService
-from ..services.context import load_bible, save_bible, summarize_bible
+from ..services.context import load_bible, save_bible, summarize_bible, sync_bible_identity
 from .deps import OwnerDep, StudioDep
 
 router = APIRouter(prefix="/api/universes", tags=["universes"])
@@ -185,8 +186,9 @@ def siguiente_paso(studio: Studio, universe: dict[str, Any]) -> dict[str, Any]:
     El camino es este y no cambia: primero se sabe quien es el artista, luego
     se le ve la cara, luego tiene una cancion, y con la cancion se monta el
     videoclip. Cada paso necesita el anterior de verdad -un video sin cara
-    aprobada no sabe a quien esta grabando- asi que ensenar los cuatro a la vez
-    es ensenar tres callejones.
+    generada no sabe a quien esta grabando- asi que ensenar los cuatro a la vez
+    es ensenar tres callejones. Ningun paso pide aprobar nada: lo que existe
+    es lo que vale.
     """
     uid = universe["id"]
     nombre = universe.get("name") or "tu artista"
@@ -231,9 +233,9 @@ def siguiente_paso(studio: Studio, universe: dict[str, Any]) -> dict[str, Any]:
         return _paso(
             "rehacer_cara",
             "Su estilo cambió: hay que rehacer su cara",
-            "Cambiaste su estilo visual después de aprobar su cara, así que "
+            "Cambiaste su estilo visual después de generar su cara, así que "
             "esa cara ya no es su estilo. Se genera otra con el estilo nuevo "
-            "y se aprueba, y a partir de ahí todo sale en el estilo nuevo.",
+            "y a partir de ahí todo sale en el estilo nuevo.",
             ir_a="characters",
             boton="Rehacer su cara",
         )
@@ -249,32 +251,25 @@ def siguiente_paso(studio: Studio, universe: dict[str, Any]) -> dict[str, Any]:
             boton="Generar su retrato",
         )
 
-    if artista.get("status") != CanonStatus.APPROVED.value:
-        return _paso(
-            "aprobar_cara",
-            "Aprueba su cara",
-            "Al aprobarla queda fijada, y a partir de ahí viaja como referencia "
-            "en todo lo que se genere: es lo que hace que siempre sea la misma persona.",
-            ir_a="characters",
-            boton="Ir a aprobarla",
-        )
+    # Con la cara generada ya esta en uso: viaja como referencia en todo lo
+    # que se genere, sin aprobarla nadie. Lo siguiente es la musica.
 
     canciones = Repository(studio.db, uid, SONGS).list(limit=50)
     if not canciones:
         return _paso(
             "cancion",
             "Su primera canción",
-            "Un videoclip se monta sobre una canción aprobada, así que la "
-            "música va antes que el video.",
+            "Un videoclip se monta sobre una canción, así que la música va "
+            "antes que el video.",
             ir_a="songs",
             boton="Empezar una canción",
         )
 
-    if not any(c.get("status") == CanonStatus.APPROVED.value for c in canciones):
+    if not any(approval_rules.current_audio_path(c) for c in canciones):
         return _paso(
-            "aprobar_cancion",
+            "terminar_cancion",
             "Termina su canción",
-            "Cuando esté aprobada se puede montar el videoclip encima.",
+            "Cuando tenga su audio generado se puede montar el videoclip encima.",
             ir_a="songs",
             boton="Ir a la canción",
         )
@@ -284,7 +279,7 @@ def siguiente_paso(studio: Studio, universe: dict[str, Any]) -> dict[str, Any]:
         return _paso(
             "videoclip",
             "Su primer videoclip",
-            "Ya hay cara aprobada y canción aprobada: es justo lo que hace falta "
+            "Ya hay cara y canción con audio: es justo lo que hace falta "
             "para empezar a rodar.",
             ir_a="projects",
             boton="Montar el videoclip",
@@ -360,7 +355,10 @@ class BibleGenerateIn(BaseModel):
 @router.get("/{universe_id}/bible")
 def get_bible(owner: OwnerDep, studio: StudioDep, universe_id: str) -> dict[str, Any]:
     studio.orchestrator.require_universe(universe_id)
-    bible = load_bible(studio.db, universe_id)
+    # Leer la Bible tambien la pone al dia: la identidad toma sus datos de
+    # las otras fichas (la edad, de los rasgos del artista), asi que un
+    # universo creado antes de la sincronia se corrige solo al abrirla.
+    bible = sync_bible_identity(studio.db, universe_id)
     return {**bible.model_dump(), "summary": summarize_bible(bible)}
 
 
@@ -402,16 +400,14 @@ def generate_bible(
 
 @router.post("/{universe_id}/bible/approve")
 def approve_bible(owner: OwnerDep, studio: StudioDep, universe_id: str) -> dict[str, Any]:
-    bible = load_bible(studio.db, universe_id)
-    bible.status = CanonStatus.APPROVED.value  # type: ignore[assignment]
-    save_bible(studio.db, universe_id, bible)
-    ApprovalService(studio.db).save_to_canon(
-        universe_id,
-        entity_type="artist_bible",
-        entity_id="current",
-        label=bible.identity.stage_name or "Artist Bible",
-    )
-    return bible.model_dump()
+    """Compatibilidad: ya no hay nada que aprobar.
+
+    La identidad esta en uso tal cual esta escrita, y sus datos duplicados
+    se sincronizan solos desde las otras fichas. Este endpoint devuelve la
+    Bible vigente (ya sincronizada) sin tocar nada.
+    """
+    studio.orchestrator.require_universe(universe_id)
+    return sync_bible_identity(studio.db, universe_id).model_dump()
 
 
 class SingingVoiceIn(BaseModel):
@@ -455,7 +451,7 @@ def put_visual_style(
 ) -> dict[str, Any]:
     """El estilo visual fijo del artista.
 
-    Si cambia despues de aprobada la cara, la cara queda marcada como
+    Si cambia despues de generada la cara, la cara queda marcada como
     desactualizada: sigue ahi, pero hay que rehacerla en el estilo nuevo
     antes de rodar videos nuevos.
     """
@@ -474,7 +470,11 @@ def put_visual_style(
     artista = next(
         (c for c in repo.list(limit=50) if c.get("role") == CharacterRole.LEAD.value), None
     )
-    if cambio and artista is not None and artista.get("status") == CanonStatus.APPROVED.value:
+    if (
+        cambio
+        and artista is not None
+        and any(s.get("storage_path") for s in artista.get("master_shots") or [])
+    ):
         bible.visual.master_stale = True
         repo.update(artista["id"], {"master_stale": True})
     save_bible(studio.db, universe_id, bible)

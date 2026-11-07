@@ -77,6 +77,9 @@ export interface PendingApproval {
  *  género y cuántos videoclips tiene a medias. */
 export interface UniverseCard extends Universe {
   cover_path: string
+  /** Marca de version del retrato vigente: va en su URL para que el
+   *  telefono no ensene la foto anterior desde su cache. */
+  cover_version: number
   artist_name: string
   projects_active: number
   projects_total: number

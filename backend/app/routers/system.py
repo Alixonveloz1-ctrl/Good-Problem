@@ -166,16 +166,25 @@ def _tarjeta(
     if protagonista is None and personajes:
         protagonista = personajes[0]
 
-    portada = ""
-    for toma in (protagonista or {}).get("master_shots", []):
-        if toma.get("storage_path"):
-            portada = toma["storage_path"]
-            break
+    # La cara de la tarjeta es el RETRATO vigente del artista, derivado de
+    # su ficha en cada lectura —nunca una copia guardada al crear— y con su
+    # marca de version: la ruta no cambia al regenerar, asi que sin la
+    # version el telefono seguiria ensenando la foto vieja desde su cache.
+    tomas = (protagonista or {}).get("master_shots", [])
+    retrato = next(
+        (t for t in tomas if t.get("key") == "portrait" and t.get("storage_path")),
+        None,
+    ) or next((t for t in tomas if t.get("storage_path")), None)
+    portada = retrato["storage_path"] if retrato else ""
+    version_portada = int(retrato.get("version") or 0) if retrato else 0
 
-    en_marcha = sum(1 for p in proyectos if p.get("status") != CanonStatus.APPROVED.value)
+    # En marcha = todavia sin su MP4 final. Un proyecto esta terminado
+    # cuando el MP4 existe; no depende de ningun estado de aprobacion.
+    en_marcha = sum(1 for p in proyectos if not p.get("master_16x9_path"))
     return {
         **universe,
         "cover_path": portada,
+        "cover_version": version_portada,
         "artist_name": (protagonista or {}).get("name", ""),
         "projects_active": en_marcha,
         "projects_total": len(proyectos),
@@ -210,7 +219,7 @@ def _filas(
 
 
 def _etapa_actual(proyecto: dict[str, Any]) -> str:
-    """Por donde va el videoclip: la primera etapa que aun no esta aprobada.
+    """Por donde va el videoclip: la primera etapa que aun no esta hecha.
 
     "BORRADOR" no dice nada; "Storyboard" dice que toca hacer hoy.
     """

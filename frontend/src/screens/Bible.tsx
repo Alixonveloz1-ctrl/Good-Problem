@@ -6,7 +6,7 @@ import type { ArtistBible, Inspiration, Registry, SingingVoice } from '../api/ty
 import { JobWatcher } from '../components/JobWatcher'
 import { ElegirEstilo, ElegirGeneros } from '../components/Seleccion'
 import { textoGeneros } from '../lib/catalogo'
-import { Card, ErrorNote, Field, Loading, StatusBadge, TopBar } from '../components/ui'
+import { Card, ErrorNote, Field, Loading, TopBar } from '../components/ui'
 
 const SECTION_LABELS: Record<string, string> = {
   identity: 'Identidad',
@@ -115,11 +115,6 @@ export function BibleScreen() {
     await reload()
   }
 
-  const approve = async () => {
-    await action.run(() => api.post(`/api/universes/${universeId}/bible/approve`))
-    await reload()
-  }
-
   const setPreference = async (patch: Record<string, string>) => {
     await action.run(() => api.put(`/api/universes/${universeId}/bible/preferences`, patch))
     await reload()
@@ -127,7 +122,7 @@ export function BibleScreen() {
 
   return (
     <>
-      <TopBar title="Identidad" back action={data && <StatusBadge status={data.status} />} />
+      <TopBar title="Identidad" back />
       <main className="screen">
         {loading && !data && <Loading />}
         <ErrorNote error={error ?? action.error} onDismiss={action.clearError} />
@@ -162,7 +157,7 @@ export function BibleScreen() {
               <h3>Su estilo visual</h3>
               <p className="muted" style={{ margin: 0 }}>
                 Queda fijo: su cara, las fotos de cada plano y los videos salen todos con este
-                estilo. Si lo cambias despues de aprobar su cara, habra que rehacerla.
+                estilo. Si lo cambias despues de generar su cara, habra que rehacerla.
               </p>
               <ElegirEstilo valor={estilo} alCambiar={setEstilo} />
               {estilo === 'photo' && (
@@ -174,7 +169,7 @@ export function BibleScreen() {
               )}
               {data.visual.master_stale && (
                 <p className="error">
-                  Su estilo cambio despues de aprobar su cara: esa cara esta desactualizada y hay
+                  Su estilo cambio despues de generar su cara: esa cara esta desactualizada y hay
                   que rehacerla desde su ficha.
                 </p>
               )}
@@ -334,9 +329,11 @@ export function BibleScreen() {
               </Card>
             ))}
 
-            <button className="btn ok block" onClick={approve} disabled={action.busy}>
-              Aprobar Artist Bible
-            </button>
+            <p className="muted" style={{ margin: 0 }}>
+              Esta ficha no se aprueba ni se edita a mano: los datos que
+              tambien viven en otras fichas —como su edad, que vive en los
+              rasgos de su ficha— se actualizan solos desde alli.
+            </p>
           </>
         )}
       </main>

@@ -27,7 +27,7 @@ from ..orchestrator.roles import system_instruction
 from ..providers import gemini_text
 from ..providers.storage import character_path
 from ..services.approvals import ApprovalService
-from ..services.context import load_bible, save_bible
+from ..services.context import load_bible, save_bible, sync_bible_identity
 from .deps import OwnerDep, StudioDep
 
 router = APIRouter(prefix="/api/universes/{universe_id}", tags=["characters"])
@@ -133,6 +133,12 @@ def patch_character(
     ApprovalService(studio.db).record_user_action(
         universe_id, CHARACTERS, character_id, UserAction.EDIT
     )
+    if body.rasgos is not None:
+        # Los rasgos son la fuente: lo que duplican otras fichas (la edad
+        # aparente de la identidad) se actualiza en el acto, sin que el
+        # usuario tenga que ir a tocarlo a ningun otro sitio.
+        sync_bible_identity(studio.db, universe_id)
+        updated = repo.require(character_id)
     return updated
 
 
@@ -364,7 +370,14 @@ def _approve_master(studio, universe_id: str, character_id: str) -> dict[str, An
 def approve_character(
     owner: OwnerDep, studio: StudioDep, universe_id: str, character_id: str
 ) -> dict[str, Any]:
-    return _approve_master(studio, universe_id, character_id)
+    """Compatibilidad: ya no hay nada que aprobar.
+
+    Lo generado nace aprobado y en uso desde que se genera (eso lo hace el
+    handler de imagenes en el acto), asi que este endpoint devuelve la ficha
+    tal cual esta, sin tocar nada. Se queda porque clientes antiguos aun
+    pueden llamarlo.
+    """
+    return _repo(studio, universe_id, CHARACTERS).require(character_id)
 
 
 @router.delete("/characters/{character_id}")
@@ -388,8 +401,12 @@ def delete_character(
 def reject_character(
     owner: OwnerDep, studio: StudioDep, universe_id: str, character_id: str
 ) -> dict[str, Any]:
-    _repo(studio, universe_id, CHARACTERS).require(character_id)
-    return ApprovalService(studio.db).reject(universe_id, CHARACTERS, character_id)
+    """Compatibilidad: rechazar ya no existe como gesto.
+
+    Si algo no gusta, se regenera, y lo regenerado sustituye a lo anterior.
+    Este endpoint devuelve la ficha tal cual esta, sin tocar nada.
+    """
+    return _repo(studio, universe_id, CHARACTERS).require(character_id)
 
 
 # --- The uploaded photo ------------------------------------------------------
@@ -475,7 +492,7 @@ async def upload_artist_photo(
         )
         bible.visual.photo_style_description = descripcion
         artista = repo.require(character_id)
-        if artista.get("status") == CanonStatus.APPROVED.value:
+        if any(s.get("storage_path") for s in artista.get("master_shots") or []):
             bible.visual.master_stale = True
             repo.update(character_id, {"master_stale": True})
         save_bible(studio.db, universe_id, bible)

@@ -355,10 +355,11 @@ def test_la_pantalla_del_artista_dice_que_toca_ahora(client, studio):
     porque no se entiende nada." La pantalla era un indice de once puertas sin
     orden entre ellas, y un indice no dice que hacer.
 
-    Cada paso necesita el anterior de verdad: un video sin cara aprobada no
-    sabe a quien esta grabando, y un videoclip sin cancion no tiene sobre que
-    montarse. Esta prueba recorre el camino y comprueba que en cada estado la
-    aplicacion pide UNA cosa, y la que toca.
+    Cada paso necesita el anterior de verdad: un video sin cara generada no
+    sabe a quien esta grabando, y un videoclip sin cancion con audio no tiene
+    sobre que montarse. Ningun paso pide aprobar nada: lo que existe es lo
+    que vale. Esta prueba recorre el camino y comprueba que en cada estado
+    la aplicacion pide UNA cosa, y la que toca.
     """
     from app.domain.enums import CanonStatus
 
@@ -379,23 +380,22 @@ def test_la_pantalla_del_artista_dice_que_toca_ahora(client, studio):
     # 1. Con artista, estilo y sin cara, lo que toca es la cara.
     assert toca(uid) == "cara"
 
-    # 2. Con cara sin aprobar, lo que toca es aprobarla.
+    # 2. Con la cara generada ya esta en uso —nadie la aprueba— y lo que
+    # toca es la primera cancion.
     tomas = studio.db.get(ficha)["master_shots"]
     tomas[0]["storage_path"] = "universes/x/character/retrato.png"
     studio.db.update(ficha, {"master_shots": tomas})
-    assert toca(uid) == "aprobar_cara"
-
-    # 3. Aprobada, lo que toca es la primera cancion.
-    studio.db.update(ficha, {"status": CanonStatus.APPROVED.value})
     assert toca(uid) == "cancion"
 
-    # 4. Con cancion sin aprobar, terminarla.
+    # 3. Con cancion pero sin audio generado, terminarla.
     cancion = client.post(f"/api/universes/{uid}/songs", json={"title": "La primera"}).json()
-    assert toca(uid) == "aprobar_cancion"
+    assert toca(uid) == "terminar_cancion"
 
-    # 5. Aprobada, el videoclip. Y no antes: es el paso que no se puede saltar.
+    # 4. Con su audio generado, el videoclip. Y no antes: es el paso que no
+    # se puede saltar.
     studio.db.update(
-        f"universes/{uid}/songs/{cancion['id']}", {"status": CanonStatus.APPROVED.value}
+        f"universes/{uid}/songs/{cancion['id']}",
+        {"approved_master_path": "universes/x/song.wav"},
     )
     assert toca(uid) == "videoclip"
 
