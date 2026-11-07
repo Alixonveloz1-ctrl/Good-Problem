@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { api, mediaUrl } from '../api/client'
+import { api, mediaUrl, newIdempotencyKey } from '../api/client'
+import { ClaveDeEnvio } from '../lib/claveEnvio'
 import { useAction, useResource } from '../hooks/useApi'
 import type { Home as HomeData, RecentProject, UniverseCard } from '../api/types'
 import { ErrorNote, Field, Loading, Sheet } from '../components/ui'
@@ -34,6 +35,19 @@ export function HomeScreen() {
   const [notas, setNotas] = useState('')
   const navegarA = useNavigate()
   const accion = useAction()
+  // La clave de ESTA apertura del formulario: la misma entre toques
+  // mientras el formulario siga abierto, nueva en cada apertura. Si la
+  // respuesta se pierde por el camino y se vuelve a tocar «Crear
+  // artista», el servidor reconoce la clave y devuelve EL MISMO
+  // artista en vez de crear un duplicado (ver lib/claveEnvio).
+  const [claveCreacion] = useState(() => new ClaveDeEnvio(() => newIdempotencyKey('creacion')))
+
+  const abrirCreacion = () => {
+    // Apertura nueva, clave nueva: lo que se cree desde aqui es otro
+    // artista, no la repeticion del anterior.
+    claveCreacion.conseguida()
+    setCreando(true)
+  }
 
   // Un solo formulario. Antes se creaba un universo con un nombre y dentro
   // habia que crear otra vez al artista con otro nombre, y el Director de
@@ -51,9 +65,12 @@ export function HomeScreen() {
           .split('\n')
           .map((linea) => linea.trim())
           .filter(Boolean),
+        idempotency_key: claveCreacion.paraEnviar(),
       }),
     )
     if (creado) {
+      // Creacion conseguida: la proxima apertura usa una clave nueva.
+      claveCreacion.conseguida()
       setCreando(false)
       setNombre('')
       setSexo('')
@@ -93,7 +110,7 @@ export function HomeScreen() {
           <>
             <div className="epigrafe">
               <h2>Mis universos</h2>
-              <button className="btn small primary" onClick={() => setCreando(true)}>
+              <button className="btn small primary" onClick={abrirCreacion}>
                 + Nuevo universo
               </button>
             </div>
@@ -129,7 +146,7 @@ export function HomeScreen() {
               </>
             )}
 
-            <button className="crear-universo" onClick={() => setCreando(true)}>
+            <button className="crear-universo" onClick={abrirCreacion}>
               + Crear nuevo universo
             </button>
           </>

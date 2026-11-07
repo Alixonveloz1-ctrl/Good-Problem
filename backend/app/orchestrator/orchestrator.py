@@ -94,8 +94,12 @@ class ResolvedModel:
     """Where the choice came from: 'user', 'bible' or 'registry'."""
 
 
-LOCAL_KINDS: frozenset[str] = frozenset({"assembly"})
-"""Kinds handled by our own FFmpeg component rather than by a model."""
+LOCAL_KINDS: frozenset[str] = frozenset({"assembly", "creation"})
+"""Kinds handled by our own components rather than resolved against the model
+registry at submit time: the assembly by our FFmpeg component, and the
+creation job, which analyses the new artist's reference links and only then
+commissions the character design (the analysis resolves its text model
+itself, inside the job, exactly as it always has)."""
 
 _KIND_TO_MODEL_KIND: dict[str, ModelKind] = {
     "text": ModelKind.TEXT,
@@ -222,11 +226,16 @@ class Orchestrator:
         self.studio.jobs.enqueue(request.universe_id, job["id"])
         return job
 
-    def submit_local(self, request: GenerationRequest) -> dict[str, Any]:
-        """Work our own FFmpeg component does: assembling a video, cutting a
-        Short out of an approved master, laying the Chirp voice over silent
-        footage. No generative model, so no model resolution and no generation
-        cost, but still a Job the phone can watch (PRD 29, 32, 33)."""
+    def submit_local(
+        self, request: GenerationRequest, *, model: str = "ffmpeg"
+    ) -> dict[str, Any]:
+        """Work our own components do: assembling a video, cutting a Short out
+        of an approved master, laying the Chirp voice over silent footage — or
+        finishing a creation whose reference links still need analysing. No
+        model resolution and no generation cost at submit time, but still a
+        Job the phone can watch (PRD 29, 32, 33). The creation job passes the
+        text model its analyses will use, so the job sheet names the model
+        that really does the work; the FFmpeg kinds keep the default."""
         if request.kind not in LOCAL_KINDS:
             raise InvalidGenerationRequest(f"'{request.kind}' no es un trabajo local.")
         self.require_universe(request.universe_id)
@@ -239,7 +248,7 @@ class Orchestrator:
         job = self.studio.jobs.create(
             request.universe_id,
             kind=request.kind,
-            model="ffmpeg",
+            model=model,
             variant="cloud-run-job",
             target_type=request.target_type,
             target_id=request.target_id,

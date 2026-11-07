@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
@@ -326,7 +327,25 @@ class JobService:
                 pass
 
     def wait_for_idle(self, timeout: float = 30.0) -> None:
-        """Test and local helper: block until inline jobs finish."""
-        for thread in list(self._threads):
-            thread.join(timeout)
-        self._threads = [t for t in self._threads if t.is_alive()]
+        """Test and local helper: block until inline jobs finish.
+
+        Un trabajo puede encadenar otro al terminar —el de creacion
+        encarga el diseno del personaje cuando sus analisis ya estan
+        guardados—, y ese hilo nuevo se suma a la lista mientras se
+        espera. Esperar solo los hilos que habia al llamar dejaria la
+        cadena a medias y la prueba siguiente leeria un estado que
+        todavia no es el final: se espera hasta que no quede ninguno
+        vivo o hasta agotar el tiempo, lo primero que pase.
+        """
+        limite = time.monotonic() + timeout
+        while True:
+            vivos = [t for t in self._threads if t.is_alive()]
+            if not vivos:
+                self._threads = []
+                return
+            for thread in vivos:
+                restante = limite - time.monotonic()
+                if restante <= 0:
+                    self._threads = vivos
+                    return
+                thread.join(restante)

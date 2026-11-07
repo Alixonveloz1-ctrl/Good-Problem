@@ -271,6 +271,23 @@ export function BibleScreen() {
                   </p>
                 </div>
               )}
+              {(data.inspirations_pending ?? []).length > 0 && (
+                <div>
+                  <p style={{ margin: 0 }}>
+                    Analizando los enlaces que pegaste al crear el artista…
+                  </p>
+                  {(data.inspirations_pending ?? []).map((enlacePendiente) => (
+                    <div key={enlacePendiente} className="sub">
+                      {enlacePendiente}
+                    </div>
+                  ))}
+                  <p className="muted" style={{ margin: 0 }}>
+                    Cuando cada analisis termine, su resumen aparece aqui solo y ya
+                    alimenta sus canciones. Mientras tanto su identidad no se puede
+                    reescribir: saldria sin estas referencias.
+                  </p>
+                </div>
+              )}
               {inspiraciones.map((inspiracion, indice) => (
                 <div key={`${inspiracion.url}-${indice}`} className="card">
                   <div className="row between">

@@ -211,6 +211,20 @@ class ArtistBible(Entity):
     desaparecia: «Como Mario» nunca llego a ser referencia y nadie lo
     supo. Ahora quedan a la vista en la ficha, para volver a pegarlos.
     """
+    inspirations_pending: list[str] = Field(default_factory=list)
+    """Enlaces pegados al crear el artista cuyo analisis esta EN COLA.
+
+    Crear el artista analizaba los enlaces dentro de la peticion, y un
+    analisis tarda mas que los 45 segundos que la pantalla espera: el
+    artista se creaba igual en el servidor, pero la pantalla decia que
+    no, y el reintento que el propio error invitaba a hacer lo dejaba
+    DUPLICADO. Ahora la creacion es inmediata y deja los enlaces aqui,
+    pendientes: el trabajo de creacion los analiza en la cola y los va
+    moviendo a ``inspirations`` (o a ``inspirations_failed``). Mientras
+    esta lista no este vacia, el analisis sigue en camino y se ve —
+    y la Biblia no se reescribe, porque saldria sin esas referencias.
+    Las Biblias guardadas antes de este campo se leen sin pendientes.
+    """
     status: CanonStatus = CanonStatus.DRAFT
     version: int = 1
 

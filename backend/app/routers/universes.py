@@ -21,7 +21,7 @@ from ..db.repositories import (
 from ..domain import artist as artist_domain
 from ..domain.enums import CanonStatus, CharacterRole, CreativeRole
 from ..domain.schemas import MASTER_SHOTS, ArtistBible, Inspiration, SingingVoice, Universe
-from ..errors import InvalidGenerationRequest, NotFound
+from ..errors import Conflict, InvalidGenerationRequest, NotFound
 from ..ids import new_id
 from ..orchestrator.orchestrator import GenerationRequest
 from ..services import approvals as approval_rules
@@ -54,6 +54,12 @@ class UniverseIn(BaseModel):
     """Hasta tres generos principales, combinables."""
     inspiration_urls: list[str] = Field(default_factory=list)
     """Enlaces de YouTube de referencia: la app los analiza sola."""
+    idempotency_key: str | None = None
+    """La clave de ESTE formulario, una por apertura.
+
+    Un doble toque, o el reintento tras un corte que la pantalla leyo
+    como error, vuelve a llegar con la misma clave: la creacion
+    devuelve EL MISMO artista en vez de crear un duplicado."""
 
 
 class UniversePatch(BaseModel):
@@ -68,7 +74,29 @@ def create_universe(owner: OwnerDep, studio: StudioDep, body: UniverseIn) -> dic
 
     Un solo formulario. Antes eran dos pantallas y dos nombres, y lo que se
     escribia en la segunda lo reescribia el Director de casting.
+
+    Y contesta ENSEGUIDA. Antes analizaba los enlaces de referencia
+    dentro de esta misma peticion, en serie, y un analisis tarda mas
+    que los 45 segundos que la pantalla espera antes de cortar: el
+    artista SI se creaba en el servidor, pero la pantalla decia «el
+    estudio tardo demasiado en contestar», y el reintento que ese
+    error invitaba a hacer creaba un segundo artista identico. Ahora
+    lo lento va en la cola: los enlaces quedan como pendientes en la
+    Biblia y el trabajo de creacion los analiza y solo entonces
+    encarga el diseno del personaje (handlers.handle_creation).
     """
+    if body.idempotency_key:
+        previo = studio.idempotency.lookup_creation(body.idempotency_key)
+        if previo is not None:
+            existente = studio.db.get(universe_path(previo))
+            if existente is not None:
+                # La misma clave: EL MISMO artista, no un duplicado.
+                return _respuesta_de_creacion(studio, existente)
+            # El universo que la clave recuerda ya no existe (se borro):
+            # la clave no puede devolver un artista fantasma, asi que
+            # se crea de verdad y la clave pasa a recordar al nuevo.
+
+    enlaces = [e.strip() for e in body.inspiration_urls if e and e.strip()]
     universe_id = new_id("uni")
     universe = Universe(
         id=universe_id,
@@ -79,7 +107,8 @@ def create_universe(owner: OwnerDep, studio: StudioDep, body: UniverseIn) -> dic
     studio.db.set(universe_path(universe_id), universe.model_dump())
     # A universe starts with an empty Bible so every later call has something
     # to read (PRD 42.4). What the form already decided goes in now: the
-    # visual style, the genre combination and the analysed inspirations.
+    # visual style, the genre combination and —como pendientes, no
+    # analizados todavia— the inspiration links.
     bible = ArtistBible(id="current", universe_id=universe_id)
     if body.visual_style in artist_domain.VISUAL_STYLE_KEYS:
         bible.visual.style_key = body.visual_style
@@ -89,16 +118,7 @@ def create_universe(owner: OwnerDep, studio: StudioDep, body: UniverseIn) -> dic
     ][: artist_domain.MAX_MAIN_GENRES]
     if body.genre and not bible.music_genres:
         bible.musical.genre = body.genre
-    for enlace in body.inspiration_urls:
-        try:
-            bible.inspirations.append(inspiration_service.analyse_youtube(studio, enlace))
-        except Exception:
-            # Un enlace que no se puede analizar no puede tumbar la creacion
-            # del artista: se puede volver a pegar desde su ficha. Pero ya
-            # no desaparece en silencio: queda en la lista visible de
-            # enlaces fallidos de la ficha, para que se sepa que falta.
-            logger.exception("no se pudo analizar la inspiracion %s", enlace)
-            bible.inspirations_failed.append(enlace)
+    bible.inspirations_pending = enlaces
     save_bible(studio.db, universe_id, bible)
 
     # Y el artista, que ES el estudio. El nombre y el sexo quedan puestos desde
@@ -107,17 +127,76 @@ def create_universe(owner: OwnerDep, studio: StudioDep, body: UniverseIn) -> dic
         new_id("char"), _ficha_en_blanco(body.name, body.gender)
     )
 
-    # Y se pone a trabajar solo. Nadie tiene que acordarse de pedirselo: sin el
-    # diseno no hay prompts, y sin prompts ningun boton de "Generar" funciona,
-    # que es exactamente donde se quedaba encallado.
-    encargo = None
+    # La clave se recuerda ANTES de encargar nada: si el encargo falla,
+    # un reintento con la misma clave encuentra este artista en vez de
+    # crear otro.
+    if body.idempotency_key:
+        studio.idempotency.remember_creation(
+            body.idempotency_key, universe_id, body.model_dump()
+        )
+
+    if enlaces:
+        # Con enlaces, el trabajo de creacion los analiza y encarga el
+        # diseno al terminar: el diseno lee la Biblia, y sus resumenes
+        # tienen que estar ya guardados cuando el Director los lea.
+        encargo = None
+        try:
+            encargo = studio.orchestrator.submit_local(
+                GenerationRequest(
+                    universe_id=universe_id,
+                    kind="creation",
+                    target_type="artist_bible",
+                    target_id="current",
+                    payload={
+                        "inspiration_urls": enlaces,
+                        "character_id": protagonista["id"],
+                        "brief": _quien_es(body),
+                        "locked": {"name": body.name, "gender": body.gender},
+                    },
+                ),
+                model=_modelo_del_analisis(studio),
+            )
+        except Exception:  # pragma: no cover - el artista existe igual
+            # El trabajo queda FAILED a la vista en «En marcha» (el
+            # encargo marca el fallo antes de propagar) y se puede
+            # reintentar desde ahi. Perder el universo por esto seria
+            # mucho peor que crearlo con el analisis por encargar.
+            logger.exception("no se pudo encargar la creacion de %s", universe_id)
+    else:
+        # Sin enlaces no hay nada que analizar: el diseno se encarga
+        # directamente, como siempre.
+        encargo = _encargar_diseno(studio, universe_id, protagonista["id"], body)
+
+    return {**universe.model_dump(), "lead_character_id": protagonista["id"], "job": encargo}
+
+
+def _modelo_del_analisis(studio: Studio) -> str:
+    """El modelo de texto que los analisis usan de verdad.
+
+    El servicio de inspiracion resuelve el modelo por defecto del
+    registro dentro de cada llamada; la ficha del trabajo de creacion
+    dice ese mismo modelo, para que «En marcha» nombre el que trabaja.
+    """
+    spec = studio.registry.default_for("text")
+    return spec.id if spec else "gemini-3.1-pro-preview"
+
+
+def _encargar_diseno(
+    studio: Studio, universe_id: str, personaje_id: str, body: UniverseIn
+) -> dict[str, Any] | None:
+    """El encargo de diseno del personaje que sale de la creacion.
+
+    Y se pone a trabajar solo. Nadie tiene que acordarse de pedirselo: sin el
+    diseno no hay prompts, y sin prompts ningun boton de "Generar" funciona,
+    que es exactamente donde se quedaba encallado.
+    """
     try:
-        encargo = studio.orchestrator.submit(
+        return studio.orchestrator.submit(
             GenerationRequest(
                 universe_id=universe_id,
                 kind="text",
                 target_type="character",
-                target_id=protagonista["id"],
+                target_id=personaje_id,
                 role=CreativeRole.CASTING_DIRECTOR,
                 payload={
                     "task": "character",
@@ -131,8 +210,25 @@ def create_universe(owner: OwnerDep, studio: StudioDep, body: UniverseIn) -> dic
         # pedir el diseno desde su pantalla. Perder el universo por esto seria
         # mucho peor que empezar sin retrato.
         logger.exception("no se pudo encargar el diseno inicial de %s", universe_id)
+        return None
 
-    return {**universe.model_dump(), "lead_character_id": protagonista["id"], "job": encargo}
+
+def _respuesta_de_creacion(studio: Studio, universe: dict[str, Any]) -> dict[str, Any]:
+    """La respuesta de crear el artista, reconstruida para una repeticion.
+
+    Una peticion repetida con la misma clave devuelve al MISMO artista:
+    su documento y su protagonista, tal como estan. No crea trabajos
+    nuevos: los de la primera vez siguen en «En marcha».
+    """
+    personajes = Repository(studio.db, universe["id"], CHARACTERS).list(limit=50)
+    artista = next(
+        (p for p in personajes if p.get("role") == CharacterRole.LEAD.value), None
+    )
+    return {
+        **universe,
+        "lead_character_id": artista["id"] if artista else None,
+        "job": None,
+    }
 
 
 def _ficha_en_blanco(nombre: str, genero: str = "") -> dict[str, Any]:
@@ -403,6 +499,20 @@ def generate_bible(
         "presente" if body.idempotency_key else "ausente",
         "presente" if body.brief else "vacio",
     )
+    # Con analisis todavia en cola, la Biblia saldria SIN las referencias
+    # que estan en camino — y saldria en silencio, que es lo inaceptable.
+    # Se avisa claro y no se genera: cuando el trabajo de creacion
+    # termine, los resumenes ya estaran guardados y esta misma peticion
+    # entra entera. No es un permiso ni una aprobacion: es un trabajo
+    # en curso, y se ve en «En marcha».
+    pendientes = load_bible(studio.db, universe_id).inspirations_pending
+    if pendientes:
+        raise Conflict(
+            "Todavia se estan analizando los enlaces que pegaste al crear "
+            f"el artista ({len(pendientes)} en curso). Espera a que "
+            "terminen y vuelve a pedirla: si su identidad se escribe "
+            "ahora, saldria sin esas referencias."
+        )
     return studio.orchestrator.submit(
         GenerationRequest(
             universe_id=universe_id,

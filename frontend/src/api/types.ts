@@ -170,6 +170,9 @@ export interface ArtistBible {
   /** Enlaces pegados al crear el artista cuyo analisis fallo: visibles
    * para volver a pegarlos, no desaparecen en silencio. */
   inspirations_failed?: string[]
+  /** Enlaces pegados al crear el artista cuyo analisis sigue EN COLA:
+   * mientras la lista no este vacia, sus resumenes estan en camino. */
+  inspirations_pending?: string[]
   summary?: string
 }
 

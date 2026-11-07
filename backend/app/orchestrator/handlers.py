@@ -27,7 +27,7 @@ from ..db.repositories import (
     Repository,
 )
 from ..domain import artist as artist_domain
-from ..domain.enums import CanonStatus, LyricsAuthor
+from ..domain.enums import CanonStatus, CreativeRole, LyricsAuthor
 from ..domain.guards import resolve_clip_duration
 from ..domain.pricing import estimate_images, estimate_song, estimate_text
 from ..domain.pricing import estimate_video as price_video
@@ -37,6 +37,7 @@ from ..ids import new_id
 from ..providers import gemini_image, lyria, veo
 from ..providers.storage import character_path, scene_path, song_path
 from ..services import approvals
+from ..services import inspiration as inspiration_service
 from ..services.context import (
     load_bible,
     nombre_en_su_ficha,
@@ -45,7 +46,7 @@ from ..services.context import (
 )
 from ..services.inspiration import inspiracion_utilizable
 from . import director
-from .orchestrator import Outcome
+from .orchestrator import GenerationRequest, Outcome
 
 logger = logging.getLogger("aaus.handlers")
 
@@ -1005,6 +1006,113 @@ def _placeholder_clip(model: str, seconds: int) -> bytes:
     ).encode()
 
 
+# --- creation: the analyses the create request used to wait for -----------
+
+
+def _enlace_resuelto(bible, enlace: str) -> bool:
+    """El enlace ya tiene su sitio en la Biblia: resumen o fallo visible.
+
+    Se casa por el video, no por la cadena: el mismo video pegado con
+    otra forma de enlace (youtu.be, music.youtube.com…) es el mismo
+    enlace, y volver a analizarlo duplicaria su resumen.
+    """
+    video_id = inspiration_service.youtube_video_id(enlace)
+    guardados = [i.url for i in bible.inspirations] + list(bible.inspirations_failed)
+    for guardado in guardados:
+        if guardado == enlace:
+            return True
+        if video_id and inspiration_service.youtube_video_id(guardado) == video_id:
+            return True
+    return False
+
+
+def handle_creation(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
+    """Termina de crear al artista: analiza sus enlaces y encarga su diseno.
+
+    Crear el artista analizaba los enlaces dentro de la peticion de
+    creacion, en serie, y un analisis tarda mas que los 45 segundos que
+    la pantalla espera: la creacion SI se completaba en el servidor,
+    pero la pantalla contestaba «el estudio tardo demasiado», y el
+    reintento creaba un artista duplicado. Ahora la creacion contesta
+    enseguida y este trabajo hace lo lento, en la cola:
+
+    1. analiza los enlaces que la creacion dejo como pendientes, en el
+       mismo orden y con la misma semantica visible de siempre: cada
+       resumen se guarda en la Biblia, y cada fallo en su lista visible
+       de fallidos — un enlace malo no tumba ni la creacion ni el resto;
+    2. limpia la marca de pendientes (quedan solo los que no se
+       llegaron a procesar, si alguna vez los hay);
+    3. SOLO ENTONCES encarga el diseno del personaje, con los resumenes
+       ya guardados: el orden analisis→Biblia→diseno es el de siempre,
+       y cualquier llamada posterior del Director lee los resumenes
+       que de verdad entraron.
+
+    Es reintentable sin duplicar: un enlace ya resuelto (resumen o
+    fallo) no se vuelve a analizar, y si el encargo del diseno falla,
+    el trabajo falla A LA VISTA y su reintento solo repite ese encargo.
+    """
+    payload = _payload(job)
+    enlaces = [e for e in (payload.get("inspiration_urls") or []) if e]
+
+    guardados = 0
+    fallidos: list[str] = []
+    for enlace in enlaces:
+        if _enlace_resuelto(load_bible(studio.db, universe_id), enlace):
+            continue
+        try:
+            inspiracion = inspiration_service.analyse_youtube(studio, enlace)
+        except Exception:
+            # La misma semantica de la creacion de siempre: el enlace
+            # queda en la lista visible de fallidos, para volver a
+            # pegarlo desde la ficha. Ni tumba el trabajo ni desaparece.
+            logger.exception("no se pudo analizar la inspiracion %s", enlace)
+            bible = load_bible(studio.db, universe_id)
+            if not _enlace_resuelto(bible, enlace):
+                bible.inspirations_failed.append(enlace)
+                save_bible(studio.db, universe_id, bible)
+            fallidos.append(enlace)
+            continue
+        bible = load_bible(studio.db, universe_id)
+        if not _enlace_resuelto(bible, enlace):
+            bible.inspirations.append(inspiracion)
+            save_bible(studio.db, universe_id, bible)
+        guardados += 1
+
+    bible = load_bible(studio.db, universe_id)
+    restantes = [e for e in bible.inspirations_pending if not _enlace_resuelto(bible, e)]
+    if restantes != bible.inspirations_pending:
+        bible.inspirations_pending = restantes
+        save_bible(studio.db, universe_id, bible)
+
+    # Y se pone a trabajar solo, como hacia la creacion: sin el diseno no
+    # hay prompts, y sin prompts ningun boton de «Generar» funciona. Aqui
+    # el encargo NO se traga su fallo: si no sale, el trabajo entero ha
+    # fallado y se ve, y reintentarlo es seguro (los analisis ya
+    # guardados no se repiten).
+    encargo = studio.orchestrator.submit(
+        GenerationRequest(
+            universe_id=universe_id,
+            kind="text",
+            target_type="character",
+            target_id=str(payload.get("character_id") or ""),
+            role=CreativeRole.CASTING_DIRECTOR,
+            payload={
+                "task": "character",
+                "brief": str(payload.get("brief") or ""),
+                "locked": payload.get("locked") or {},
+            },
+        )
+    )
+    return Outcome(
+        result={
+            "inspirations": guardados,
+            "inspirations_failed": fallidos,
+            "job": encargo,
+        },
+        cost=None,
+    )
+
+
 # --- assembly --------------------------------------------------------------
 
 
@@ -1031,4 +1139,5 @@ HANDLERS: dict[str, Callable[..., Outcome]] = {
     "music": handle_music,
     "video": handle_video,
     "assembly": handle_assembly,
+    "creation": handle_creation,
 }
