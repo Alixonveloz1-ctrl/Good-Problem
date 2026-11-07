@@ -271,10 +271,15 @@ else
   gcloud tasks queues create "$COLA" --location="$REGION" --project="$PROJECT_ID" >/dev/null
   ok "Creada"
 fi
-# Sin reintentos automáticos: un vídeo que falla no se vuelve a cobrar solo.
+# La ENTREGA se reintenta hasta 3 veces: el reintento es del aviso
+# «procesa este trabajo», no de la generación — el trabajo se procesa
+# una sola vez, según su estado, así que nadie paga dos veces por lo
+# mismo. Con un solo intento, una entrega que caía en un despliegue o
+# en un 503 mataba la tarea y el trabajo quedaba «en cola» para
+# siempre, sin error.
 gcloud tasks queues update "$COLA" --location="$REGION" --project="$PROJECT_ID" \
-  --max-concurrent-dispatches=4 --max-attempts=1 >/dev/null
-ok "Configurada: 4 a la vez, sin reintentos automáticos"
+  --max-concurrent-dispatches=4 --max-attempts=3 >/dev/null
+ok "Configurada: 4 a la vez, entrega con hasta 3 intentos"
 
 # ══════════════════════════════════════════════════════════════════════
 #  6 · El login, montado solo

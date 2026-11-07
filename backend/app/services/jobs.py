@@ -15,9 +15,10 @@ import json
 import logging
 import threading
 from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Any
 
-from ..clock import now_iso
+from ..clock import now, now_iso
 from ..db.client import Database
 from ..db.repositories import JOBS, Repository
 from ..domain.enums import JobState
@@ -31,6 +32,12 @@ logger = logging.getLogger("aaus.jobs")
 JobRunner = Callable[[str, str], None]
 """(universe_id, job_id) -> None"""
 
+SIN_ENTREGAR_TRAS_SEGUNDOS = 600
+"""Diez minutos «en cola» sin un solo intento = la entrega no llego."""
+
+MENSAJE_COLA_NO_ENTREGO = "La cola no llegó a entregar este trabajo"
+"""El motivo visible cuando ni el re-encolado del vigilante llego."""
+
 
 class JobService:
     def __init__(self, db: Database, settings: Settings, runner: JobRunner | None = None):
@@ -38,6 +45,7 @@ class JobService:
         self.settings = settings
         self.runner = runner
         self._threads: list[threading.Thread] = []
+        self._vigilando = False
 
     def repo(self, universe_id: str) -> Repository:
         return Repository(self.db, universe_id, JOBS)
@@ -80,19 +88,93 @@ class JobService:
         )
 
     def get(self, universe_id: str, job_id: str) -> dict[str, Any]:
+        self.vigilar(universe_id)
         return self.repo(universe_id).require(job_id)
 
     def list(self, universe_id: str, *, state: str | None = None, limit: int = 50):
+        self.vigilar(universe_id)
         where = {"state": state} if state else None
         return self.repo(universe_id).list(where=where, limit=limit)
 
     def active(self, universe_id: str, limit: int = 50) -> list[dict[str, Any]]:
+        self.vigilar(universe_id)
         rows = self.repo(universe_id).list(limit=200)
         return [
             row
             for row in rows
             if row.get("state") in {JobState.QUEUED.value, JobState.PROCESSING.value}
         ][:limit]
+
+    # -- vigilante de entregas ----------------------------------------------
+    @staticmethod
+    def _segundos_desde(marca: Any) -> float | None:
+        if not marca:
+            return None
+        try:
+            desde = datetime.fromisoformat(str(marca))
+        except ValueError:
+            return None
+        if desde.tzinfo is None:
+            desde = desde.replace(tzinfo=UTC)
+        return (now() - desde).total_seconds()
+
+    def vigilar(self, universe_id: str) -> None:
+        """Rescata los trabajos que la cola nunca entrego.
+
+        El documento se escribe «en cola» antes de encargarlo, y todo fallo
+        DENTRO del servicio deja rastro (PROCESSING, FAILED con su error).
+        El punto ciego esta entre la cola y este codigo: la entrega es un
+        intento contra este servicio, y si ese intento cae en un despliegue
+        o en un 503, la tarea muere y el trabajo se queda en QUEUED para
+        siempre, sin error y sin que nadie lo mire — paso dos veces seguidas
+        con la reescritura de la Biblia de un artista real.
+
+        Al leer trabajos, el vigilante mira ese punto ciego: un QUEUED con
+        ``attempts == 0`` (nadie lo llego a procesar) y mas de diez minutos
+        se re-encola UNA vez; si tras otros diez minutos sigue sin
+        entregarse, se marca FAILED con el motivo a la vista. Un fallo
+        visible siempre es mejor que una espera eterna.
+        """
+        if self._vigilando:
+            return
+        self._vigilando = True
+        try:
+            try:
+                filas = self.repo(universe_id).list(limit=200)
+            except Exception:  # pragma: no cover - el vigilante nunca tumba una lectura
+                return
+            for job in filas:
+                if job.get("state") != JobState.QUEUED.value:
+                    continue
+                if int(job.get("attempts", 0)) != 0:
+                    continue
+                edad = self._segundos_desde(job.get("created_at"))
+                if edad is None or edad < SIN_ENTREGAR_TRAS_SEGUNDOS:
+                    continue
+                reencolado = job.get("watchdog_requeued_at")
+                if not reencolado:
+                    self.repo(universe_id).update(
+                        job["id"], {"watchdog_requeued_at": now_iso()}
+                    )
+                    try:
+                        self.enqueue(universe_id, job["id"])
+                    except Exception:
+                        # enqueue ya dejo el trabajo FAILED con el motivo
+                        # del encargo: visible, que es lo que se busca.
+                        logger.exception(
+                            "vigilante: no se pudo re-encolar %s", job["id"]
+                        )
+                    continue
+                desde_reencolado = self._segundos_desde(reencolado)
+                if (
+                    desde_reencolado is not None
+                    and desde_reencolado >= SIN_ENTREGAR_TRAS_SEGUNDOS
+                ):
+                    self.mark_failed(
+                        universe_id, job["id"], MENSAJE_COLA_NO_ENTREGO
+                    )
+        finally:
+            self._vigilando = False
 
     def mark_processing(self, universe_id: str, job_id: str) -> dict[str, Any]:
         job = self.get(universe_id, job_id)
