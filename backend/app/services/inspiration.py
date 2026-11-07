@@ -57,6 +57,44 @@ def is_youtube_url(url: str) -> bool:
     return False
 
 
+def youtube_video_id(url: str) -> str | None:
+    """The video id inside any YouTube URL shape, or None."""
+    try:
+        parsed = urlparse(url or "")
+    except ValueError:
+        return None
+    host = (parsed.hostname or "").lower()
+    if host == "youtu.be":
+        candidato = parsed.path.strip("/").split("/")[0]
+        return candidato or None
+    if host in {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com"}:
+        if parsed.path == "/watch":
+            valores = parse_qs(parsed.query).get("v") or []
+            return valores[0] if valores else None
+        for prefijo in ("/shorts/", "/embed/", "/live/"):
+            if parsed.path.startswith(prefijo):
+                candidato = parsed.path[len(prefijo):].split("/")[0]
+                return candidato or None
+    return None
+
+
+def normalize_youtube_url(url: str) -> str:
+    """The one canonical watch URL for a YouTube link.
+
+    The link the user pastes travels to Vertex exactly as copied — and a
+    music.youtube.com URL made the model "watch" YouTube's deprecated-
+    browser page instead of the song, then invent a whole analysis of that
+    page (production, «Falsos Positivos»: title "Your browser is
+    deprecated", glitch pop that was never in the song). Every URL shape —
+    music.youtube.com, youtu.be, shorts, embed, live — is rewritten to the
+    plain watch URL of the same video before anything is analysed.
+    """
+    video_id = youtube_video_id(url)
+    if not video_id:
+        return (url or "").strip()
+    return f"https://www.youtube.com/watch?v={video_id}"
+
+
 def _video_part(url: str, *, start: int | None = None, end: int | None = None) -> dict[str, Any]:
     part: dict[str, Any] = {"fileData": {"fileUri": url, "mimeType": "video/mp4"}}
     if start is not None and end is not None:
@@ -87,6 +125,7 @@ def analyse_youtube(studio, url: str) -> Inspiration:
         raise InvalidGenerationRequest(
             "Ese enlace no es de YouTube. Pega el enlace de la cancion de YouTube."
         )
+    url = normalize_youtube_url(url)
     try:
         data = _analyse(studio, url, video_part=_video_part(url))
     except ProviderError:
@@ -110,7 +149,111 @@ def analyse_youtube(studio, url: str) -> Inspiration:
         if not parciales:
             raise
         data = _merge(studio, parciales)
-    return _to_inspiration(url, data)
+    inspiracion = _to_inspiration(url, data)
+    _comprobar_que_vio_el_video(inspiracion)
+    return inspiracion
+
+
+# --- La guardia anti-fabricacion -------------------------------------------
+#
+# Un analisis puede "funcionar" sin haber visto el video: el modelo recibe
+# una pagina de error de YouTube y, en vez de fallar, inventa un analisis
+# completo de esa pagina. Paso en produccion («Falsos Positivos»): el
+# resumen guardado empezaba «Reference: Your browser is deprecated» y
+# describia glitch pop industrial para un duo romantico. Un resumen asi no
+# es un resumen malo: es un resumen de otra cosa, y guardarlo como valido
+# contamina cada paso siguiente. Las firmas comprobadas son pocas y
+# concretas, las que delatan que lo visto fue una pagina de error o que el
+# propio modelo declara no haber accedido:
+#
+# * el titulo viene vacio (un analisis real nombra el video que vio);
+# * el titulo o el resumen traen el titulo de una pagina de error conocida
+#   de YouTube («Your browser is deprecated», «This video is unavailable»,
+#   «Sign in to confirm», ...);
+# * el titulo o el resumen declaran que no se pudo acceder al video.
+
+_FIRMAS_PAGINA_ERROR = (
+    "browser is deprecated",
+    "browser is no longer supported",
+    "this video is unavailable",
+    "video unavailable",
+    "video no disponible",
+    "sign in to confirm",
+    "private video",
+    "page not found",
+)
+
+_FIRMAS_SIN_ACCESO = (
+    "no pude acceder",
+    "no se pudo acceder",
+    "no puedo ver el video",
+    "no fue posible acceder",
+    "could not access",
+    "couldn't access",
+    "unable to access",
+    "cannot access the video",
+    "can't access the video",
+)
+
+_FIRMAS = _FIRMAS_PAGINA_ERROR + _FIRMAS_SIN_ACCESO
+
+
+def _firma_en(texto: str) -> str | None:
+    bajo = (texto or "").lower()
+    for firma in _FIRMAS:
+        if firma in bajo:
+            return firma
+    return None
+
+
+def motivo_resumen_no_utilizable(summary_text: str) -> str | None:
+    """Why a stored summary cannot be used as a song reference, or None.
+
+    Empty is unusable — and so is fabricated: a summary whose text carries
+    an error-page signature is the analysis of a page that was not the
+    song, however full it looks. The song router checks stored summaries
+    with this before proposing a concept, so a phantom analysis saved
+    before this guard existed cannot slip into a new concept either.
+    """
+    texto = (summary_text or "").strip()
+    if not texto:
+        return "el analisis no dejo ningun resumen guardado"
+    firma = _firma_en(texto)
+    if firma:
+        return (
+            f"el resumen guardado no viene de la cancion: trae «{firma}», "
+            "la firma de una pagina de error de YouTube"
+        )
+    return None
+
+
+def _comprobar_que_vio_el_video(inspiracion: Inspiration) -> None:
+    """Raise unless the analysis really saw a video.
+
+    An empty summary, an empty title, or an error-page/no-access signature
+    anywhere in the result means the video was not watched: the analysis
+    FAILS, visibly, and nothing is saved as a usable summary.
+    """
+    if not (inspiracion.title or "").strip():
+        raise ProviderError(
+            "El analisis no devolvio ni el titulo del video: no consta que "
+            "lo haya visto, asi que no se guarda ningun resumen. Prueba con "
+            "el enlace normal de YouTube (youtube.com/watch?v=...)."
+        )
+    motivo = motivo_resumen_no_utilizable(inspiracion.summary_text)
+    if motivo is None:
+        firma = _firma_en(inspiracion.title)
+        if firma:
+            motivo = (
+                f"el titulo devuelto no es el de la cancion: trae «{firma}», "
+                "la firma de una pagina de error de YouTube"
+            )
+    if motivo is not None:
+        raise ProviderError(
+            f"El analisis de ese enlace no es utilizable: {motivo}. No se "
+            "guardo ningun resumen; prueba con el enlace normal de YouTube "
+            "(youtube.com/watch?v=...)."
+        )
 
 
 def _merge(studio, parciales: list[dict[str, Any]]) -> dict[str, Any]:

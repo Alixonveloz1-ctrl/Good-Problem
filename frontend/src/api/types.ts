@@ -214,6 +214,8 @@ export interface Song {
   genre_free?: string
   inspiration_url?: string
   inspiration_summary?: string
+  inspiration_failed?: boolean
+  inspiration_error?: string
   genre: string
   bpm: number | null
   mood: string

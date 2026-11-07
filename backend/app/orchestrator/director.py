@@ -18,7 +18,7 @@ from ..errors import InvalidGenerationRequest
 from ..providers import gemini_text
 from ..services.context import load_bible, summarize_bible, summarize_canon
 from . import schemas_json as S
-from .roles import system_instruction
+from .roles import TAREAS_DE_CANCION, system_instruction
 
 TASK_ROLES: dict[str, CreativeRole] = {
     "artist_bible": CreativeRole.CREATIVE_DIRECTOR,
@@ -56,12 +56,32 @@ def _overrides_block(overrides: dict[str, Any]) -> str:
     )
 
 
-def _fixed_music_blocks(payload: dict[str, Any]) -> list[str]:
+def _fixed_music_blocks(payload: dict[str, Any], task: str = "") -> list[str]:
     """What is fixed for this artist and this song, handed to the Director as
     given: the singing voice text, the genre combination and the inspiration
     summaries. The handlers impose them again on the result, so a Director
-    that paraphrases them has not changed anything that reaches Lyria."""
+    that paraphrases them has not changed anything that reaches Lyria.
+
+    The song concept is the exception that the owner ordered: in that call
+    the song's OWN reference goes first and with rank — it sets the form —
+    the artist's inspiration summaries do not enter at all (they already
+    shaped the artist; repeating them buried the song's reference), and the
+    genre combination is presented as the artist's usual ground, not as
+    "(fixed)": when the reference asks for another mix, the proposal follows
+    the reference. The singing voice stays fixed in every task, verbatim.
+    """
     blocks: list[str] = []
+    if task == "music_concept":
+        referencia = (payload.get("song_inspiration_text") or "").strip()
+        if referencia:
+            blocks.append(
+                "THIS SONG'S REFERENCE — IT SETS THE FORM. Take from it the "
+                "rhythm, the structure, the kind of lyrics, the kind of "
+                "story and the mood: what made that song work. Build an "
+                "ORIGINAL song with that form, sung in this artist's style "
+                "and voice. This reference outranks the artist's background "
+                f"themes and usual genres wherever they differ.\n{referencia}"
+            )
     voz = (payload.get("singing_voice_text") or "").strip()
     if voz:
         blocks.append(
@@ -70,14 +90,22 @@ def _fixed_music_blocks(payload: dict[str, Any]) -> list[str]:
         )
     generos = (payload.get("genres_text") or "").strip()
     if generos:
-        blocks.append(f"GENRE COMBINATION (fixed): {generos}")
-    inspiracion = (payload.get("inspiration_text") or "").strip()
-    if inspiracion:
-        blocks.append(
-            "REFERENCE INSPIRATION. Take the style, the kind of music and the "
-            "way the lyrics are written. Create ORIGINAL lyrics and melody: "
-            f"never copy the reference's lyrics or melody.\n{inspiracion}"
-        )
+        if task == "music_concept":
+            blocks.append(
+                "GENRE COMBINATION (the artist's usual ground — the "
+                "reference's mix wins wherever they differ): "
+                f"{generos}"
+            )
+        else:
+            blocks.append(f"GENRE COMBINATION (fixed): {generos}")
+    if task != "music_concept":
+        inspiracion = (payload.get("inspiration_text") or "").strip()
+        if inspiracion:
+            blocks.append(
+                "REFERENCE INSPIRATION. Take the style, the kind of music and the "
+                "way the lyrics are written. Create ORIGINAL lyrics and melody: "
+                f"never copy the reference's lyrics or melody.\n{inspiracion}"
+            )
     return blocks
 
 
@@ -102,7 +130,7 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
             "sent to Lyria 3 Pro in US English, including the artist's singing voice "
             "description verbatim and the requested duration."
         )
-        sections.extend(_fixed_music_blocks(payload))
+        sections.extend(_fixed_music_blocks(payload, task))
         if brief:
             sections.append(f"USER IDEA\n{brief}")
         duration = payload.get("duration_seconds")
@@ -114,7 +142,7 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
             "Write the full lyrics for this song. Mark sections in square brackets, "
             "e.g. [Verse 1], [Chorus]. Keep the hook intact."
         )
-        sections.extend(_fixed_music_blocks(payload))
+        sections.extend(_fixed_music_blocks(payload, task))
         concept = payload.get("concept") or {}
         if concept:
             sections.append(f"APPROVED CONCEPT\n{_kv(concept)}")
@@ -129,7 +157,7 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
             "Then write the Lyria 3 Pro prompt in US English including the artist's singing "
             "voice description verbatim."
         )
-        sections.extend(_fixed_music_blocks(payload))
+        sections.extend(_fixed_music_blocks(payload, task))
         sections.append(f"USER LYRICS\n{lyrics}")
 
     elif task == "video_concept":
@@ -261,22 +289,47 @@ def _kv(value: Any, indent: int = 0) -> str:
     return f"{pad}{value}"
 
 
+_OFICIO_NO_CONTENIDO = (
+    "THE REFERENCES TEACH CRAFT, NOT CONTENT. The reference summaries in "
+    "the Artist Bible describe how those songs are MADE — their technique, "
+    "flow, metrics, structure, delivery and sound — and that craft is what "
+    "this artist learned from them. What those songs SING ABOUT is not "
+    "imported: never turn a reference song's lyric themes or story into "
+    "this artist's recurring themes or lyric themes. The artist's themes "
+    "come from the artist's own concept and brief above."
+)
+
+
 def run(studio, universe_id: str, model_id: str, payload: dict[str, Any]):
     """Execute one Director task and return the raw TextResult."""
     task = payload.get("task", "")
     if task not in TASK_SCHEMAS:
         raise InvalidGenerationRequest(f"Tarea de Director desconocida: '{task}'.")
     bible = load_bible(studio.db, universe_id)
+    # Each task reads the Bible with the framing its job needs: the song
+    # concept gets background-labelled themes and no artist inspirations,
+    # the Bible's own generation gets craft-only references, and the song
+    # tasks swap the censorship block for the reference/Bible split.
+    if task == "music_concept":
+        vista = "concepto_cancion"
+    elif task == "artist_bible":
+        vista = "biblia_artista"
+    else:
+        vista = "general"
     instruction = system_instruction(
         TASK_ROLES[task],
-        bible_summary=summarize_bible(bible),
+        bible_summary=summarize_bible(bible, vista=vista),
         canon=summarize_canon(studio.db, universe_id),
+        reparto_canciones=task in TAREAS_DE_CANCION,
     )
+    prompt = build_prompt(task, payload)
+    if task == "artist_bible" and bible.inspirations:
+        prompt = f"{prompt}\n\n{_OFICIO_NO_CONTENIDO}"
     return gemini_text.generate(
         studio.vertex,
         model_id,
         system_instruction=instruction,
-        prompt=build_prompt(task, payload),
+        prompt=prompt,
         schema=TASK_SCHEMAS[task],
         temperature=float(payload.get("temperature", 0.9)),
     )

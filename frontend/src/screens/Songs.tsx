@@ -205,6 +205,16 @@ export function SongScreen() {
               >
                 {action.busy ? 'Escuchandola…' : 'Analizar esta cancion'}
               </button>
+              {(data.inspiration_failed ||
+                (data.inspiration_url && !(data.inspiration_summary ?? '').trim())) && (
+                <div className="error">
+                  Este enlace no se pudo analizar
+                  {data.inspiration_error ? `: ${data.inspiration_error}` : ''}. No hay
+                  resumen guardado y la propuesta de concepto avisara antes de generarse
+                  sin el. Pega el enlace normal de YouTube (youtube.com/watch?v=…) y vuelve
+                  a analizar, o escribe tu el resumen de su estilo aqui abajo.
+                </div>
+              )}
               {(resumen || data.inspiration_url) && (
                 <>
                   <Field

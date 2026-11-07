@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 from ..db.repositories import SONGS, Repository
 from ..domain import artist as artist_domain
 from ..domain.enums import CanonStatus, CreativeRole, LyricsAuthor, UserAction
-from ..errors import Conflict, NotFound
+from ..errors import Conflict, DomainError, NotFound
 from ..ids import new_id
 from ..orchestrator.orchestrator import GenerationRequest
 from ..services import approvals as approval_rules
@@ -84,7 +84,33 @@ def _bloques_fijos(studio, universe_id: str, cancion: dict[str, Any]) -> dict[st
             cancion.get("genre_free") or bible.music_genre_free,
         ),
         "inspiration_text": resumenes,
+        # La referencia de ESTA cancion, por separado: en la llamada de
+        # concepto viaja en su propio bloque, primero y con rango, sin
+        # mezclarse con las inspiraciones del artista.
+        "song_inspiration_text": (cancion.get("inspiration_summary") or "").strip(),
     }
+
+
+def _referencia_no_utilizable(cancion: dict[str, Any]) -> str | None:
+    """Why this song's reference link cannot feed a concept, or None.
+
+    A pasted link is a promise: the concept must not be generated "as if"
+    the reference had entered when its analysis failed, came back empty or
+    was fabricated from an error page. The failure mark written by the
+    inspiration endpoint is checked first; a stored summary is checked
+    too, so a phantom summary saved before the guard existed (the
+    «Falsos Positivos» case) is caught here as well.
+    """
+    if cancion.get("inspiration_failed"):
+        return (
+            cancion.get("inspiration_error")
+            or "el analisis de ese enlace fallo y no dejo resumen"
+        )
+    if not (cancion.get("inspiration_url") or "").strip():
+        return None
+    return inspiration_service.motivo_resumen_no_utilizable(
+        cancion.get("inspiration_summary") or ""
+    )
 
 
 @router.post("")
@@ -152,6 +178,11 @@ def patch_song(
         allowed["genres"] = [
             g for g in allowed["genres"] if g in artist_domain.MUSIC_GENRE_KEYS
         ][: artist_domain.MAX_MAIN_GENRES]
+    if (allowed.get("inspiration_summary") or "").strip():
+        # Un resumen escrito a mano sustituye al analisis que fallo: la
+        # marca de fallo ya no describe esta ficha.
+        allowed["inspiration_failed"] = False
+        allowed["inspiration_error"] = ""
     updated = repo.update(song_id, allowed)
     ApprovalService(studio.db).record_user_action(universe_id, SONGS, song_id, UserAction.EDIT)
     return updated
@@ -180,6 +211,14 @@ def propose_concept(
     owner: OwnerDep, studio: StudioDep, universe_id: str, song_id: str, body: DirectorIn
 ) -> dict[str, Any]:
     song = _repo(studio, universe_id).require(song_id)
+    motivo = _referencia_no_utilizable(song)
+    if motivo:
+        raise Conflict(
+            "Esta cancion tiene un enlace de referencia que no se pudo "
+            f"analizar: {motivo}. Vuelve a analizar el enlace desde la "
+            "ficha de la cancion y luego pide la propuesta: no se genera "
+            "un concepto fingiendo que la referencia entro."
+        )
     return studio.orchestrator.submit(
         GenerationRequest(
             universe_id=universe_id,
@@ -393,14 +432,34 @@ def song_inspiration(
 ) -> dict[str, Any]:
     """Un enlace de YouTube solo para esta cancion. Se analiza al momento y
     su resumen queda guardado en la cancion, editable, alimentando su letra
-    y su encargo a Lyria."""
+    y su encargo a Lyria.
+
+    Si el analisis falla — o vuelve fabricado de una pagina de error, que
+    la guardia del servicio detecta — la cancion queda con una marca
+    persistente y visible de que ese enlace no se pudo analizar, y el error
+    sube tal cual: nunca se guarda un "analizado" fantasma.
+    """
     repo = _repo(studio, universe_id)
     repo.require(song_id)
-    inspiracion = inspiration_service.analyse_youtube(studio, body.url)
+    try:
+        inspiracion = inspiration_service.analyse_youtube(studio, body.url)
+    except DomainError as exc:
+        repo.update(
+            song_id,
+            {
+                "inspiration_url": body.url,
+                "inspiration_summary": "",
+                "inspiration_failed": True,
+                "inspiration_error": exc.message,
+            },
+        )
+        raise
     return repo.update(
         song_id,
         {
-            "inspiration_url": body.url,
+            "inspiration_url": inspiracion.url,
             "inspiration_summary": inspiracion.summary_text,
+            "inspiration_failed": False,
+            "inspiration_error": "",
         },
     )

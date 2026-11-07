@@ -88,12 +88,56 @@ def sync_bible_identity(db: Database, universe_id: str) -> ArtistBible:
     return bible
 
 
-def summarize_bible(bible: ArtistBible) -> str:
-    """A compact rendering that fits comfortably in a system instruction."""
+def summarize_bible(bible: ArtistBible, *, vista: str = "general") -> str:
+    """A compact rendering that fits comfortably in a system instruction.
+
+    ``vista`` adjusts the framing for one reading, without touching the data:
+
+    * ``"concepto_cancion"`` (the song-concept call): the artist's themes are
+      labelled as background identity — NOT the topic of this song — the
+      genre combination loses its "(fixed)" label (usual ground, not a
+      filter), and the artist's inspiration summaries are left out entirely:
+      in that call the song's own reference travels in the prompt, first and
+      with rank, and the artist summaries only duplicated it into noise.
+    * ``"biblia_artista"`` (the Bible-generation call): the inspiration
+      summaries are framed as CRAFT ONLY — technique, flow, metrics,
+      structure, delivery and sound. What the reference songs SING ABOUT is
+      never imported as the artist's recurring or lyric themes: an artist
+      whose references sing about betrayal is not thereby an artist about
+      betrayal.
+    * ``"general"``: the plain rendering every other reader gets, including
+      the Bible screen's own summary.
+    """
+    en_concepto = vista == "concepto_cancion"
     identity = bible.identity
     musical = bible.musical
     visual = bible.visual
     comms = bible.communication
+    texto_generos = (
+        artist_domain.genres_text(bible.music_genres, bible.music_genre_free)
+        or musical.genre
+    )
+    if en_concepto:
+        temas = (
+            f"Recurring themes (background identity of the artist — NOT the "
+            f"topic of this song unless the song's reference or the user's "
+            f"idea asks for them): {', '.join(identity.recurring_themes)}"
+        )
+        temas_letra = (
+            f"Lyric themes (background identity, same rule — not this song's "
+            f"topic by default): {', '.join(musical.lyrical_themes)}"
+        )
+        generos = (
+            "Genres (the artist's usual combination — background ground, "
+            f"not a filter): {texto_generos} / {', '.join(musical.subgenres)}"
+        )
+    else:
+        temas = f"Recurring themes: {', '.join(identity.recurring_themes)}"
+        temas_letra = f"Lyric themes: {', '.join(musical.lyrical_themes)}"
+        generos = (
+            f"Genres (fixed combination): {texto_generos}"
+            f" / {', '.join(musical.subgenres)}"
+        )
     lines = [
         f"Stage name: {identity.stage_name or '(sin definir)'}",
         f"Apparent age: {identity.apparent_age}",
@@ -102,16 +146,14 @@ def summarize_bible(bible: ArtistBible) -> str:
         f"Personality: {identity.personality}",
         f"Backstory: {identity.backstory}",
         f"Audience: {identity.target_audience}",
-        f"Recurring themes: {', '.join(identity.recurring_themes)}",
+        temas,
         "",
-        f"Genres (fixed combination): "
-        f"{artist_domain.genres_text(bible.music_genres, bible.music_genre_free) or musical.genre}"
-        f" / {', '.join(musical.subgenres)}",
+        generos,
         f"BPM range: {musical.bpm_range}",
         f"Instrumentation: {', '.join(musical.instrumentation)}",
         f"Production: {musical.production}",
         f"Song structures: {', '.join(musical.structures)}",
-        f"Lyric themes: {', '.join(musical.lyrical_themes)}",
+        temas_letra,
         f"Lyrics language: {musical.language}",
         f"Mood: {musical.mood}",
         f"Vocal characteristics: {musical.vocal_characteristics}",
@@ -134,13 +176,24 @@ def summarize_bible(bible: ArtistBible) -> str:
         "SINGING VOICE (fixed text, include verbatim in every music prompt):",
         bible.singing_voice.text or bible.voice_profile.as_prompt() or "(sin definir)",
     ]
-    for inspiracion in bible.inspirations:
-        if inspiracion.summary_text:
+    if not en_concepto:
+        for inspiracion in bible.inspirations:
+            if not inspiracion.summary_text:
+                continue
             lines.append("")
-            lines.append(
-                "REFERENCE INSPIRATION (style only; create original material, "
-                f"never copy lyrics or melody):\n{inspiracion.summary_text}"
-            )
+            if vista == "biblia_artista":
+                lines.append(
+                    "REFERENCE CRAFT (craft only: technique, flow, metrics, "
+                    "song structure, delivery and sound. NEVER import what "
+                    "this reference's lyrics are about: its themes and its "
+                    "story are not the artist's themes):\n"
+                    f"{inspiracion.summary_text}"
+                )
+            else:
+                lines.append(
+                    "REFERENCE INSPIRATION (style only; create original material, "
+                    f"never copy lyrics or melody):\n{inspiracion.summary_text}"
+                )
     return "\n".join(line for line in lines if line is not None)
 
 

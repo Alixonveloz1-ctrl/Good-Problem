@@ -13,20 +13,57 @@ from __future__ import annotations
 
 from ..domain.enums import CreativeRole
 
-_SHARED = """
+_BASE = """
 You work inside AI Artist Universe Studio, a supervised production tool.
 
 Hard rules:
 - You propose. The user decides. Never assume approval.
-- Stay inside the Artist Bible and the Canon you are given. If something
-  contradicts them, say so instead of silently changing the artist.
 - Never promise virality, chart performance or audience numbers.
 - When the user changes something you proposed, rebuild your proposal from that
   change. Do not argue it back.
 - Write every user facing string in Spanish. Keep generation prompts for the
   image, video and music models in US English.
+"""
+
+# The artist-defining tasks (the Bible itself, characters, video built on an
+# existing song) keep the coherence rule: the Bible is the artist, and quietly
+# drifting away from it would dissolve the character. The VISUAL forbidden
+# elements live here too: they protect image and video generation.
+_COHERENCIA = """
+- Stay inside the Artist Bible and the Canon you are given. If something
+  contradicts them, say so instead of silently changing the artist.
 - Respect the forbidden elements listed in the Artist Bible without exception.
 """
+
+# Song tasks (concept, lyrics, lyrics analysis) run under a different split,
+# decided by the studio's owner after watching the coherence rule censor a
+# reference song: the Bible gives the artist, the song's own reference gives
+# the song. The Bible NEVER vetoes an element of the reference and NEVER
+# imposes its themes as the topic of every song.
+_REPARTO_CANCIONES = """
+How the Artist Bible and a song reference divide the work:
+- The Artist Bible gives the artist's identity, style and singing voice. It
+  never vetoes an element of a song reference and never imposes the song's
+  topic: the Bible's recurring themes and lyric themes are the artist's
+  background identity, not the subject of every song.
+- When a song carries its own reference summary, that reference sets the
+  FORM of the song: its rhythm, its structure, the kind of lyrics, the kind
+  of story and its mood — what made that song work. The new song is original
+  material sung in this artist's style and voice, never a copy of the
+  reference's lyrics or melody.
+- The genre combination on the artist's sheet is their usual ground, not a
+  filter: when the reference asks for a different mix, the proposal follows
+  the reference.
+- Never write notes about your own process inside the fields you return —
+  nothing like "discarded X because it contradicts the Bible" or "omitted Y
+  to respect the artist's aesthetic". The fields describe the song, not your
+  internal decisions.
+"""
+
+# Tasks whose output IS a song or is written from one. Video tasks are not
+# here: they adapt a song that already exists, and the visual forbidden
+# elements still guard what gets generated on screen.
+TAREAS_DE_CANCION = frozenset({"music_concept", "lyrics", "lyrics_analysis"})
 
 _ROLE_INSTRUCTIONS: dict[CreativeRole, str] = {
     CreativeRole.DIRECTOR: """
@@ -71,8 +108,22 @@ without losing the subject.
 }
 
 
-def system_instruction(role: CreativeRole, *, bible_summary: str = "", canon: str = "") -> str:
-    parts = [_ROLE_INSTRUCTIONS[role].strip(), _SHARED.strip()]
+def system_instruction(
+    role: CreativeRole,
+    *,
+    bible_summary: str = "",
+    canon: str = "",
+    reparto_canciones: bool = False,
+) -> str:
+    """Assemble a role's system instruction.
+
+    ``reparto_canciones`` swaps the coherence/censorship block for the song
+    split (the reference sets the form; the Bible gives the artist and never
+    vetoes). Only the song tasks pass it — see TAREAS_DE_CANCION and
+    director.run.
+    """
+    reglas = _REPARTO_CANCIONES if reparto_canciones else _COHERENCIA
+    parts = [_ROLE_INSTRUCTIONS[role].strip(), _BASE.strip(), reglas.strip()]
     if bible_summary:
         parts.append(f"ARTIST BIBLE\n{bible_summary.strip()}")
     if canon:
