@@ -219,7 +219,7 @@ def generate_master_shot(
     """Character Master shots. Worth generating with the best model available:
     everything downstream leans on them (PRD 18)."""
     character = _repo(studio, universe_id, CHARACTERS).require(character_id)
-    prompt = body.prompt or _shot_prompt(character, shot_key)
+    prompt = _con_rasgos_actuales(character, body.prompt or _shot_prompt(character, shot_key))
     if not prompt:
         raise Conflict(
             "No hay prompt para esta toma. Pide el diseno al Director o escribe uno."
@@ -255,6 +255,33 @@ def _shot_prompt(character: dict[str, Any], shot_key: str) -> str:
     if not base and character.get("appearance"):
         base = f"{shot_key.replace('_', ' ')} of {character['name']}: {character['appearance']}"
     return base
+
+
+def _con_rasgos_actuales(character: dict[str, Any], prompt: str) -> str:
+    """Suma al prompt los rasgos que el usuario tiene elegidos AHORA.
+
+    El prompt guardado de la toma y el texto ``appearance`` los escribio el
+    Director con los rasgos de aquel momento. Si despues se cambia la edad,
+    la barba o los tatuajes con los selectores y nadie reescribe esos textos,
+    regenerar pide la cara vieja con las mismas palabras: salia la misma
+    cara aunque la ficha ya dijera otra cosa. Este bloque se compone en el
+    momento de generar, desde la ficha viva (es texto determinista, no
+    cuesta ninguna llamada), y declara que manda sobre cualquier descripcion
+    anterior que no coincida. Lo elegido por el usuario manda siempre: es la
+    misma garantia que ``_lo_que_ya_decidio`` aplica sobre el Director.
+    """
+    decidio = _lo_que_ya_decidio(character)
+    if not decidio:
+        return prompt
+    rasgos = "; ".join(f"{clave}: {valor}" for clave, valor in decidio.items())
+    bloque = (
+        "Current traits chosen by the user (authoritative: they define this "
+        "person and override any earlier description that disagrees): "
+        f"{rasgos}."
+    )
+    if bloque in prompt:
+        return prompt
+    return f"{prompt}\n\n{bloque}" if prompt else bloque
 
 
 def _approve_master(studio, universe_id: str, character_id: str) -> dict[str, Any]:
@@ -420,7 +447,7 @@ async def upload_artist_photo(
     # base_for_master: a new portrait from the photo, in the chosen style.
     bible = load_bible(studio.db, universe_id)
     estilo = artist_domain.visual_style_prompt(bible)
-    base = _shot_prompt(repo.require(character_id), "portrait")
+    base = _con_rasgos_actuales(character, _shot_prompt(character, "portrait"))
     prompt = (
         (base + "\n\n") if base else ""
     ) + (

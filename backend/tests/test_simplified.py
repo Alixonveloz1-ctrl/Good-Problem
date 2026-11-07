@@ -290,3 +290,110 @@ def test_sin_mp4_renderizado_no_se_aprueba_el_proyecto(client, studio):
 )
 def test_las_rutas_quitadas_no_existen(client, universe, ruta):
     assert client.get(f"/api/universes/{universe}/{ruta}").status_code == 404
+
+
+# --- El rostro sigue a los rasgos, y lo generado nace aprobado --------------
+#
+# Dos reglas del dueno, aprendidas con un artista real: si cambia los rasgos
+# del artista con los selectores, la siguiente cara tiene que pedirse con los
+# rasgos nuevos (el texto viejo de la ficha pedia la cara vieja y salia la
+# misma); y lo que se genera queda aprobado y en uso en el acto, sin pasos
+# de revision ni de adopcion (si no le gusta, regenera).
+
+APARIENCIA_VIEJA = (
+    "Hombre latino de 29 anos, barba recortada, tatuajes en el cuello y las manos."
+)
+
+
+def _generar_retrato(client, studio, uid, char_id):
+    respuesta = client.post(
+        f"/api/universes/{uid}/characters/{char_id}/master/portrait", json={}
+    )
+    assert respuesta.status_code == 200, respuesta.text
+    studio.jobs.wait_for_idle(20)
+
+
+def test_el_retrato_se_pide_con_los_rasgos_actuales_tras_cambiarlos(client, studio):
+    creado = _universo(client, studio, gender="hombre")
+    uid, char_id = creado["id"], creado["lead_character_id"]
+    # La ficha nace como nacio la real: el texto largo describe los rasgos
+    # de entonces y los selectores dicen lo mismo.
+    client.patch(
+        f"/api/universes/{uid}/characters/{char_id}",
+        json={
+            "appearance": APARIENCIA_VIEJA,
+            "rasgos": {
+                "edad": "29",
+                "vello_facial": "barba recortada",
+                "detalles": "tatuajes en el cuello y las manos",
+            },
+        },
+    )
+    studio.calls.clear()
+    _generar_retrato(client, studio, uid, char_id)
+    assert "Exact age: 29" in _textos_de_imagen(studio)
+
+    # El usuario cambia los rasgos con los selectores. Nadie reescribe el
+    # texto largo: sigue diciendo 29, barba recortada, cuello y manos.
+    client.patch(
+        f"/api/universes/{uid}/characters/{char_id}",
+        json={
+            "rasgos": {
+                "edad": "21",
+                "vello_facial": "barba cerrada",
+                "detalles": "tatuajes en los brazos",
+            }
+        },
+    )
+    ficha = client.get(f"/api/universes/{uid}/characters/{char_id}").json()
+    assert ficha["appearance"] == APARIENCIA_VIEJA
+
+    # Y aun asi, la regeneracion se pide con los rasgos nuevos, declarados
+    # como los que mandan sobre la descripcion anterior.
+    studio.calls.clear()
+    _generar_retrato(client, studio, uid, char_id)
+    pedido = _textos_de_imagen(studio)
+    assert "Exact age: 21" in pedido
+    assert "barba cerrada" in pedido
+    assert "tatuajes en los brazos" in pedido
+    assert "override any earlier description" in pedido
+
+
+def test_la_imagen_generada_queda_aprobada_y_en_uso_sin_aprobar_a_mano(client, studio):
+    creado = _universo(client, studio, gender="mujer")
+    uid, char_id = creado["id"], creado["lead_character_id"]
+
+    _generar_retrato(client, studio, uid, char_id)
+
+    # Sin tocar ningun boton de aprobar: el artista ya esta aprobado, el
+    # retrato es su referencia en uso y no queda marcado desactualizado.
+    artista = client.get(f"/api/universes/{uid}/characters/{char_id}").json()
+    assert artista["status"] == CanonStatus.APPROVED.value
+    retrato = next(s for s in artista["master_shots"] if s["key"] == "portrait")
+    assert retrato["storage_path"]
+    assert retrato["status"] == CanonStatus.APPROVED.value
+    assert artista["reference_image_paths"] == [retrato["storage_path"]]
+    assert artista["master_stale"] is False
+
+
+def test_master_aprobado_se_regenera_y_sigue_aprobado_y_en_uso(client, studio):
+    creado = _universo(client, studio, gender="hombre")
+    uid, char_id = creado["id"], creado["lead_character_id"]
+
+    _generar_retrato(client, studio, uid, char_id)
+    aprobado = client.post(f"/api/universes/{uid}/characters/{char_id}/approve")
+    assert aprobado.status_code == 200, aprobado.text
+    antes = client.get(f"/api/universes/{uid}/characters/{char_id}").json()
+    assert antes["status"] == CanonStatus.APPROVED.value
+    referencias_antes = list(antes["reference_image_paths"])
+    historial_antes = len(antes.get("approval_history") or [])
+
+    # Regenerar con el Master ya aprobado: la toma nueva lo sustituye y el
+    # artista sigue aprobado y en uso, sin volver a aprobar nada a mano.
+    _generar_retrato(client, studio, uid, char_id)
+    despues = client.get(f"/api/universes/{uid}/characters/{char_id}").json()
+    assert despues["status"] == CanonStatus.APPROVED.value
+    retrato = next(s for s in despues["master_shots"] if s["key"] == "portrait")
+    assert retrato["status"] == CanonStatus.APPROVED.value
+    assert despues["reference_image_paths"] == referencias_antes
+    assert len(despues.get("approval_history") or []) > historial_antes

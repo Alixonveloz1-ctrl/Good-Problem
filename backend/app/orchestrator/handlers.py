@@ -2,8 +2,11 @@
 
 A handler receives the studio, the universe and the job, does the work, writes
 the artefact into Cloud Storage and the document into Firestore with status
-DRAFT, and returns the real cost. It never approves anything: results land in
-READY and wait for a human (PRD 36).
+DRAFT, and returns the real cost. Results land in READY and wait for a human
+(PRD 36) — with one exception decided by the studio's owner: the artist's own
+Character Master images. Those are approved and in use the moment they are
+generated (see ``_store_image``), because the owner regenerates instead of
+reviewing: a generated face is the face until he asks for another one.
 """
 
 from __future__ import annotations
@@ -435,7 +438,7 @@ def _store_image(studio, universe_id, job, purpose, payload, result, reference_p
         for shot in shots:
             if shot.get("key") == shot_key:
                 shot["storage_path"] = stored.path
-                shot["status"] = CanonStatus.DRAFT.value
+                shot["status"] = CanonStatus.APPROVED.value
                 found = True
         if not found:
             shots.append(
@@ -443,10 +446,39 @@ def _store_image(studio, universe_id, job, purpose, payload, result, reference_p
                     "key": shot_key,
                     "label": shot_key,
                     "storage_path": stored.path,
-                    "status": CanonStatus.DRAFT.value,
+                    "status": CanonStatus.APPROVED.value,
                 }
             )
-        repo.update(target_id, {"master_shots": shots})
+        # Regla del estudio, decidida por su dueno: lo que se genera queda
+        # aprobado y en uso, sin pasos de revision ni de adopcion. La imagen
+        # recien generada ES la toma: entra en las referencias del artista y
+        # el Master queda aprobado con ella, sustituyendo a la anterior si
+        # la habia (regenerar reemplaza; si no gusta, se regenera otra vez).
+        # Es lo mismo que hacia aprobar el Master a mano, hecho en el acto.
+        con_imagen = [s for s in shots if s.get("storage_path")]
+        for shot in con_imagen:
+            shot["status"] = CanonStatus.APPROVED.value
+        service = approvals.ApprovalService(studio.db)
+        service.approve(
+            universe_id,
+            CHARACTERS,
+            target_id,
+            note="Automatico: imagen generada, queda aprobada y en uso.",
+            master_shots=shots,
+            reference_image_paths=[s["storage_path"] for s in con_imagen],
+            master_stale=False,
+        )
+        bible = load_bible(studio.db, universe_id)
+        if bible.visual.master_stale:
+            bible.visual.master_stale = False
+            save_bible(studio.db, universe_id, bible)
+        service.save_to_canon(
+            universe_id,
+            entity_type="character",
+            entity_id=target_id,
+            label=character.get("name", ""),
+            storage_path=con_imagen[0]["storage_path"],
+        )
         return stored, {"id": None}
 
     if purpose == "cover":
