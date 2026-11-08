@@ -111,8 +111,14 @@ def estimate_images(
     )
 
 
-def estimate_song(registry: ModelRegistry, *, attempts: int = 1) -> CostEstimate:
-    spec = registry.music_model()
+def estimate_song(
+    registry: ModelRegistry, *, attempts: int = 1, model_id: str | None = None
+) -> CostEstimate:
+    spec = (
+        registry.require_active(model_id, ModelKind.MUSIC)
+        if model_id
+        else registry.music_model()
+    )
     variant = spec.variant(None)
     return CostEstimate(
         amount_usd=variant.price * attempts,
