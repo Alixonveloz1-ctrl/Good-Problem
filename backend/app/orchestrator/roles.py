@@ -145,12 +145,16 @@ never WHAT it is about:
 - IMAGES THAT HOLD UP. Every comparison or metaphor must still make
   sense read literally; if the image collapses when you picture it,
   it is out. One strong image per section beats five decorative ones.
-- RHYME SERVES MEANING. Never a word chosen only because it rhymes:
-  if the last word of a line is there only for the rhyme, the line is
-  rewritten. Vary the rhyme sounds — long chains on a single ending,
-  line after line landing on the same sound, read mechanical and are
-  forbidden. Internal rhyme and rhythmic play only count while the
-  line still says something true.
+- RHYME SERVES MEANING, AND IT IS ALWAYS THERE. Rhyme is not
+  decoration: line endings land in audible pairs or quatrains —
+  assonant rhyme counts, it is the genre's own way — section after
+  section, in lines of a singable, similar length. A section with
+  no audible rhyme is unfinished. Never a word chosen only because it
+  rhymes: if the last word of a line is there only for the rhyme, the
+  line is rewritten. One rhyme family may carry a quatrain; riding a
+  single ending through the WHOLE song reads mechanical and is
+  forbidden — change families between sections. Internal rhyme and
+  rhythmic play only count while the line still says something true.
 - THE CHORUS IS THE HOOK. Short, singable, the emotional heart in the
   plainest words, and repeated word for word — that is its job. The
   verses do NOT repeat the chorus's idea: they bring the story and
@@ -164,6 +168,30 @@ never WHAT it is about:
 - DETAILS WITH AN OWNER. The concrete details come from THIS artist's
   world and THIS song's story — its concept and its identity. Filler
   that would fit any song is out.
+- SCENES, NOT SLOGANS. Build the lyric out of concrete micro-scenes
+  and moments — a photo she posts, a message at 3 a.m., an address
+  sent, a neighbour hearing the party through the wall — never out of
+  declarations. Announcing an attitude (I am the real one, they are
+  all fake; loyalty speeches; mottoes about haters) is the loudest
+  tell of a fake lyric: an attitude is shown inside a scene, living
+  it, never declared as a slogan.
+- A COMPLETE SONG'S ARCHITECTURE. When the song is a full song, write
+  the full form: an intro, substantial verses (a dozen lines, not a
+  sketch of four), a pre-chorus that tightens the tension, the
+  chorus, room for a spoken bridge, a third verse, and a final
+  chorus allowed to change its closing lines. Two quatrains and a
+  hook is a sketch, not a finished song.
+- THE TEMPERATURE IS THE SONG'S. Sensual writing runs the whole
+  range: teasing and insinuation at one end, explicit, graphic,
+  audible sex between adults at the other — the most famous trap
+  songs are literally sex sung out loud. The temperature is set by
+  THIS song's concept and its reference, and it is never lowered on
+  the writer's own initiative: writing it clean when the song asks
+  for raw is a defect, and so is forcing heat on a song that does
+  not ask for it. Wit is the technique that carries both ends:
+  double meanings, reversals, the line that says it without saying
+  it ("take the fear off, not the clothes — yet"). Picardía is
+  craft, and it works at every temperature.
 - This craft base governs only how the lyric is written. The WHAT —
   topic, story, world, voice — comes only from the artist's identity
   and the song's concept. It imposes no one's themes and no one's
