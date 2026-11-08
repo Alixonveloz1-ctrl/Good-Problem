@@ -140,7 +140,7 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
         sections.append(
             "Develop a song concept for this artist: title, concept, hook, genre, BPM, mood, "
             "structure, production and vocal interpretation. Then write the prompt that will be "
-            "sent to Lyria 3.5 in US English, including the artist's singing voice "
+            "sent to Lyria 3 Pro in US English, including the artist's singing voice "
             "description verbatim and the requested duration."
         )
         sections.extend(_fixed_music_blocks(payload, task))
@@ -181,7 +181,7 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
                 )
         duration = payload.get("duration_seconds")
         if duration:
-            sections.append(f"Requested song duration: {duration} seconds (Lyria 3.5, max 180).")
+            sections.append(f"Requested song duration: {duration} seconds (Lyria 3 Pro, max 180).")
 
     elif task == "lyrics":
         sections.append(
@@ -200,7 +200,7 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
         sections.append(
             "The user supplied these lyrics. Analyse theme and structure, detect the hooks, and "
             "propose genre, BPM, vocal interpretation and production. Do NOT rewrite the lyrics. "
-            "Then write the Lyria 3.5 prompt in US English including the artist's singing "
+            "Then write the Lyria 3 Pro prompt in US English including the artist's singing "
             "voice description verbatim."
         )
         sections.extend(_fixed_music_blocks(payload, task))
