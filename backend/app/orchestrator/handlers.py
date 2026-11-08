@@ -687,7 +687,28 @@ def handle_music(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
     bible = load_bible(studio.db, universe_id)
     voice_lines = song.get("voice_profile", {}).get("lines") or bible.voice_profile.lines
     prompt = _compose_music_prompt(song, voice_lines, payload, bible)
-    duration = int(payload.get("duration_seconds") or song.get("requested_duration_seconds") or 150)
+
+    # La duracion NACE de la letra y del BPM del dueno: ya no es un
+    # numero fijo que la app imponga. Se estima el largo natural de
+    # esta letra a ese BPM y ese estimado es la guia que recibe
+    # Lyria. Si el estimado pasa de tres minutos, la cancion no se
+    # generaria completa: el trabajo falla a la vista con el motivo
+    # y las dos salidas (la pantalla avisa antes y no deja generar,
+    # pero la guardia vive aqui, no en la pantalla).
+    generos = song.get("genres") or bible.music_genres
+    bpm = tempo_domain.bpm_efectivo(generos, song.get("bpm_usuario"))
+    palabras = tempo_domain.contar_palabras(song.get("lyrics", ""))
+    estimada = tempo_domain.duracion_estimada_segundos(palabras, generos, bpm)
+    if palabras and estimada > tempo_domain.DURACION_MAXIMA_SEGUNDOS:
+        raise ProviderError(
+            f"Esta letra a {bpm} BPM dura unos {estimada // 60}:{estimada % 60:02d} — "
+            "pasa de tres minutos y la canción no se generaría completa. "
+            "Sube el BPM o regenera la letra."
+        )
+    if palabras:
+        duration = max(45, min(tempo_domain.DURACION_MAXIMA_SEGUNDOS, estimada))
+    else:
+        duration = int(payload.get("duration_seconds") or song.get("requested_duration_seconds") or 150)
 
     result = lyria.generate_song(
         studio.vertex,
@@ -816,14 +837,16 @@ def _compose_music_prompt(
         f"Structure: {', '.join(song.get('structure') or concept.get('structure') or [])}",
     ]
     parts.extend(d for d in descriptors if not d.endswith(": "))
-    # El tempo REAL: el del genero principal que el dueno escogio, de
-    # la tabla de tempo natural. El BPM que el Director inventaba en
-    # el concepto ya NO viaja: era un numero sin relacion con el
-    # genero ni con el fraseo, y la cancion salia a la velocidad que
-    # saliera. Sin genero de la tabla (solo texto libre), no se manda
-    # ningun numero: manda la orden de ritmo del proveedor.
-    linea_tempo = tempo_domain.linea_tempo(
-        song.get("genres") or (bible.music_genres if bible is not None else None)
+    # El tempo REAL: el BPM del dueno si lo puso en su selector; si
+    # no, el del genero principal que escogio, de la tabla de tempo
+    # natural. El BPM que el Director inventaba en el concepto ya NO
+    # viaja: era un numero sin relacion con el genero ni con el
+    # fraseo, y la cancion salia a la velocidad que saliera. Sin BPM
+    # que mandar (solo texto libre), no se manda ningun numero: manda
+    # la orden de ritmo del proveedor.
+    linea_tempo = tempo_domain.linea_tempo_cancion(
+        song.get("genres") or (bible.music_genres if bible is not None else None),
+        song.get("bpm_usuario"),
     )
     if linea_tempo:
         parts.append(linea_tempo)
