@@ -81,11 +81,13 @@ def test_full_production_from_a_phone(client, studio):
     # no-op de compatibilidad).
     _run(client, studio, "post", f"/api/universes/{uid}/songs/{sid}/lyrics/approve")
 
-    # 12. Generar cancion con Lyria 3 Pro a la duracion pedida.
+    # 12. Generar cancion con Lyria 3 Pro. La duracion ya no se pide:
+    # nace de la letra y del BPM (esta letra de prueba tiene tres
+    # palabras, asi que manda el piso de la guia: 45 segundos).
     music_job = _run(client, studio, "post", f"/api/universes/{uid}/songs/{sid}/generate",
-                     json={"duration_seconds": 150})
+                     json={})
     assert music_job["model"] == "lyria-3-pro-preview"
-    assert music_job["result"]["duration_seconds"] == 150
+    assert music_job["result"]["duration_seconds"] == 45
 
     # 15. La version generada ya es el master: el handler la dejo vigente
     # al generarla, y la vieja llamada a aprobarla no cambia nada.
