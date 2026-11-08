@@ -10,7 +10,7 @@ import logging
 from typing import Any
 
 from .db.client import Database, build_database
-from .db.repositories import CONFIG_MODELS
+from .db.repositories import CONFIG_MODELS, CONFIG_SECRETS
 from .domain.registry import ModelRegistry, load_seed
 from .providers.storage import Storage, build_storage
 from .providers.vertex import CallLog, VertexClient, build_vertex_client
@@ -94,6 +94,26 @@ class Studio:
         document = {**document, "id": "models"}
         self.db.set(CONFIG_MODELS, document)
         return self.reload_registry()
+
+    # -- secretos del estudio --------------------------------------------------
+
+    def gemini_api_key(self) -> str:
+        """La clave de Gemini del dueno, si la puso.
+
+        Vive en su propio documento, la escribe solo el endpoint de
+        ajustes y de aqui sale unicamente hacia la llamada de musica
+        que la necesita: ningun GET la devuelve, ni siquiera tapada.
+        """
+        doc = self.db.get(CONFIG_SECRETS) or {}
+        return str(doc.get("gemini_api_key") or "").strip()
+
+    def set_gemini_api_key(self, key: str) -> None:
+        self.db.set(
+            CONFIG_SECRETS, {"id": "secrets", "gemini_api_key": key.strip()}
+        )
+
+    def clear_gemini_api_key(self) -> None:
+        self.db.set(CONFIG_SECRETS, {"id": "secrets", "gemini_api_key": ""})
 
 
 _studio: Studio | None = None
