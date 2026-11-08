@@ -343,7 +343,7 @@ def approve_lyrics(
 def generate_song(
     owner: OwnerDep, studio: StudioDep, universe_id: str, song_id: str, body: GenerateIn
 ) -> dict[str, Any]:
-    """Always Lyria 3.5. There is no model selector here because there is
+    """Always Lyria 3 Pro. There is no model selector here because there is
     nothing to select: the other two Lyria models make 30 second clips."""
     song = _repo(studio, universe_id).require(song_id)
     approval_rules.assert_lyrics_ready(studio.db, universe_id, song_id)
@@ -353,7 +353,7 @@ def generate_song(
             kind="music",
             target_type="song",
             target_id=song_id,
-            model=None,  # resolved to lyria-3.5 by the orchestrator
+            model=None,  # resolved to lyria-3-pro-preview by the orchestrator
             idempotency_key=body.idempotency_key,
             payload={
                 "duration_seconds": body.duration_seconds
