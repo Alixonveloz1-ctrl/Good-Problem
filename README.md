@@ -195,16 +195,20 @@ renderizado, un proyecto no se puede aprobar.
   insinuación y la picardía al sexo gráfico — sin que la app la baje.
   La letra que el Director escribe pasa una revisión contra esa base
   antes de guardarse.
-- **Tempo: la velocidad la manda el género.** Cada género escogible
-  tiene su tempo natural (BPM, paso y fraseo) y ese es el que viaja
-  en el encargo; el BPM que el Director inventaba en el concepto ya
-  no llega a Lyria. El encargo ordena tempo firme: prohibido acelerar
-  para que quepa la letra — si algo no cabe, se repite menos el coro.
-  Y la letra nace medida: la app calcula cuántas palabras caben
-  cantadas bien en los segundos pedidos al paso del género, y la
-  escritura y su revisión se quedan dentro de esa medida. (La
-  primera generación del dueño tras este despliegue es la prueba de
-  oído del control.)
+- **Tempo: la velocidad la manda el dueño, con su selector de BPM.**
+  Cada género escogible tiene su tempo natural y el selector arranca
+  ahí, pero el número que manda es el que el dueño deja puesto
+  (60–180), escogido ANTES de generar la letra: ese BPM es la
+  velocidad de la voz que se le pide a Lyria, con orden de tempo
+  firme — prohibido acelerar para que quepa la letra. La duración ya
+  no es un número fijo: nace de la letra y del BPM (la app estima el
+  largo natural y lo da como guía). Y una restricción del dueño:
+  ninguna letra generada puede pasar de tres minutos ni a la
+  velocidad más alta (techo de 550 palabras); la letra nace medida
+  para el BPM puesto, y si el dueño cambia el BPM y la cuenta se
+  pasa de tres minutos, la pantalla avisa y generar queda en pausa
+  hasta que suba el BPM o regenere la letra. El BPM que el Director
+  inventaba en el concepto ya no llega a Lyria.
 - **Música: Lyria por dos puertas.** Sin clave: Lyria 3 Pro
   (`lyria-3-pro-preview`) por Vertex, con la identidad del proyecto.
   Con la clave de Gemini del dueño puesta como variable de entorno
