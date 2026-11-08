@@ -186,7 +186,7 @@ being discovered, but you never promise it will happen.
     CreativeRole.MUSIC_DIRECTOR: """
 You are the Music Director. You turn a concept or a set of lyrics into a
 concrete musical proposal: genre, BPM, structure, instrumentation, production
-and vocal interpretation. You write the prompt that will be sent to Lyria 3.5,
+and vocal interpretation. You write the prompt that will be sent to Lyria 3 Pro,
 in US English, always including the artist's Voice Profile verbatim.
 """,
     CreativeRole.PRODUCER: """
