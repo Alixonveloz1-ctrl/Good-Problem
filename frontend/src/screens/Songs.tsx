@@ -383,8 +383,8 @@ export function SongScreen() {
               <p className="muted" style={{ margin: 0 }}>
                 Cancion completa a la duracion pedida ({data.requested_duration_seconds}s).{' '}
                 {conClave
-                  ? 'Canta Lyria 3.5, con tu clave de Gemini puesta en Ajustes.'
-                  : 'Canta Lyria 3 Pro. Con tu clave de Gemini puesta en Ajustes cantaria Lyria 3.5.'}{' '}
+                  ? 'Canta Lyria 3.5, con tu clave de Gemini puesta en el servicio.'
+                  : 'Canta Lyria 3 Pro. Con tu clave de Gemini puesta en el servicio cantaria Lyria 3.5.'}{' '}
                 Lyria 3
                 y Lyria 2 hacen clips de 30 s y estan fuera del sistema, tampoco como respaldo si
                 algo falla.
