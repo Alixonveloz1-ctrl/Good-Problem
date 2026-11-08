@@ -691,6 +691,7 @@ def handle_music(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
     result = lyria.generate_song(
         studio.vertex,
         model=job["model"],
+        gemini_api_key=studio.gemini_api_key(),
         prompt=prompt,
         duration_seconds=duration,
         lyrics=song.get("lyrics", ""),
@@ -705,7 +706,7 @@ def handle_music(studio, universe_id: str, job: dict[str, Any]) -> Outcome:
         result.data,
         result.mime_type,
     )
-    cost = estimate_song(studio.registry, attempts=1)
+    cost = estimate_song(studio.registry, attempts=1, model_id=result.model)
     # La version recien generada ES la cancion: queda como master vigente en
     # el acto y las anteriores pasan a archivo. Regenerar sustituye; nadie
     # aprueba nada para que el videoclip o la descarga la puedan usar.
