@@ -5,7 +5,7 @@ from a phone without a deploy (PRD 41). That flexibility must not be able to
 reintroduce the four mistakes the PRD v2.1 exists to correct, so those rules are
 hardcoded here and the registry is validated against them on load.
 
-  1. Music is Lyria 3.5 and nothing else, not even as a fallback after a
+  1. Music is Lyria 3 Pro and nothing else, not even as a fallback after a
      failure (PRD 14).
   2. Veo is always called with audio disabled, in every format (PRD 5, 26).
   3. Veo clips last 4, 6 or 8 seconds, and 8 is mandatory whenever the request
@@ -21,7 +21,7 @@ from ..errors import InvalidGenerationRequest, ModelNotAllowed
 
 # --- 1. Music --------------------------------------------------------------
 
-MUSIC_MODEL_ID = "lyria-3.5"
+MUSIC_MODEL_ID = "lyria-3-pro-preview"
 
 BANNED_MODEL_IDS: frozenset[str] = frozenset(
     {
@@ -41,10 +41,10 @@ BANNED_MODEL_IDS: frozenset[str] = frozenset(
 )
 
 BANNED_REASONS: dict[str, str] = {
-    "lyria-3-clip-preview": "Genera clips de 30 s. Solo se usa Lyria 3.5.",
-    "lyria-3": "Genera clips de 30 s. Solo se usa Lyria 3.5.",
-    "lyria-2": "Genera clips de 30 s. Solo se usa Lyria 3.5.",
-    "lyria-002": "Genera clips de 30 s. Solo se usa Lyria 3.5.",
+    "lyria-3-clip-preview": "Genera clips de 30 s. Solo se usa Lyria 3 Pro.",
+    "lyria-3": "Genera clips de 30 s. Solo se usa Lyria 3 Pro.",
+    "lyria-2": "Genera clips de 30 s. Solo se usa Lyria 3 Pro.",
+    "lyria-002": "Genera clips de 30 s. Solo se usa Lyria 3 Pro.",
 }
 
 # --- 2. Video audio --------------------------------------------------------
@@ -70,7 +70,7 @@ def assert_not_banned(model_id: str) -> None:
 
 
 def assert_music_model(model_id: str) -> str:
-    """Music generation only ever reaches Lyria 3.5."""
+    """Music generation only ever reaches Lyria 3 Pro."""
     key = (model_id or "").strip() or MUSIC_MODEL_ID
     assert_not_banned(key)
     if key != MUSIC_MODEL_ID:
