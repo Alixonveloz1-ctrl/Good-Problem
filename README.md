@@ -188,9 +188,14 @@ renderizado, un proyecto no se puede aprobar.
 
 ## Modelos
 
-- **Música: Lyria 3 Pro** (`lyria-3-pro-preview`), el único modelo de música
-  del sistema. El encargo incluye una orden de dicción: cada palabra
-  completa, sílaba a sílaba, sin recortar palabras para caber en el ritmo.
-  (El 2026-11-07 se probó Lyria 3.5 con una canción real y Vertex contestó
-  que no está soportada por su API de interacciones; por esa puerta no
-  existe, y la música se quedó en Lyria 3 Pro.)
+- **Música: Lyria por dos puertas.** Sin clave: Lyria 3 Pro
+  (`lyria-3-pro-preview`) por Vertex, con la identidad del proyecto.
+  Con la clave de Gemini del dueño puesta en Ajustes: Lyria 3.5
+  (`lyria-3.5`) por la API de Gemini. El encargo es el mismo en las
+  dos puertas e incluye una orden de dicción: cada palabra completa,
+  sílaba a sílaba, sin recortar palabras para caber en el ritmo.
+  (El 2026-11-07 se probó Lyria 3.5 por Vertex con una canción real y
+  Vertex contestó que no está soportada por su API de interacciones;
+  esa misma noche el dueño habilitó su clave y se abrió la segunda
+  puerta. La clave se guarda en el documento de secretos del estudio
+  y ningún GET la devuelve.)
