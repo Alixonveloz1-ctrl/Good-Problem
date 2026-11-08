@@ -183,3 +183,12 @@ storyboard de cada videoclip, con planos cortos pensados para cortar cada
 3–5 segundos y la música sonando desde el segundo 0. El montaje final se
 renderiza de verdad en el servicio, que lleva FFmpeg en su imagen: sin MP4
 renderizado, un proyecto no se puede aprobar.
+
+---
+
+## Modelos
+
+- **Música: Lyria 3.5** (`lyria-3.5`), el único modelo de música del sistema.
+  El encargo incluye una orden de dicción: cada palabra completa, sílaba a
+  sílaba, sin recortar palabras para caber en el ritmo. (Lyria 3 Pro,
+  `lyria-3-pro-preview`, fue el modelo hasta el 2026-11-07.)
