@@ -130,9 +130,17 @@ class Orchestrator:
             raise InvalidGenerationRequest(f"Tipo de generacion desconocido: '{request.kind}'.")
 
         if model_kind is ModelKind.MUSIC:
-            # There is one music model and it is not negotiable, not even as a
-            # fallback after a failure.
-            spec = registry.require_active(assert_music_model(request.model or ""), model_kind)
+            # La musica no se negocia: el modelo es el de la puerta que
+            # este abierta — Lyria 3.5 si el dueno puso su clave de
+            # Gemini, Lyria 3 Pro por Vertex si no — y ningun fallo
+            # cambia a otro a escondidas.
+            spec = registry.require_active(
+                assert_music_model(
+                    request.model or "",
+                    gemini=bool(self.studio.gemini_api_key()),
+                ),
+                model_kind,
+            )
             return ResolvedModel(spec, spec.variant(request.variant).key, "system")
 
         if request.model:
@@ -174,7 +182,7 @@ class Orchestrator:
                 registry, resolved.spec.id, resolved.variant, seconds=seconds, clips=1
             )
         if request.kind == "music":
-            return estimate_song(registry, attempts=1)
+            return estimate_song(registry, attempts=1, model_id=resolved.spec.id)
         return estimate_text(
             registry,
             resolved.spec.id,
