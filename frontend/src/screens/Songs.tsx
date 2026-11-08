@@ -110,6 +110,8 @@ export function SongScreen() {
   const { data, loading, error, reload } = useResource<Song>(
     `/api/universes/${universeId}/songs/${songId}`,
   )
+  const ajustes = useResource<{ gemini_key_configured: boolean }>('/api/settings')
+  const conClave = ajustes.data?.gemini_key_configured ?? false
   const action = useAction()
   const [jobId, setJobId] = useState<string | null>(null)
   const [lyrics, setLyrics] = useState('')
@@ -375,11 +377,15 @@ export function SongScreen() {
             {/* 3. Lyria */}
             <Card>
               <div className="row between">
-                <h3>3 · Generar con Lyria 3 Pro</h3>
+                <h3>3 · Generar con {conClave ? 'Lyria 3.5' : 'Lyria 3 Pro'}</h3>
                 <span className="badge accent">Sin selector</span>
               </div>
               <p className="muted" style={{ margin: 0 }}>
-                Cancion completa a la duracion pedida ({data.requested_duration_seconds}s). Lyria 3
+                Cancion completa a la duracion pedida ({data.requested_duration_seconds}s).{' '}
+                {conClave
+                  ? 'Canta Lyria 3.5, con tu clave de Gemini puesta en Ajustes.'
+                  : 'Canta Lyria 3 Pro. Con tu clave de Gemini puesta en Ajustes cantaria Lyria 3.5.'}{' '}
+                Lyria 3
                 y Lyria 2 hacen clips de 30 s y estan fuera del sistema, tampoco como respaldo si
                 algo falla.
               </p>
