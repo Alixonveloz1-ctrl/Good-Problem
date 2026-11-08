@@ -188,6 +188,13 @@ renderizado, un proyecto no se puede aprobar.
 
 ## Modelos
 
+- **Letras: la base de oficio cubre el espectro completo.** Estructura
+  de canción entera (intro, versos, pre-coro, coro, puente hablado,
+  tercer verso), escenas concretas en vez de consignas, rima audible
+  constante y la temperatura que pida cada canción — de la
+  insinuación y la picardía al sexo gráfico — sin que la app la baje.
+  La letra que el Director escribe pasa una revisión contra esa base
+  antes de guardarse.
 - **Música: Lyria por dos puertas.** Sin clave: Lyria 3 Pro
   (`lyria-3-pro-preview`) por Vertex, con la identidad del proyecto.
   Con la clave de Gemini del dueño puesta en Ajustes: Lyria 3.5
