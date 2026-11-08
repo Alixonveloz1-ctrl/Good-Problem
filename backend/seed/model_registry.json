@@ -1,1 +1,283 @@
-ewogICJzY2hlbWFfdmVyc2lvbiI6IDUsCiAgIm5vdGUiOiAiTG9zIGlkZW50aWZpY2Fkb3JlcyBzb24gbG9zIHF1ZSBWZXJ0ZXggQUkgcmVjb25vY2UsIG5vIGxvcyBub21icmVzIGNvbWVyY2lhbGVzLiBBbCBzdWJpciBzY2hlbWFfdmVyc2lvbiwgbGEgYXBsaWNhY2lvbiByZWVzY3JpYmUgZXN0ZSBkb2N1bWVudG8gZW4gZWwgYXJyYW5xdWUgc2lndWllbnRlLiBQcmVjaW9zIHJldmFsaWRhZG9zIGNvbnRyYSBsYSBkb2N1bWVudGFjaW9uIG9maWNpYWwgZGUgR29vZ2xlIGVsIDIwMjYtMTEtMDU6IHRvZG9zIGxvcyBpZGVudGlmaWNhZG9yZXMgc2lndWVuIGV4aXN0aWVuZG87IHNlIGNvcnJpZ2llcm9uIGVsIHByZWNpbyBkZSB0ZXh0byBkZSBHZW1pbmkgMy4xIFBybyAoMiwwMC8xMiwwMCBwb3IgbWlsbG9uKSB5IGxvcyBkZSBOYW5vIEJhbmFuYSAyIGEgNTEyIHB4IHkgNEsuIENoaXJwIHNhbGlvIGRlbCByZWdpc3RybyBhbCBlbGltaW5hciBsYSB2b3ogaGFibGFkYSBjbG9uYWRhLiBFbCAyMDI2LTExLTA3IGxhIG11c2ljYSBwYXNvIGEgTHlyaWEgMy41IChseXJpYS0zLjUpLCBsYSBnZW5lcmFjaW9uIHF1ZSBHb29nbGUgcmVjb21pZW5kYSBlbiBsdWdhciBkZSBseXJpYS0zLXByby1wcmV2aWV3LCB5IGVsIGVuY2FyZ28gYSBMeXJpYSBsbGV2YSB1bmEgb3JkZW4gZGUgZGljY2lvbjogcGFsYWJyYSBjb21wbGV0YSwgc2lsYWJhIGEgc2lsYWJhLCBzaW4gcmVjb3J0YXIgcGFyYSBjYWJlciBlbiBlbCByaXRtby4iLAogICJjdXJyZW5jeSI6ICJVU0QiLAogICJtb2RlbHMiOiBbCiAgICB7CiAgICAgICJpZCI6ICJnZW1pbmktMy4xLXByby1wcmV2aWV3IiwKICAgICAgImtpbmQiOiAidGV4dCIsCiAgICAgICJsYWJlbCI6ICJHZW1pbmkgMyBQcm8iLAogICAgICAicm9sZV9oaW50IjogIkRpcmVjdG9yLCBQcm9kdWNlciwgTXVzaWMgRGlyZWN0b3IiLAogICAgICAic3RhdHVzIjogImFjdGl2ZSIsCiAgICAgICJ2YXJpYW50cyI6IFsKICAgICAgICB7CiAgICAgICAgICAia2V5IjogImRlZmF1bHQiLAogICAgICAgICAgImxhYmVsIjogIkVzdGFuZGFyIiwKICAgICAgICAgICJ1bml0IjogIjFtX3Rva2VucyIsCiAgICAgICAgICAicHJpY2VfaW5wdXQiOiAyLjAsCiAgICAgICAgICAicHJpY2Vfb3V0cHV0IjogMTIuMAogICAgICAgIH0KICAgICAgXSwKICAgICAgImNhcGFiaWxpdGllcyI6IHsKICAgICAgICAiYWNjZXB0c19pbWFnZXMiOiB0cnVlLAogICAgICAgICJzdHJ1Y3R1cmVkX291dHB1dCI6IHRydWUsCiAgICAgICAgInByb21wdF9sYW5ndWFnZSI6ICJlbi1VUyIKICAgICAgfQogICAgfSwKICAgIHsKICAgICAgImlkIjogImdlbWluaS0zLXByby1pbWFnZSIsCiAgICAgICJraW5kIjogImltYWdlIiwKICAgICAgImxhYmVsIjogIk5hbm8gQmFuYW5hIFBybyIsCiAgICAgICJzdGF0dXMiOiAiYWN0aXZlIiwKICAgICAgImRlZmF1bHRfdmFyaWFudCI6ICIxSyIsCiAgICAgICJ2YXJpYW50cyI6IFsKICAgICAgICB7CiAgICAgICAgICAia2V5IjogIjFLIiwKICAgICAgICAgICJsYWJlbCI6ICIxSyIsCiAgICAgICAgICAidW5pdCI6ICJpbWFnZSIsCiAgICAgICAgICAicHJpY2UiOiAwLjEzNAogICAgICAgIH0sCiAgICAgICAgewogICAgICAgICAgImtleSI6ICIySyIsCiAgICAgICAgICAibGFiZWwiOiAiMksiLAogICAgICAgICAgInVuaXQiOiAiaW1hZ2UiLAogICAgICAgICAgInByaWNlIjogMC4xMzQKICAgICAgICB9LAogICAgICAgIHsKICAgICAgICAgICJrZXkiOiAiNEsiLAogICAgICAgICAgImxhYmVsIjogIjRLIiwKICAgICAgICAgICJ1bml0IjogImltYWdlIiwKICAgICAgICAgICJwcmljZSI6IDAuMjQKICAgICAgICB9CiAgICAgIF0sCiAgICAgICJjYXBhYmlsaXRpZXMiOiB7CiAgICAgICAgInJlZmVyZW5jZV9jaGFyYWN0ZXJzX21heCI6IDUsCiAgICAgICAgInJlZmVyZW5jZV9vYmplY3RzX21heCI6IDYsCiAgICAgICAgInJlZmVyZW5jZV9zdHlsZXNfbWF4IjogMywKICAgICAgICAicmVzb2x1dGlvbnMiOiBbCiAgICAgICAgICAiMUsiLAogICAgICAgICAgIjJLIiwKICAgICAgICAgICI0SyIKICAgICAgICBdCiAgICAgIH0KICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJnZW1pbmktMy4xLWZsYXNoLWltYWdlIiwKICAgICAgImtpbmQiOiAiaW1hZ2UiLAogICAgICAibGFiZWwiOiAiTmFubyBCYW5hbmEgMiIsCiAgICAgICJzdGF0dXMiOiAiYWN0aXZlIiwKICAgICAgImRlZmF1bHRfdmFyaWFudCI6ICIxSyIsCiAgICAgICJ2YXJpYW50cyI6IFsKICAgICAgICB7CiAgICAgICAgICAia2V5IjogIjUxMnB4IiwKICAgICAgICAgICJsYWJlbCI6ICI1MTIgcHgiLAogICAgICAgICAgInVuaXQiOiAiaW1hZ2UiLAogICAgICAgICAgInByaWNlIjogMC4wNDUKICAgICAgICB9LAogICAgICAgIHsKICAgICAgICAgICJrZXkiOiAiMUsiLAogICAgICAgICAgImxhYmVsIjogIjFLIiwKICAgICAgICAgICJ1bml0IjogImltYWdlIiwKICAgICAgICAgICJwcmljZSI6IDAuMDY3CiAgICAgICAgfSwKICAgICAgICB7CiAgICAgICAgICAia2V5IjogIjJLIiwKICAgICAgICAgICJsYWJlbCI6ICIySyIsCiAgICAgICAgICAidW5pdCI6ICJpbWFnZSIsCiAgICAgICAgICAicHJpY2UiOiAwLjEwMQogICAgICAgIH0sCiAgICAgICAgewogICAgICAgICAgImtleSI6ICI0SyIsCiAgICAgICAgICAibGFiZWwiOiAiNEsiLAogICAgICAgICAgInVuaXQiOiAiaW1hZ2UiLAogICAgICAgICAgInByaWNlIjogMC4xNQogICAgICAgIH0KICAgICAgXSwKICAgICAgImNhcGFiaWxpdGllcyI6IHsKICAgICAgICAicmVmZXJlbmNlX2NoYXJhY3RlcnNfbWF4IjogNCwKICAgICAgICAicmVmZXJlbmNlX29iamVjdHNfbWF4IjogMTAsCiAgICAgICAgInJlZmVyZW5jZV9zdHlsZXNfbWF4IjogMCwKICAgICAgICAicmVzb2x1dGlvbnMiOiBbCiAgICAgICAgICAiNTEycHgiLAogICAgICAgICAgIjFLIiwKICAgICAgICAgICIySyIsCiAgICAgICAgICAiNEsiCiAgICAgICAgXQogICAgICB9CiAgICB9LAogICAgewogICAgICAiaWQiOiAibHlyaWEtMy41IiwKICAgICAgImtpbmQiOiAibXVzaWMiLAogICAgICAibGFiZWwiOiAiTHlyaWEgMy41IiwKICAgICAgInN0YXR1cyI6ICJhY3RpdmUiLAogICAgICAiZGVmYXVsdF92YXJpYW50IjogInNvbmciLAogICAgICAidmFyaWFudHMiOiBbCiAgICAgICAgewogICAgICAgICAgImtleSI6ICJzb25nIiwKICAgICAgICAgICJsYWJlbCI6ICJDYW5jaW9uIGNvbXBsZXRhIiwKICAgICAgICAgICJ1bml0IjogInNvbmciLAogICAgICAgICAgInByaWNlIjogMC4wOAogICAgICAgIH0KICAgICAgXSwKICAgICAgImNhcGFiaWxpdGllcyI6IHsKICAgICAgICAiZnVsbF9zb25ncyI6IHRydWUsCiAgICAgICAgIm1heF9kdXJhdGlvbl9zZWNvbmRzIjogMTgwLAogICAgICAgICJyZWZlcmVuY2VfYXVkaW8iOiBmYWxzZSwKICAgICAgICAicmVmZXJlbmNlX2ltYWdlcyI6IHRydWUsCiAgICAgICAgInByb21wdF9sYW5ndWFnZSI6ICJlbi1VUyIKICAgICAgfQogICAgfSwKICAgIHsKICAgICAgImlkIjogInZlby0zLjEtZ2VuZXJhdGUtMDAxIiwKICAgICAgImtpbmQiOiAidmlkZW8iLAogICAgICAibGFiZWwiOiAiVmVvIDMuMSIsCiAgICAgICJzdGF0dXMiOiAiYWN0aXZlIiwKICAgICAgImRlZmF1bHRfdmFyaWFudCI6ICIxMDgwcCIsCiAgICAgICJ2YXJpYW50cyI6IFsKICAgICAgICB7CiAgICAgICAgICAia2V5IjogIjEwODBwIiwKICAgICAgICAgICJsYWJlbCI6ICIxMDgwcCIsCiAgICAgICAgICAidW5pdCI6ICJzZWNvbmQiLAogICAgICAgICAgInByaWNlIjogMC4yCiAgICAgICAgfSwKICAgICAgICB7CiAgICAgICAgICAia2V5IjogIjRLIiwKICAgICAgICAgICJsYWJlbCI6ICI0SyIsCiAgICAgICAgICAidW5pdCI6ICJzZWNvbmQiLAogICAgICAgICAgInByaWNlIjogMC40CiAgICAgICAgfQogICAgICBdLAogICAgICAiY2FwYWJpbGl0aWVzIjogewogICAgICAgICJkdXJhdGlvbnNfc2Vjb25kcyI6IFsKICAgICAgICAgIDQsCiAgICAgICAgICA2LAogICAgICAgICAgOAogICAgICAgIF0sCiAgICAgICAgInJlZmVyZW5jZV9pbWFnZXNfbWF4IjogMywKICAgICAgICAiYXNwZWN0X3JhdGlvcyI6IFsKICAgICAgICAgICIxNjo5IiwKICAgICAgICAgICI5OjE2IgogICAgICAgIF0sCiAgICAgICAgImF1ZGlvIjogImFsd2F5c19kaXNhYmxlZCIKICAgICAgfQogICAgfSwKICAgIHsKICAgICAgImlkIjogInZlby0zLjEtZmFzdC1nZW5lcmF0ZS0wMDEiLAogICAgICAia2luZCI6ICJ2aWRlbyIsCiAgICAgICJsYWJlbCI6ICJWZW8gMy4xIEZhc3QiLAogICAgICAic3RhdHVzIjogImFjdGl2ZSIsCiAgICAgICJkZWZhdWx0X3ZhcmlhbnQiOiAiMTA4MHAiLAogICAgICAidmFyaWFudHMiOiBbCiAgICAgICAgewogICAgICAgICAgImtleSI6ICIxMDgwcCIsCiAgICAgICAgICAibGFiZWwiOiAiMTA4MHAiLAogICAgICAgICAgInVuaXQiOiAic2Vjb25kIiwKICAgICAgICAgICJwcmljZSI6IDAuMQogICAgICAgIH0sCiAgICAgICAgewogICAgICAgICAgImtleSI6ICI3MjBwIiwKICAgICAgICAgICJsYWJlbCI6ICI3MjBwIiwKICAgICAgICAgICJ1bml0IjogInNlY29uZCIsCiAgICAgICAgICAicHJpY2UiOiAwLjA4CiAgICAgICAgfQogICAgICBdLAogICAgICAiY2FwYWJpbGl0aWVzIjogewogICAgICAgICJkdXJhdGlvbnNfc2Vjb25kcyI6IFsKICAgICAgICAgIDQsCiAgICAgICAgICA2LAogICAgICAgICAgOAogICAgICAgIF0sCiAgICAgICAgInJlZmVyZW5jZV9pbWFnZXNfbWF4IjogMywKICAgICAgICAiYXNwZWN0X3JhdGlvcyI6IFsKICAgICAgICAgICIxNjo5IiwKICAgICAgICAgICI5OjE2IgogICAgICAgIF0sCiAgICAgICAgImF1ZGlvIjogImFsd2F5c19kaXNhYmxlZCIKICAgICAgfQogICAgfSwKICAgIHsKICAgICAgImlkIjogInZlby0zLjEtbGl0ZS1nZW5lcmF0ZS0wMDEiLAogICAgICAia2luZCI6ICJ2aWRlbyIsCiAgICAgICJsYWJlbCI6ICJWZW8gMy4xIExpdGUiLAogICAgICAic3RhdHVzIjogImFjdGl2ZSIsCiAgICAgICJkZWZhdWx0X3ZhcmlhbnQiOiAiMTA4MHAiLAogICAgICAidmFyaWFudHMiOiBbCiAgICAgICAgewogICAgICAgICAgImtleSI6ICIxMDgwcCIsCiAgICAgICAgICAibGFiZWwiOiAiMTA4MHAiLAogICAgICAgICAgInVuaXQiOiAic2Vjb25kIiwKICAgICAgICAgICJwcmljZSI6IDAuMDUKICAgICAgICB9LAogICAgICAgIHsKICAgICAgICAgICJrZXkiOiAiNzIwcCIsCiAgICAgICAgICAibGFiZWwiOiAiNzIwcCIsCiAgICAgICAgICAidW5pdCI6ICJzZWNvbmQiLAogICAgICAgICAgInByaWNlIjogMC4wMwogICAgICAgIH0KICAgICAgXSwKICAgICAgImNhcGFiaWxpdGllcyI6IHsKICAgICAgICAiZHVyYXRpb25zX3NlY29uZHMiOiBbCiAgICAgICAgICA0LAogICAgICAgICAgNiwKICAgICAgICAgIDgKICAgICAgICBdLAogICAgICAgICJyZWZlcmVuY2VfaW1hZ2VzX21heCI6IDMsCiAgICAgICAgImFzcGVjdF9yYXRpb3MiOiBbCiAgICAgICAgICAiMTY6OSIsCiAgICAgICAgICAiOToxNiIKICAgICAgICBdLAogICAgICAgICJhdWRpbyI6ICJhbHdheXNfZGlzYWJsZWQiCiAgICAgIH0KICAgIH0sCiAgICB7CiAgICAgICJpZCI6ICJnZW1pbmktMi41LWZsYXNoLWltYWdlIiwKICAgICAgImtpbmQiOiAiaW1hZ2UiLAogICAgICAibGFiZWwiOiAiTmFubyBCYW5hbmEiLAogICAgICAic3RhdHVzIjogImFjdGl2ZSIsCiAgICAgICJkZWZhdWx0X3ZhcmlhbnQiOiAiMUsiLAogICAgICAicm9sZV9oaW50IjogIiIsCiAgICAgICJ2YXJpYW50cyI6IFsKICAgICAgICB7CiAgICAgICAgICAia2V5IjogIjFLIiwKICAgICAgICAgICJsYWJlbCI6ICIxSyIsCiAgICAgICAgICAidW5pdCI6ICJpbWFnZSIsCiAgICAgICAgICAicHJpY2UiOiAwLjAzOQogICAgICAgIH0sCiAgICAgICAgewogICAgICAgICAgImtleSI6ICIySyIsCiAgICAgICAgICAibGFiZWwiOiAiMksiLAogICAgICAgICAgInVuaXQiOiAiaW1hZ2UiLAogICAgICAgICAgInByaWNlIjogMC4wMzkKICAgICAgICB9CiAgICAgIF0sCiAgICAgICJjYXBhYmlsaXRpZXMiOiB7CiAgICAgICAgInJlc29sdXRpb25zIjogWwogICAgICAgICAgIjFLIiwKICAgICAgICAgICIySyIKICAgICAgICBdCiAgICAgIH0KICAgIH0KICBdLAogICJleGNsdWRlZCI6IFsKICAgIHsKICAgICAgImlkIjogImx5cmlhLTMtY2xpcC1wcmV2aWV3IiwKICAgICAgImtpbmQiOiAibXVzaWMiLAogICAgICAicmVhc29uIjogIkdlbmVyYSBjbGlwcyBkZSAzMCBzLCBubyBjYW5jaW9uZXMgY29tcGxldGFzLiBQcm9oaWJpZG8gdGFtYmllbiBjb21vIHJlc3BhbGRvIGFudGUgdW4gZmFsbG8gKFBSRCAxNCkuIgogICAgfSwKICAgIHsKICAgICAgImlkIjogImx5cmlhLTIiLAogICAgICAia2luZCI6ICJtdXNpYyIsCiAgICAgICJyZWFzb24iOiAiR2VuZXJhIGNsaXBzIGRlIDMwIHMsIG5vIGNhbmNpb25lcyBjb21wbGV0YXMuIFByb2hpYmlkbyB0YW1iaWVuIGNvbW8gcmVzcGFsZG8gYW50ZSB1biBmYWxsbyAoUFJEIDE0KS4iCiAgICB9LAogICAgewogICAgICAiaWQiOiAiaW1hZ2VuLTMuMC1nZW5lcmF0ZS0wMDIiLAogICAgICAia2luZCI6ICJpbWFnZSIsCiAgICAgICJyZWFzb24iOiAiSW1hZ2VuIG5vIGFjZXB0YSBpbWFnZW5lcyBkZSByZWZlcmVuY2lhOyBlbmRwb2ludHMgYXBhZ2Fkb3MgZWwgMTctMDgtMjAyNiAoUFJEIDI0KS4iCiAgICB9LAogICAgewogICAgICAiaWQiOiAiaW1hZ2VuLTQuMC1nZW5lcmF0ZS0wMDEiLAogICAgICAia2luZCI6ICJpbWFnZSIsCiAgICAgICJyZWFzb24iOiAiSW1hZ2VuIG5vIGFjZXB0YSBpbWFnZW5lcyBkZSByZWZlcmVuY2lhOyBlbmRwb2ludHMgYXBhZ2Fkb3MgZWwgMTctMDgtMjAyNiAoUFJEIDI0KS4iCiAgICB9CiAgXQp9Cg==
+{
+  "schema_version": 5,
+  "note": "Los identificadores son los que Vertex AI reconoce, no los nombres comerciales. Al subir schema_version, la aplicacion reescribe este documento en el arranque siguiente. Precios revalidados contra la documentacion oficial de Google el 2026-11-05: todos los identificadores siguen existiendo; se corrigieron el precio de texto de Gemini 3.1 Pro (2,00/12,00 por millon) y los de Nano Banana 2 a 512 px y 4K. Chirp salio del registro al eliminar la voz hablada clonada. El 2026-11-07 la musica paso a Lyria 3.5 (lyria-3.5), la generacion que Google recomienda en lugar de lyria-3-pro-preview, y el encargo a Lyria lleva una orden de diccion: palabra completa, silaba a silaba, sin recortar para caber en el ritmo.",
+  "currency": "USD",
+  "models": [
+    {
+      "id": "gemini-3.1-pro-preview",
+      "kind": "text",
+      "label": "Gemini 3 Pro",
+      "role_hint": "Director, Producer, Music Director",
+      "status": "active",
+      "variants": [
+        {
+          "key": "default",
+          "label": "Estandar",
+          "unit": "1m_tokens",
+          "price_input": 2.0,
+          "price_output": 12.0
+        }
+      ],
+      "capabilities": {
+        "accepts_images": true,
+        "structured_output": true,
+        "prompt_language": "en-US"
+      }
+    },
+    {
+      "id": "gemini-3-pro-image",
+      "kind": "image",
+      "label": "Nano Banana Pro",
+      "status": "active",
+      "default_variant": "1K",
+      "variants": [
+        {
+          "key": "1K",
+          "label": "1K",
+          "unit": "image",
+          "price": 0.134
+        },
+        {
+          "key": "2K",
+          "label": "2K",
+          "unit": "image",
+          "price": 0.134
+        },
+        {
+          "key": "4K",
+          "label": "4K",
+          "unit": "image",
+          "price": 0.24
+        }
+      ],
+      "capabilities": {
+        "reference_characters_max": 5,
+        "reference_objects_max": 6,
+        "reference_styles_max": 3,
+        "resolutions": [
+          "1K",
+          "2K",
+          "4K"
+        ]
+      }
+    },
+    {
+      "id": "gemini-3.1-flash-image",
+      "kind": "image",
+      "label": "Nano Banana 2",
+      "status": "active",
+      "default_variant": "1K",
+      "variants": [
+        {
+          "key": "512px",
+          "label": "512 px",
+          "unit": "image",
+          "price": 0.045
+        },
+        {
+          "key": "1K",
+          "label": "1K",
+          "unit": "image",
+          "price": 0.067
+        },
+        {
+          "key": "2K",
+          "label": "2K",
+          "unit": "image",
+          "price": 0.101
+        },
+        {
+          "key": "4K",
+          "label": "4K",
+          "unit": "image",
+          "price": 0.15
+        }
+      ],
+      "capabilities": {
+        "reference_characters_max": 4,
+        "reference_objects_max": 10,
+        "reference_styles_max": 0,
+        "resolutions": [
+          "512px",
+          "1K",
+          "2K",
+          "4K"
+        ]
+      }
+    },
+    {
+      "id": "lyria-3.5",
+      "kind": "music",
+      "label": "Lyria 3.5",
+      "status": "active",
+      "default_variant": "song",
+      "variants": [
+        {
+          "key": "song",
+          "label": "Cancion completa",
+          "unit": "song",
+          "price": 0.08
+        }
+      ],
+      "capabilities": {
+        "full_songs": true,
+        "max_duration_seconds": 180,
+        "reference_audio": false,
+        "reference_images": true,
+        "prompt_language": "en-US"
+      }
+    },
+    {
+      "id": "veo-3.1-generate-001",
+      "kind": "video",
+      "label": "Veo 3.1",
+      "status": "active",
+      "default_variant": "1080p",
+      "variants": [
+        {
+          "key": "1080p",
+          "label": "1080p",
+          "unit": "second",
+          "price": 0.2
+        },
+        {
+          "key": "4K",
+          "label": "4K",
+          "unit": "second",
+          "price": 0.4
+        }
+      ],
+      "capabilities": {
+        "durations_seconds": [
+          4,
+          6,
+          8
+        ],
+        "reference_images_max": 3,
+        "aspect_ratios": [
+          "16:9",
+          "9:16"
+        ],
+        "audio": "always_disabled"
+      }
+    },
+    {
+      "id": "veo-3.1-fast-generate-001",
+      "kind": "video",
+      "label": "Veo 3.1 Fast",
+      "status": "active",
+      "default_variant": "1080p",
+      "variants": [
+        {
+          "key": "1080p",
+          "label": "1080p",
+          "unit": "second",
+          "price": 0.1
+        },
+        {
+          "key": "720p",
+          "label": "720p",
+          "unit": "second",
+          "price": 0.08
+        }
+      ],
+      "capabilities": {
+        "durations_seconds": [
+          4,
+          6,
+          8
+        ],
+        "reference_images_max": 3,
+        "aspect_ratios": [
+          "16:9",
+          "9:16"
+        ],
+        "audio": "always_disabled"
+      }
+    },
+    {
+      "id": "veo-3.1-lite-generate-001",
+      "kind": "video",
+      "label": "Veo 3.1 Lite",
+      "status": "active",
+      "default_variant": "1080p",
+      "variants": [
+        {
+          "key": "1080p",
+          "label": "1080p",
+          "unit": "second",
+          "price": 0.05
+        },
+        {
+          "key": "720p",
+          "label": "720p",
+          "unit": "second",
+          "price": 0.03
+        }
+      ],
+      "capabilities": {
+        "durations_seconds": [
+          4,
+          6,
+          8
+        ],
+        "reference_images_max": 3,
+        "aspect_ratios": [
+          "16:9",
+          "9:16"
+        ],
+        "audio": "always_disabled"
+      }
+    },
+    {
+      "id": "gemini-2.5-flash-image",
+      "kind": "image",
+      "label": "Nano Banana",
+      "status": "active",
+      "default_variant": "1K",
+      "role_hint": "",
+      "variants": [
+        {
+          "key": "1K",
+          "label": "1K",
+          "unit": "image",
+          "price": 0.039
+        },
+        {
+          "key": "2K",
+          "label": "2K",
+          "unit": "image",
+          "price": 0.039
+        }
+      ],
+      "capabilities": {
+        "resolutions": [
+          "1K",
+          "2K"
+        ]
+      }
+    }
+  ],
+  "excluded": [
+    {
+      "id": "lyria-3-clip-preview",
+      "kind": "music",
+      "reason": "Genera clips de 30 s, no canciones completas. Prohibido tambien como respaldo ante un fallo (PRD 14)."
+    },
+    {
+      "id": "lyria-2",
+      "kind": "music",
+      "reason": "Genera clips de 30 s, no canciones completas. Prohibido tambien como respaldo ante un fallo (PRD 14)."
+    },
+    {
+      "id": "imagen-3.0-generate-002",
+      "kind": "image",
+      "reason": "Imagen no acepta imagenes de referencia; endpoints apagados el 17-08-2026 (PRD 24)."
+    },
+    {
+      "id": "imagen-4.0-generate-001",
+      "kind": "image",
+      "reason": "Imagen no acepta imagenes de referencia; endpoints apagados el 17-08-2026 (PRD 24)."
+    }
+  ]
+}
