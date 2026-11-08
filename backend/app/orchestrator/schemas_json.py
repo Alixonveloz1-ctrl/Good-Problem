@@ -1,1 +1,315 @@
-IiIiUmVzcG9uc2Ugc2NoZW1hcyBoYW5kZWQgdG8gR2VtaW5pIHNvIHByb3Bvc2FscyBjb21lIGJhY2sgc3RydWN0dXJlZC4KClZlcnRleCB1c2VzIHRoZSBPcGVuQVBJIHN1YnNldCwgc28gdHlwZXMgYXJlIHVwcGVyIGNhc2Ugc3RyaW5ncy4KIiIiCgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCgpmcm9tIHR5cGluZyBpbXBvcnQgQW55CgoKZGVmIF9zdHIoZGVzY3JpcHRpb246IHN0ciA9ICIiKSAtPiBkaWN0W3N0ciwgQW55XToKICAgIHJldHVybiB7InR5cGUiOiAiU1RSSU5HIiwgImRlc2NyaXB0aW9uIjogZGVzY3JpcHRpb259IGlmIGRlc2NyaXB0aW9uIGVsc2UgeyJ0eXBlIjogIlNUUklORyJ9CgoKZGVmIF9hcnIoaXRlbXM6IGRpY3Rbc3RyLCBBbnldKSAtPiBkaWN0W3N0ciwgQW55XToKICAgIHJldHVybiB7InR5cGUiOiAiQVJSQVkiLCAiaXRlbXMiOiBpdGVtc30KCgpNVVNJQ19DT05DRVBUX1NDSEVNQTogZGljdFtzdHIsIEFueV0gPSB7CiAgICAidHlwZSI6ICJPQkpFQ1QiLAogICAgInByb3BlcnRpZXMiOiB7CiAgICAgICAgInRpdGxlIjogX3N0cigiVGl0dWxvIGRlIGxhIGNhbmNpb24sIGVuIGVsIGlkaW9tYSBkZWwgYXJ0aXN0YSIpLAogICAgICAgICJjb25jZXB0IjogX3N0cigiRG9zIG8gdHJlcyBmcmFzZXMgZW4gZXNwYW5vbCIpLAogICAgICAgICJob29rIjogX3N0cigiRWwgZ2FuY2hvLCB0YWwgeSBjb21vIHNlIGNhbnRhcmlhIiksCiAgICAgICAgImdlbnJlIjogX3N0cigpLAogICAgICAgICJicG0iOiB7InR5cGUiOiAiSU5URUdFUiJ9LAogICAgICAgICJtb29kIjogX3N0cigpLAogICAgICAgICJzdHJ1Y3R1cmUiOiBfYXJyKF9zdHIoIkVqLiBJbnRybywgVmVyc2UgMSwgUHJlLWNob3J1cywgQ2hvcnVzIikpLAogICAgICAgICJwcm9kdWN0aW9uIjogX3N0cigiQ29tbyBzdWVuYSBsYSBwcm9kdWNjaW9uLCBlbiBlc3Bhbm9sIiksCiAgICAgICAgImludGVycHJldGF0aW9uIjogX3N0cigiQ29tbyBzZSBjYW50YSwgZW4gZXNwYW5vbCIpLAogICAgICAgICJ2aXN1YWxfY29uY2VwdCI6IF9zdHIoIklkZWEgdmlzdWFsIGFzb2NpYWRhLCBlbiBlc3Bhbm9sIiksCiAgICAgICAgIm11c2ljX3Byb21wdCI6IF9zdHIoIlByb21wdCBwYXJhIEx5cmlhIDMuNSwgZW4gaW5nbGVzIGRlIEVzdGFkb3MgVW5pZG9zIiksCiAgICB9LAogICAgInJlcXVpcmVkIjogWyJ0aXRsZSIsICJjb25jZXB0IiwgImhvb2siLCAiZ2VucmUiLCAiYnBtIiwgInN0cnVjdHVyZSIsICJtdXNpY19wcm9tcHQiXSwKfQoKTFlSSUNTX1NDSEVNQTogZGljdFtzdHIsIEFueV0gPSB7CiAgICAidHlwZSI6ICJPQkpFQ1QiLAogICAgInByb3BlcnRpZXMiOiB7CiAgICAgICAgInRpdGxlIjogX3N0cigpLAogICAgICAgICJseXJpY3MiOiBfc3RyKCJMZXRyYSBjb21wbGV0YSBjb24gbWFyY2FzIGRlIHNlY2Npb24gZW50cmUgY29yY2hldGVzIiksCiAgICAgICAgIm5vdGVzIjogX3N0cigiUXVlIHNlIGJ1c2NvIGNvbiBsYSBsZXRyYSwgZW4gZXNwYW5vbCIpLAogICAgfSwKICAgICJyZXF1aXJlZCI6IFsibHlyaWNzIl0sCn0KCkxZUklDU19BTkFMWVNJU19TQ0hFTUE6IGRpY3Rbc3RyLCBBbnldID0gewogICAgInR5cGUiOiAiT0JKRUNUIiwKICAgICJwcm9wZXJ0aWVzIjogewogICAgICAgICJ0aGVtZSI6IF9zdHIoKSwKICAgICAgICAic3RydWN0dXJlIjogX2Fycihfc3RyKCkpLAogICAgICAgICJob29rcyI6IF9hcnIoX3N0cigpKSwKICAgICAgICAicHJvcG9zZWRfZ2VucmUiOiBfc3RyKCksCiAgICAgICAgInByb3Bvc2VkX2JwbSI6IHsidHlwZSI6ICJJTlRFR0VSIn0sCiAgICAgICAgInByb3Bvc2VkX2ludGVycHJldGF0aW9uIjogX3N0cigpLAogICAgICAgICJwcm9wb3NlZF9wcm9kdWN0aW9uIjogX3N0cigpLAogICAgICAgICJtdXNpY19wcm9tcHQiOiBfc3RyKCJQcm9tcHQgcGFyYSBMeXJpYSAzLjUsIGVuIGluZ2xlcyBkZSBFc3RhZG9zIFVuaWRvcyIpLAogICAgICAgICJzdW1tYXJ5IjogX3N0cigiTGEgcHJvcHVlc3RhIGV4cGxpY2FkYSBhbCB1c3VhcmlvLCBlbiBlc3Bhbm9sIiksCiAgICB9LAogICAgInJlcXVpcmVkIjogWyJ0aGVtZSIsICJwcm9wb3NlZF9nZW5yZSIsICJtdXNpY19wcm9tcHQiLCAic3VtbWFyeSJdLAp9CgpWSURFT19DT05DRVBUX1NDSEVNQTogZGljdFtzdHIsIEFueV0gPSB7CiAgICAidHlwZSI6ICJPQkpFQ1QiLAogICAgInByb3BlcnRpZXMiOiB7CiAgICAgICAgInRpdGxlIjogX3N0cigpLAogICAgICAgICJ2aWRlb190eXBlIjogewogICAgICAgICAgICAidHlwZSI6ICJTVFJJTkciLAogICAgICAgICAgICAiZW51bSI6IFsicGVyZm9ybWFuY2UiLCAibmFycmF0aXZlIiwgImNpbmVtYXRpYyIsICJtaW5pbWFsIiwgImh5YnJpZCJdLAogICAgICAgIH0sCiAgICAgICAgImNvbmNlcHQiOiBfc3RyKCJFbiBlc3Bhbm9sIiksCiAgICAgICAgInN0b3J5IjogewogICAgICAgICAgICAidHlwZSI6ICJPQkpFQ1QiLAogICAgICAgICAgICAicHJvcGVydGllcyI6IHsKICAgICAgICAgICAgICAgICJwcmVtaXNlIjogX3N0cigpLAogICAgICAgICAgICAgICAgImJlZ2lubmluZyI6IF9zdHIoKSwKICAgICAgICAgICAgICAgICJkZXZlbG9wbWVudCI6IF9zdHIoKSwKICAgICAgICAgICAgICAgICJjb25mbGljdCI6IF9zdHIoKSwKICAgICAgICAgICAgICAgICJjbGltYXgiOiBfc3RyKCksCiAgICAgICAgICAgICAgICAicmVzb2x1dGlvbiI6IF9zdHIoKSwKICAgICAgICAgICAgfSwKICAgICAgICB9LAogICAgICAgICJ3YXJkcm9iZV9ub3RlcyI6IF9zdHIoCiAgICAgICAgICAgICJFbCB2ZXN0dWFyaW8gZGVsIGFydGlzdGEgZW4gZXN0ZSB2aWRlbywgZW4gZXNwYW5vbDogcXVlIGxsZXZhIGVuICIKICAgICAgICAgICAgImNhZGEgdHJhbW8geSBwb3IgcXVlLiBFcyB0ZXh0byBkZSBsYSBwcm9wdWVzdGEsIG5vIHVuYSBzZWNjaW9uIGFwYXJ0ZS4iCiAgICAgICAgKSwKICAgICAgICAibG9jYXRpb25fbm90ZXMiOiBfc3RyKAogICAgICAgICAgICAiRG9uZGUgb2N1cnJlIGVzdGUgdmlkZW8sIGVuIGVzcGFub2w6IGxvcyBzaXRpb3MsIHN1IGx1eiB5IHN1ICIKICAgICAgICAgICAgIm1vbWVudG8gZGVsIGRpYS4gRXMgdGV4dG8gZGUgbGEgcHJvcHVlc3RhLCBubyB1bmEgc2VjY2lvbiBhcGFydGUuIgogICAgICAgICksCiAgICB9LAogICAgInJlcXVpcmVkIjogWyJ0aXRsZSIsICJ2aWRlb190eXBlIiwgImNvbmNlcHQiLCAic3RvcnkiXSwKfQoKU1RPUllCT0FSRF9TQ0hFTUE6IGRpY3Rbc3RyLCBBbnldID0gewogICAgInR5cGUiOiAiT0JKRUNUIiwKICAgICJwcm9wZXJ0aWVzIjogewogICAgICAgICJzY2VuZXMiOiBfYXJyKAogICAgICAgICAgICB7CiAgICAgICAgICAgICAgICAidHlwZSI6ICJPQkpFQ1QiLAogICAgICAgICAgICAgICAgInByb3BlcnRpZXMiOiB7CiAgICAgICAgICAgICAgICAgICAgImluZGV4IjogeyJ0eXBlIjogIklOVEVHRVIifSwKICAgICAgICAgICAgICAgICAgICAiZHVyYXRpb25fc2Vjb25kcyI6IHsidHlwZSI6ICJJTlRFR0VSIiwgImVudW0iOiBbOF19LAogICAgICAgICAgICAgICAgICAgICJzb25nX3RpbWVzdGFtcCI6IF9zdHIoIm1tOnNzLW1tOnNzIiksCiAgICAgICAgICAgICAgICAgICAgImNoYXJhY3Rlcl9uYW1lcyI6IF9hcnIoX3N0cigpKSwKICAgICAgICAgICAgICAgICAgICAibG9jYXRpb25fZGVzY3JpcHRpb24iOiBfc3RyKAogICAgICAgICAgICAgICAgICAgICAgICAiRG9uZGUgb2N1cnJlIGVsIHBsYW5vLCBlbiBlc3Bhbm9sLCBjb24gc3UgbHV6IgogICAgICAgICAgICAgICAgICAgICksCiAgICAgICAgICAgICAgICAgICAgIndhcmRyb2JlX2Rlc2NyaXB0aW9uIjogX3N0cigKICAgICAgICAgICAgICAgICAgICAgICAgIlF1ZSBsbGV2YSBwdWVzdG8gZWwgYXJ0aXN0YSBlbiBlc3RlIHBsYW5vLCBlbiBlc3Bhbm9sIgogICAgICAgICAgICAgICAgICAgICksCiAgICAgICAgICAgICAgICAgICAgInBsYW5vcyI6IF9hcnIoCiAgICAgICAgICAgICAgICAgICAgICAgIF9zdHIoCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAiVW4gcGxhbm8gY29ydG8gZGVudHJvIGRlbCBibG9xdWUsIGVuIGVzcGFub2w6ICIKICAgICAgICAgICAgICAgICAgICAgICAgICAgICJlbmN1YWRyZSB5IGFjY2lvbi4gRG9zIG8gdHJlcyBwb3IgYmxvcXVlLiIKICAgICAgICAgICAgICAgICAgICAgICAgKQogICAgICAgICAgICAgICAgICAgICksCiAgICAgICAgICAgICAgICAgICAgImFjdGlvbiI6IF9zdHIoIkVuIGVzcGFub2wiKSwKICAgICAgICAgICAgICAgICAgICAiZW1vdGlvbiI6IF9zdHIoKSwKICAgICAgICAgICAgICAgICAgICAiY2FtZXJhIjogX3N0cigpLAogICAgICAgICAgICAgICAgICAgICJsaWdodGluZyI6IF9zdHIoKSwKICAgICAgICAgICAgICAgICAgICAiZW52aXJvbm1lbnQiOiBfc3RyKCksCiAgICAgICAgICAgICAgICAgICAgImRpYWxvZ3VlIjogX3N0cigpLAogICAgICAgICAgICAgICAgICAgICJ2aXN1YWxfb2JqZWN0aXZlIjogX3N0cigpLAogICAgICAgICAgICAgICAgICAgICJyZXVzZXNfc2NlbmVfaW5kZXgiOiB7CiAgICAgICAgICAgICAgICAgICAgICAgICJ0eXBlIjogIklOVEVHRVIiLAogICAgICAgICAgICAgICAgICAgICAgICAiZGVzY3JpcHRpb24iOiAiLTEgc2kgbGEgdG9tYSBzZSBnZW5lcmEgbnVldmEiLAogICAgICAgICAgICAgICAgICAgIH0sCiAgICAgICAgICAgICAgICAgICAgInJldXNlX25vdGUiOiBfc3RyKCJQb3IgcXVlIHNlIHB1ZWRlIHJlYXByb3ZlY2hhciIpLAogICAgICAgICAgICAgICAgICAgICJpbWFnZV9wcm9tcHQiOiBfc3RyKCJQcm9tcHQgZGUgaW1hZ2VuLCBlbiBpbmdsZXMgZGUgRXN0YWRvcyBVbmlkb3MiKSwKICAgICAgICAgICAgICAgICAgICAidmlkZW9fcHJvbXB0IjogX3N0cigiUHJvbXB0IGRlIHZpZGVvLCBlbiBpbmdsZXMgZGUgRXN0YWRvcyBVbmlkb3MiKSwKICAgICAgICAgICAgICAgIH0sCiAgICAgICAgICAgICAgICAicmVxdWlyZWQiOiBbImluZGV4IiwgImFjdGlvbiIsICJjYW1lcmEiLCAiaW1hZ2VfcHJvbXB0IiwgInZpZGVvX3Byb21wdCJdLAogICAgICAgICAgICB9CiAgICAgICAgKSwKICAgICAgICAibm90ZXMiOiBfc3RyKCJDb21vIHNlIG9yZ2FuaXpvIGxhIHJldXRpbGl6YWNpb24gZGUgdG9tYXMsIGVuIGVzcGFub2wiKSwKICAgIH0sCiAgICAicmVxdWlyZWQiOiBbInNjZW5lcyJdLAp9CgpDSEFSQUNURVJfU0NIRU1BOiBkaWN0W3N0ciwgQW55XSA9IHsKICAgICJ0eXBlIjogIk9CSkVDVCIsCiAgICAicHJvcGVydGllcyI6IHsKICAgICAgICAibmFtZSI6IF9zdHIoKSwKICAgICAgICAiYXBwYXJlbnRfYWdlIjogX3N0cigpLAogICAgICAgICJhcHBlYXJhbmNlIjogX3N0cigiRGVzY3JpcGNpb24gZmlzaWNhIGRldGFsbGFkYSwgZW4gZXNwYW5vbCIpLAogICAgICAgICJwZXJzb25hbGl0eSI6IF9zdHIoKSwKICAgICAgICAibWFzdGVyX3Byb21wdHMiOiBfYXJyKAogICAgICAgICAgICB7CiAgICAgICAgICAgICAgICAidHlwZSI6ICJPQkpFQ1QiLAogICAgICAgICAgICAgICAgInByb3BlcnRpZXMiOiB7CiAgICAgICAgICAgICAgICAgICAgImtleSI6IHsKICAgICAgICAgICAgICAgICAgICAgICAgInR5cGUiOiAiU1RSSU5HIiwKICAgICAgICAgICAgICAgICAgICAgICAgImVudW0iOiBbCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAicG9ydHJhaXQiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgImZ1bGxfYm9keSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAicHJvZmlsZSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAidGhyZWVfcXVhcnRlciIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAibmV1dHJhbCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAiZW1vdGlvbnMiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgInBvc2VzIiwKICAgICAgICAgICAgICAgICAgICAgICAgXSwKICAgICAgICAgICAgICAgICAgICB9LAogICAgICAgICAgICAgICAgICAgICJwcm9tcHQiOiBfc3RyKCJFbiBpbmdsZXMgZGUgRXN0YWRvcyBVbmlkb3MiKSwKICAgICAgICAgICAgICAgIH0sCiAgICAgICAgICAgICAgICAicmVxdWlyZWQiOiBbImtleSIsICJwcm9tcHQiXSwKICAgICAgICAgICAgfQogICAgICAgICksCiAgICB9LAogICAgInJlcXVpcmVkIjogWyJuYW1lIiwgImFwcGVhcmFuY2UiLCAibWFzdGVyX3Byb21wdHMiXSwKfQoKQVJUSVNUX0JJQkxFX1NDSEVNQTogZGljdFtzdHIsIEFueV0gPSB7CiAgICAidHlwZSI6ICJPQkpFQ1QiLAogICAgInByb3BlcnRpZXMiOiB7CiAgICAgICAgImlkZW50aXR5IjogewogICAgICAgICAgICAidHlwZSI6ICJPQkpFQ1QiLAogICAgICAgICAgICAicHJvcGVydGllcyI6IHsKICAgICAgICAgICAgICAgICJzdGFnZV9uYW1lIjogX3N0cigpLAogICAgICAgICAgICAgICAgImZpY3Rpb25hbF9uYW1lIjogX3N0cigpLAogICAgICAgICAgICAgICAgImFwcGFyZW50X2FnZSI6IF9zdHIoKSwKICAgICAgICAgICAgICAgICJvcmlnaW4iOiBfc3RyKCksCiAgICAgICAgICAgICAgICAibGFuZ3VhZ2VzIjogX2Fycihfc3RyKCkpLAogICAgICAgICAgICAgICAgInBlcnNvbmFsaXR5IjogX3N0cigpLAogICAgICAgICAgICAgICAgImJhY2tzdG9yeSI6IF9zdHIoKSwKICAgICAgICAgICAgICAgICJ0YXJnZXRfYXVkaWVuY2UiOiBfc3RyKCksCiAgICAgICAgICAgICAgICAicmVjdXJyaW5nX3RoZW1lcyI6IF9hcnIoX3N0cigpKSwKICAgICAgICAgICAgfSwKICAgICAgICB9LAogICAgICAgICJtdXNpY2FsIjogewogICAgICAgICAgICAidHlwZSI6ICJPQkpFQ1QiLAogICAgICAgICAgICAicHJvcGVydGllcyI6IHsKICAgICAgICAgICAgICAgICJnZW5yZSI6IF9zdHIoKSwKICAgICAgICAgICAgICAgICJzdWJnZW5yZXMiOiBfYXJyKF9zdHIoKSksCiAgICAgICAgICAgICAgICAiYnBtX3JhbmdlIjogX3N0cigpLAogICAgICAgICAgICAgICAgImluc3RydW1lbnRhdGlvbiI6IF9hcnIoX3N0cigpKSwKICAgICAgICAgICAgICAgICJwcm9kdWN0aW9uIjogX3N0cigpLAogICAgICAgICAgICAgICAgInN0cnVjdHVyZXMiOiBfYXJyKF9zdHIoKSksCiAgICAgICAgICAgICAgICAibHlyaWNhbF90aGVtZXMiOiBfYXJyKF9zdHIoKSksCiAgICAgICAgICAgICAgICAibGFuZ3VhZ2UiOiBfc3RyKCksCiAgICAgICAgICAgICAgICAibW9vZCI6IF9zdHIoKSwKICAgICAgICAgICAgICAgICJ2b2NhbF9jaGFyYWN0ZXJpc3RpY3MiOiBfc3RyKCksCiAgICAgICAgICAgIH0sCiAgICAgICAgfSwKICAgICAgICAidmlzdWFsIjogewogICAgICAgICAgICAidHlwZSI6ICJPQkpFQ1QiLAogICAgICAgICAgICAicHJvcGVydGllcyI6IHsKICAgICAgICAgICAgICAgICJhcHBlYXJhbmNlIjogX3N0cigpLAogICAgICAgICAgICAgICAgImFlc3RoZXRpYyI6IF9zdHIoKSwKICAgICAgICAgICAgICAgICJwYWxldHRlIjogX2Fycihfc3RyKCkpLAogICAgICAgICAgICAgICAgImxpZ2h0aW5nIjogX3N0cigpLAogICAgICAgICAgICAgICAgInBob3RvZ3JhcGh5IjogX3N0cigpLAogICAgICAgICAgICAgICAgImNpbmVtYXRvZ3JhcGh5IjogX3N0cigpLAogICAgICAgICAgICAgICAgImFyY2hpdGVjdHVyZSI6IF9zdHIoKSwKICAgICAgICAgICAgICAgICJzZXR0aW5ncyI6IF9hcnIoX3N0cigpKSwKICAgICAgICAgICAgICAgICJyZWN1cnJpbmdfbW90aWZzIjogX2Fycihfc3RyKCkpLAogICAgICAgICAgICAgICAgImZvcmJpZGRlbl9lbGVtZW50cyI6IF9hcnIoX3N0cigpKSwKICAgICAgICAgICAgfSwKICAgICAgICB9LAogICAgICAgICJjb21tdW5pY2F0aW9uIjogewogICAgICAgICAgICAidHlwZSI6ICJPQkpFQ1QiLAogICAgICAgICAgICAicHJvcGVydGllcyI6IHsKICAgICAgICAgICAgICAgICJzcGVlY2hfc3R5bGUiOiBfc3RyKCksCiAgICAgICAgICAgICAgICAiaHVtb3VyIjogX3N0cigpLAogICAgICAgICAgICAgICAgImNhdGNocGhyYXNlcyI6IF9hcnIoX3N0cigpKSwKICAgICAgICAgICAgICAgICJpbnRlcnZpZXdfc3R5bGUiOiBfc3RyKCksCiAgICAgICAgICAgICAgICAicmVjdXJyaW5nX3RvcGljcyI6IF9hcnIoX3N0cigpKSwKICAgICAgICAgICAgfSwKICAgICAgICB9LAogICAgICAgICJ2b2ljZV9wcm9maWxlX2xpbmVzIjogX2Fycihfc3RyKCJVbmEgY2FyYWN0ZXJpc3RpY2Egdm9jYWwgcG9yIGxpbmVhLCBlbiBpbmdsZXMiKSksCiAgICB9LAogICAgInJlcXVpcmVkIjogWyJpZGVudGl0eSIsICJtdXNpY2FsIiwgInZpc3VhbCJdLAp9CgoKRURJVF9QTEFOX1NDSEVNQTogZGljdFtzdHIsIEFueV0gPSB7CiAgICAidHlwZSI6ICJPQkpFQ1QiLAogICAgInByb3BlcnRpZXMiOiB7CiAgICAgICAgImN1dHMiOiBfYXJyKAogICAgICAgICAgICB7CiAgICAgICAgICAgICAgICAidHlwZSI6ICJPQkpFQ1QiLAogICAgICAgICAgICAgICAgInByb3BlcnRpZXMiOiB7CiAgICAgICAgICAgICAgICAgICAgImFmdGVyX3NjZW5lX2luZGV4IjogewogICAgICAgICAgICAgICAgICAgICAgICAidHlwZSI6ICJJTlRFR0VSIiwKICAgICAgICAgICAgICAgICAgICAgICAgImRlc2NyaXB0aW9uIjogIkVsIGNvcnRlIHF1ZSB2YSBERVNQVUVTIGRlIGVzdGEgZXNjZW5hIiwKICAgICAgICAgICAgICAgICAgICB9LAogICAgICAgICAgICAgICAgICAgICJ0eXBlIjogewogICAgICAgICAgICAgICAgICAgICAgICAidHlwZSI6ICJTVFJJTkciLAogICAgICAgICAgICAgICAgICAgICAgICAiZW51bSI6IFsiY3V0IiwgImZhZGUiLCAiZmFkZWJsYWNrIiwgImRpc3NvbHZlIl0sCiAgICAgICAgICAgICAgICAgICAgICAgICJkZXNjcmlwdGlvbiI6ICgKICAgICAgICAgICAgICAgICAgICAgICAgICAgICJjdXQ6IGNvcnRlIHNlY28uIGZhZGU6IGZ1bmRpZG8gZW5jYWRlbmFkby4gIgogICAgICAgICAgICAgICAgICAgICAgICAgICAgImZhZGVibGFjazogcGFzYSBwb3IgbmVncm8uIGRpc3NvbHZlOiBkaXNvbHZlbmNpYSBsZW50YS4iCiAgICAgICAgICAgICAgICAgICAgICAgICksCiAgICAgICAgICAgICAgICAgICAgfSwKICAgICAgICAgICAgICAgICAgICAic2Vjb25kcyI6IHsKICAgICAgICAgICAgICAgICAgICAgICAgInR5cGUiOiAiTlVNQkVSIiwKICAgICAgICAgICAgICAgICAgICAgICAgImRlc2NyaXB0aW9uIjogIkR1cmFjaW9uIGRlbCBmdW5kaWRvLCBlbnRyZSAwLDI1IHkgMS4gU2UgaWdub3JhIGVuIGN1dC4iLAogICAgICAgICAgICAgICAgICAgIH0sCiAgICAgICAgICAgICAgICAgICAgIndoeSI6IF9zdHIoIlBvciBxdWUgZXNlIGNvcnRlIHkgbm8gb3RybywgZW4gZXNwYW5vbCB5IGVuIHVuYSBsaW5lYSIpLAogICAgICAgICAgICAgICAgfSwKICAgICAgICAgICAgICAgICJyZXF1aXJlZCI6IFsiYWZ0ZXJfc2NlbmVfaW5kZXgiLCAidHlwZSJdLAogICAgICAgICAgICB9CiAgICAgICAgKSwKICAgICAgICAibm90ZXMiOiBfc3RyKCJDb21vIHNlIGhhIG1vbnRhZG8gZWwgdmlkZW9jbGlwLCBlbiBlc3Bhbm9sLCBlbiBkb3MgbyB0cmVzIGZyYXNlcyIpLAogICAgfSwKICAgICJyZXF1aXJlZCI6IFsiY3V0cyJdLAp9CgoKCgoKCiMgLS0tIEluc3BpcmF0aW9uIGFuZCBwaG90byBzdHlsZSAoc2ltcGxpZmllZCBzdHVkaW8pIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQoKIyBgYHRpdGxlYGAgZXMgb2JsaWdhdG9yaW8gYSBwcm9wb3NpdG86IHVuIGFuYWxpc2lzIHF1ZSBubyBub21icmEgZWwgdmlkZW8KIyBxdWUgdmlvIG5vIGVzIHVuIGFuYWxpc2lzIGRlbCB2aWRlby4gQ3VhbmRvIGVyYSBvcGNpb25hbCwgdW5hIHJlc3B1ZXN0YQojIHNpbiB0aXR1bG8gKG8gY29uIGVsIHRpdHVsbyBkZSBsYSBwYWdpbmEgZGUgZXJyb3IgZGUgWW91VHViZSkgcGFzYWJhIGVsCiMgZXNxdWVtYSB5IHNlIGd1YXJkYWJhIGNvbW8gcmVzdW1lbiDCq3ZhbGlkb8K7OyBzaW4gdGl0dWxvLCBhaG9yYSBlcyB1bgojIGVycm9yIGRlIGVzcXVlbWEgZW4gdmV6IGRlIHVuIHJlc3VtZW4uCklOU1BJUkFUSU9OX1NDSEVNQTogZGljdFtzdHIsIEFueV0gPSB7CiAgICAidHlwZSI6ICJPQkpFQ1QiLAogICAgInByb3BlcnRpZXMiOiB7CiAgICAgICAgInRpdGxlIjogX3N0cigiVGl0dWxvIGRlbCB2aWRlbyBhbmFsaXphZG8iKSwKICAgICAgICAiZ2VucmVzIjogX3N0cigiR2VuZXJvcyB5IG1lemNsYSBxdWUgc2Ugb3llbiwgZW4gZXNwYW5vbCIpLAogICAgICAgICJnZW5yZV9rZXlzIjogX2FycigKICAgICAgICAgICAgX3N0cigKICAgICAgICAgICAgICAgICJVbmEgY2xhdmUgZGVsIGNhdGFsb2dvIGZpam8gZGUgZ2VuZXJvcyBkZSBsYSBhcHAsIGVzY3JpdGEgIgogICAgICAgICAgICAgICAgImV4YWN0YW1lbnRlIGNvbW8gdmllbmUgZW4gbGEgaW5zdHJ1Y2Npb24iCiAgICAgICAgICAgICkKICAgICAgICApLAogICAgICAgICJyaHl0aG0iOiBfc3RyKCJSaXRtbywgdmVsb2NpZGFkIHkgc2Vuc2FjaW9uLCBlbiBlc3Bhbm9sIiksCiAgICAgICAgImluc3RydW1lbnRzIjogX2Fycihfc3RyKCJVbiBpbnN0cnVtZW50byBkb21pbmFudGUgcG9yIGVsZW1lbnRvIikpLAogICAgICAgICJzdHJ1Y3R1cmUiOiBfc3RyKCJFc3RydWN0dXJhOiB2ZXJzbywgY29ybywgcHVlbnRlLi4uLCBlbiBlc3Bhbm9sIiksCiAgICAgICAgIm1vb2QiOiBfc3RyKCJBbWJpZW50ZSwgZW4gZXNwYW5vbCIpLAogICAgICAgICJseXJpY190aGVtZXMiOiBfYXJyKF9zdHIoIlVuIHRlbWEgZGUgbGEgbGV0cmEgcG9yIGVsZW1lbnRvIikpLAogICAgICAgICJseXJpY19zdHlsZSI6IF9zdHIoIk1hbmVyYSBkZSBlc2NyaWJpciBsYSBsZXRyYSwgZW4gZXNwYW5vbCIpLAogICAgfSwKICAgICJyZXF1aXJlZCI6IFsidGl0bGUiLCAiZ2VucmVzIiwgInJoeXRobSIsICJzdHJ1Y3R1cmUiXSwKfQoKUEhPVE9fU1RZTEVfU0NIRU1BOiBkaWN0W3N0ciwgQW55XSA9IHsKICAgICJ0eXBlIjogIk9CSkVDVCIsCiAgICAicHJvcGVydGllcyI6IHsKICAgICAgICAic3R5bGVfZGVzY3JpcHRpb24iOiBfc3RyKAogICAgICAgICAgICAiVGhlIHZpc3VhbCBzdHlsZSBvZiB0aGUgcGhvdG8gYXMgb25lIHByb21wdC1yZWFkeSBkZXNjcmlwdGlvbiBpbiAiCiAgICAgICAgICAgICJVUyBFbmdsaXNoOiBtZWRpdW0gKHBob3RvZ3JhcGgsIGFuaW1lLCBvaWwgcGFpbnRpbmcuLi4pLCByZW5kZXJpbmcsICIKICAgICAgICAgICAgImxpZ2h0aW5nLCBwYWxldHRlIGFuZCBmaW5pc2guIE5vIG1lbnRpb24gb2Ygd2hvIHRoZSBwZXJzb24gaXMuIgogICAgICAgICksCiAgICAgICAgIm1lZGl1bSI6IF9zdHIoInBob3RvZ3JhcGgsIGFuaW1lLCBvaWwgcGFpbnRpbmcsIDNEIHJlbmRlci4uLiIpLAogICAgICAgICJwYWxldHRlIjogX3N0cigiRG9taW5hbnQgY29sb3VycywgaW4gVVMgRW5nbGlzaCIpLAogICAgICAgICJsaWdodGluZyI6IF9zdHIoIkxpZ2h0aW5nLCBpbiBVUyBFbmdsaXNoIiksCiAgICB9LAogICAgInJlcXVpcmVkIjogWyJzdHlsZV9kZXNjcmlwdGlvbiJdLAp9Cg==
+"""Response schemas handed to Gemini so proposals come back structured.
+
+Vertex uses the OpenAPI subset, so types are upper case strings.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+
+def _str(description: str = "") -> dict[str, Any]:
+    return {"type": "STRING", "description": description} if description else {"type": "STRING"}
+
+
+def _arr(items: dict[str, Any]) -> dict[str, Any]:
+    return {"type": "ARRAY", "items": items}
+
+
+MUSIC_CONCEPT_SCHEMA: dict[str, Any] = {
+    "type": "OBJECT",
+    "properties": {
+        "title": _str("Titulo de la cancion, en el idioma del artista"),
+        "concept": _str("Dos o tres frases en espanol"),
+        "hook": _str("El gancho, tal y como se cantaria"),
+        "genre": _str(),
+        "bpm": {"type": "INTEGER"},
+        "mood": _str(),
+        "structure": _arr(_str("Ej. Intro, Verse 1, Pre-chorus, Chorus")),
+        "production": _str("Como suena la produccion, en espanol"),
+        "interpretation": _str("Como se canta, en espanol"),
+        "visual_concept": _str("Idea visual asociada, en espanol"),
+        "music_prompt": _str("Prompt para Lyria 3.5, en ingles de Estados Unidos"),
+    },
+    "required": ["title", "concept", "hook", "genre", "bpm", "structure", "music_prompt"],
+}
+
+LYRICS_SCHEMA: dict[str, Any] = {
+    "type": "OBJECT",
+    "properties": {
+        "title": _str(),
+        "lyrics": _str("Letra completa con marcas de seccion entre corchetes"),
+        "notes": _str("Que se busco con la letra, en espanol"),
+    },
+    "required": ["lyrics"],
+}
+
+LYRICS_ANALYSIS_SCHEMA: dict[str, Any] = {
+    "type": "OBJECT",
+    "properties": {
+        "theme": _str(),
+        "structure": _arr(_str()),
+        "hooks": _arr(_str()),
+        "proposed_genre": _str(),
+        "proposed_bpm": {"type": "INTEGER"},
+        "proposed_interpretation": _str(),
+        "proposed_production": _str(),
+        "music_prompt": _str("Prompt para Lyria 3.5, en ingles de Estados Unidos"),
+        "summary": _str("La propuesta explicada al usuario, en espanol"),
+    },
+    "required": ["theme", "proposed_genre", "music_prompt", "summary"],
+}
+
+VIDEO_CONCEPT_SCHEMA: dict[str, Any] = {
+    "type": "OBJECT",
+    "properties": {
+        "title": _str(),
+        "video_type": {
+            "type": "STRING",
+            "enum": ["performance", "narrative", "cinematic", "minimal", "hybrid"],
+        },
+        "concept": _str("En espanol"),
+        "story": {
+            "type": "OBJECT",
+            "properties": {
+                "premise": _str(),
+                "beginning": _str(),
+                "development": _str(),
+                "conflict": _str(),
+                "climax": _str(),
+                "resolution": _str(),
+            },
+        },
+        "wardrobe_notes": _str(
+            "El vestuario del artista en este video, en espanol: que lleva en "
+            "cada tramo y por que. Es texto de la propuesta, no una seccion aparte."
+        ),
+        "location_notes": _str(
+            "Donde ocurre este video, en espanol: los sitios, su luz y su "
+            "momento del dia. Es texto de la propuesta, no una seccion aparte."
+        ),
+    },
+    "required": ["title", "video_type", "concept", "story"],
+}
+
+STORYBOARD_SCHEMA: dict[str, Any] = {
+    "type": "OBJECT",
+    "properties": {
+        "scenes": _arr(
+            {
+                "type": "OBJECT",
+                "properties": {
+                    "index": {"type": "INTEGER"},
+                    "duration_seconds": {"type": "INTEGER", "enum": [8]},
+                    "song_timestamp": _str("mm:ss-mm:ss"),
+                    "character_names": _arr(_str()),
+                    "location_description": _str(
+                        "Donde ocurre el plano, en espanol, con su luz"
+                    ),
+                    "wardrobe_description": _str(
+                        "Que lleva puesto el artista en este plano, en espanol"
+                    ),
+                    "planos": _arr(
+                        _str(
+                            "Un plano corto dentro del bloque, en espanol: "
+                            "encuadre y accion. Dos o tres por bloque."
+                        )
+                    ),
+                    "action": _str("En espanol"),
+                    "emotion": _str(),
+                    "camera": _str(),
+                    "lighting": _str(),
+                    "environment": _str(),
+                    "dialogue": _str(),
+                    "visual_objective": _str(),
+                    "reuses_scene_index": {
+                        "type": "INTEGER",
+                        "description": "-1 si la toma se genera nueva",
+                    },
+                    "reuse_note": _str("Por que se puede reaprovechar"),
+                    "image_prompt": _str("Prompt de imagen, en ingles de Estados Unidos"),
+                    "video_prompt": _str("Prompt de video, en ingles de Estados Unidos"),
+                },
+                "required": ["index", "action", "camera", "image_prompt", "video_prompt"],
+            }
+        ),
+        "notes": _str("Como se organizo la reutilizacion de tomas, en espanol"),
+    },
+    "required": ["scenes"],
+}
+
+CHARACTER_SCHEMA: dict[str, Any] = {
+    "type": "OBJECT",
+    "properties": {
+        "name": _str(),
+        "apparent_age": _str(),
+        "appearance": _str("Descripcion fisica detallada, en espanol"),
+        "personality": _str(),
+        "master_prompts": _arr(
+            {
+                "type": "OBJECT",
+                "properties": {
+                    "key": {
+                        "type": "STRING",
+                        "enum": [
+                            "portrait",
+                            "full_body",
+                            "profile",
+                            "three_quarter",
+                            "neutral",
+                            "emotions",
+                            "poses",
+                        ],
+                    },
+                    "prompt": _str("En ingles de Estados Unidos"),
+                },
+                "required": ["key", "prompt"],
+            }
+        ),
+    },
+    "required": ["name", "appearance", "master_prompts"],
+}
+
+ARTIST_BIBLE_SCHEMA: dict[str, Any] = {
+    "type": "OBJECT",
+    "properties": {
+        "identity": {
+            "type": "OBJECT",
+            "properties": {
+                "stage_name": _str(),
+                "fictional_name": _str(),
+                "apparent_age": _str(),
+                "origin": _str(),
+                "languages": _arr(_str()),
+                "personality": _str(),
+                "backstory": _str(),
+                "target_audience": _str(),
+                "recurring_themes": _arr(_str()),
+            },
+        },
+        "musical": {
+            "type": "OBJECT",
+            "properties": {
+                "genre": _str(),
+                "subgenres": _arr(_str()),
+                "bpm_range": _str(),
+                "instrumentation": _arr(_str()),
+                "production": _str(),
+                "structures": _arr(_str()),
+                "lyrical_themes": _arr(_str()),
+                "language": _str(),
+                "mood": _str(),
+                "vocal_characteristics": _str(),
+            },
+        },
+        "visual": {
+            "type": "OBJECT",
+            "properties": {
+                "appearance": _str(),
+                "aesthetic": _str(),
+                "palette": _arr(_str()),
+                "lighting": _str(),
+                "photography": _str(),
+                "cinematography": _str(),
+                "architecture": _str(),
+                "settings": _arr(_str()),
+                "recurring_motifs": _arr(_str()),
+                "forbidden_elements": _arr(_str()),
+            },
+        },
+        "communication": {
+            "type": "OBJECT",
+            "properties": {
+                "speech_style": _str(),
+                "humour": _str(),
+                "catchphrases": _arr(_str()),
+                "interview_style": _str(),
+                "recurring_topics": _arr(_str()),
+            },
+        },
+        "voice_profile_lines": _arr(_str("Una caracteristica vocal por linea, en ingles")),
+    },
+    "required": ["identity", "musical", "visual"],
+}
+
+
+EDIT_PLAN_SCHEMA: dict[str, Any] = {
+    "type": "OBJECT",
+    "properties": {
+        "cuts": _arr(
+            {
+                "type": "OBJECT",
+                "properties": {
+                    "after_scene_index": {
+                        "type": "INTEGER",
+                        "description": "El corte que va DESPUES de esta escena",
+                    },
+                    "type": {
+                        "type": "STRING",
+                        "enum": ["cut", "fade", "fadeblack", "dissolve"],
+                        "description": (
+                            "cut: corte seco. fade: fundido encadenado. "
+                            "fadeblack: pasa por negro. dissolve: disolvencia lenta."
+                        ),
+                    },
+                    "seconds": {
+                        "type": "NUMBER",
+                        "description": "Duracion del fundido, entre 0,25 y 1. Se ignora en cut.",
+                    },
+                    "why": _str("Por que ese corte y no otro, en espanol y en una linea"),
+                },
+                "required": ["after_scene_index", "type"],
+            }
+        ),
+        "notes": _str("Como se ha montado el videoclip, en espanol, en dos o tres frases"),
+    },
+    "required": ["cuts"],
+}
+
+
+
+
+
+
+# --- Inspiration and photo style (simplified studio) ------------------------
+
+# ``title`` es obligatorio a proposito: un analisis que no nombra el video
+# que vio no es un analisis del video. Cuando era opcional, una respuesta
+# sin titulo (o con el titulo de la pagina de error de YouTube) pasaba el
+# esquema y se guardaba como resumen «valido»; sin titulo, ahora es un
+# error de esquema en vez de un resumen.
+INSPIRATION_SCHEMA: dict[str, Any] = {
+    "type": "OBJECT",
+    "properties": {
+        "title": _str("Titulo del video analizado"),
+        "genres": _str("Generos y mezcla que se oyen, en espanol"),
+        "genre_keys": _arr(
+            _str(
+                "Una clave del catalogo fijo de generos de la app, escrita "
+                "exactamente como viene en la instruccion"
+            )
+        ),
+        "rhythm": _str("Ritmo, velocidad y sensacion, en espanol"),
+        "instruments": _arr(_str("Un instrumento dominante por elemento")),
+        "structure": _str("Estructura: verso, coro, puente..., en espanol"),
+        "mood": _str("Ambiente, en espanol"),
+        "lyric_themes": _arr(_str("Un tema de la letra por elemento")),
+        "lyric_style": _str("Manera de escribir la letra, en espanol"),
+    },
+    "required": ["title", "genres", "rhythm", "structure"],
+}
+
+PHOTO_STYLE_SCHEMA: dict[str, Any] = {
+    "type": "OBJECT",
+    "properties": {
+        "style_description": _str(
+            "The visual style of the photo as one prompt-ready description in "
+            "US English: medium (photograph, anime, oil painting...), rendering, "
+            "lighting, palette and finish. No mention of who the person is."
+        ),
+        "medium": _str("photograph, anime, oil painting, 3D render..."),
+        "palette": _str("Dominant colours, in US English"),
+        "lighting": _str("Lighting, in US English"),
+    },
+    "required": ["style_description"],
+}
