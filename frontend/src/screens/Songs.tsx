@@ -132,12 +132,16 @@ export function SongScreen() {
     setResumen(data.inspiration_summary ?? '')
   }, [data])
 
-  const guardarGeneros = async () => {
-    const hecho = await action.run(() =>
-      api.patch(base, { genres: generos, genre_free: mezcla }),
-    )
+  // La combinacion se guarda SOLA, en el acto de cambiarla. Antes vivia
+  // solo en la pantalla hasta que se apretaba su propio boton de guardar,
+  // y cualquier otra accion que recargara la ficha (guardar la letra,
+  // generar la cancion) la devolvia a los generos que si estaban
+  // guardados — los del artista — perdiendo lo elegido sin avisar. Sin
+  // recargar despues de guardar: lo que se ve ya es lo que hay guardado.
+  const guardarGenerosAhora = async (g: string[], m: string) => {
+    const hecho = await action.run(() => api.patch(base, { genres: g, genre_free: m }))
     if (hecho) setAvisoGeneros(true)
-    await reload()
+    return Boolean(hecho)
   }
 
   const analizarEnlace = async () => {
@@ -181,15 +185,17 @@ export function SongScreen() {
               <h3>Generos de esta cancion</h3>
               <p className="muted" style={{ margin: 0 }}>
                 Viene relleno con la combinacion de su artista — y si analizas una cancion en la
-                referencia de abajo, con los generos de esa cancion. Si la cambias aqui, cambia solo
-                esta cancion; la del artista sigue
-                como esta en su Identidad. Entra en la letra y en el encargo a Lyria.
+                referencia de abajo, con los generos de esa cancion. Si la cambias aqui, se guarda
+                sola en el acto, sin boton que apretar, y cambia solo esta cancion; la del artista
+                sigue como esta en su Identidad. Es la combinacion que entra en la letra y en el
+                encargo a Lyria.
               </p>
               <ElegirGeneros
                 valor={generos}
                 alCambiar={(valor) => {
                   setGeneros(valor)
                   setAvisoGeneros(false)
+                  void guardarGenerosAhora(valor, mezcla)
                 }}
               />
               <Field
@@ -199,13 +205,11 @@ export function SongScreen() {
                   setMezcla(valor)
                   setAvisoGeneros(false)
                 }}
+                onBlur={() => void guardarGenerosAhora(generos, mezcla)}
               />
               {textoGeneros(generos, mezcla) && (
                 <p className="muted">Suena a: {textoGeneros(generos, mezcla)}</p>
               )}
-              <button className="btn block" onClick={guardarGeneros} disabled={action.busy}>
-                Guardar los generos de esta cancion
-              </button>
               {avisoGeneros && (
                 <p className="muted" style={{ margin: 0 }}>
                   ✓ Guardado
@@ -288,7 +292,8 @@ export function SongScreen() {
                 <button
                   className="btn primary"
                   disabled={action.busy}
-                  onClick={() =>
+                  onClick={async () => {
+                    await guardarGenerosAhora(generos, mezcla)
                     run(() =>
                       api.post(`${base}/concept`, {
                         brief,
@@ -296,7 +301,7 @@ export function SongScreen() {
                         idempotency_key: newIdempotencyKey('concept'),
                       }),
                     )
-                  }
+                  }}
                 >
                   Pedir propuesta
                 </button>
@@ -322,6 +327,7 @@ export function SongScreen() {
                   className="btn"
                   disabled={action.busy}
                   onClick={async () => {
+                    await guardarGenerosAhora(generos, mezcla)
                     await action.run(() =>
                       api.put(`${base}/lyrics`, { lyrics, author: 'user' }),
                     )
@@ -346,13 +352,14 @@ export function SongScreen() {
                 <button
                   className="btn"
                   disabled={action.busy || !hayConcepto}
-                  onClick={() =>
+                  onClick={async () => {
+                    await guardarGenerosAhora(generos, mezcla)
                     run(() =>
                       api.post(`${base}/lyrics/generate`, {
                         idempotency_key: newIdempotencyKey('lyrics'),
                       }),
                     )
-                  }
+                  }}
                 >
                   Que la escriba el Director
                 </button>
@@ -379,14 +386,15 @@ export function SongScreen() {
               <button
                 className="btn primary block"
                 disabled={action.busy || !hayLetra}
-                onClick={() =>
+                onClick={async () => {
+                  await guardarGenerosAhora(generos, mezcla)
                   run(() =>
                     api.post(`${base}/generate`, {
                       duration_seconds: data.requested_duration_seconds,
                       idempotency_key: newIdempotencyKey('song'),
                     }),
                   )
-                }
+                }}
               >
                 Generar cancion · $0,08
               </button>
@@ -443,13 +451,14 @@ export function SongScreen() {
                 <button
                   className="btn"
                   disabled={action.busy}
-                  onClick={() =>
+                  onClick={async () => {
+                    await guardarGenerosAhora(generos, mezcla)
                     run(() =>
                       api.post(`${base}/generate`, {
                         idempotency_key: newIdempotencyKey('song'),
                       }),
                     )
-                  }
+                  }}
                 >
                   Regenerar cancion
                 </button>
