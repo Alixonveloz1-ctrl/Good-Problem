@@ -195,6 +195,14 @@ renderizado, un proyecto no se puede aprobar.
   insinuación y la picardía al sexo gráfico — sin que la app la baje.
   La letra que el Director escribe pasa una revisión contra esa base
   antes de guardarse.
+- **Tempo: la velocidad la manda el género.** Cada género escogible
+  tiene su tempo natural (BPM, paso y fraseo) y ese es el que viaja
+  en el encargo; el BPM que el Director inventaba en el concepto ya
+  no llega a Lyria. El encargo ordena tempo firme: prohibido acelerar
+  para que quepa la letra — si algo no cabe, se repite menos el coro.
+  Y la letra nace medida: la app calcula cuántas palabras caben
+  cantadas bien en los segundos pedidos al paso del género, y la
+  escritura y su revisión se quedan dentro de esa medida.
 - **Música: Lyria por dos puertas.** Sin clave: Lyria 3 Pro
   (`lyria-3-pro-preview`) por Vertex, con la identidad del proyecto.
   Con la clave de Gemini del dueño puesta como variable de entorno
