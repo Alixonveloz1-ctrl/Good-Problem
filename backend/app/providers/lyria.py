@@ -1,4 +1,4 @@
-"""Lyria 3 Pro (PRD 14).
+"""Lyria: canciones completas por dos puertas (PRD 14).
 
 The only music model in the system. Lyria 3 and Lyria 2 make 30 second clips,
 so they are not in the selector and the orchestrator is forbidden from reaching
@@ -6,13 +6,17 @@ for them, including as a fallback after a failure. ``assert_music_model`` runs
 on every call, which is why that rule cannot be bypassed by passing a different
 id from anywhere else in the code.
 
-Lyria 3.5 is NOT an option here, and that is proven, not assumed: on
-2026-11-07 the system was switched to ``lyria-3.5`` for one real test song
-and Vertex answered 400, "Model 'lyria-3.5' is not supported by the
-Interactions API". The model exists on Google's other door (the Gemini API
-with an API key), which this studio does not use (PRD 40: no API keys, only
-the project's own identity). The switch was reverted the same day; what
-stayed is the diction order in the text sent to Lyria (see ``_con_duracion``).
+Lyria 3.5 lives behind Google's other door, and that is proven, not
+assumed: on 2026-11-07 the system was switched to ``lyria-3.5`` on the
+Vertex door for one real test song and Vertex answered 400, "Model
+'lyria-3.5' is not supported by the Interactions API". The switch was
+reverted the same day. That evening the owner ordered the second door
+opened: when he sets his own Gemini API key in the studio's settings,
+music goes out through the Gemini API with that key and sings with
+Lyria 3.5; with no key set, music stays on the Vertex door with Lyria
+3 Pro. The composed text (prompt, duration, the diction order in
+``_con_duracion``, lyrics, fixed voice) is identical on both doors —
+only the door and the model change.
 
 Lyria accepts text and reference images but not reference audio, so there is no
 way to pin a sung voice. The Voice Profile is text that travels with every
@@ -57,16 +61,17 @@ def generate_song(
     client: VertexClient,
     *,
     model: str = "lyria-3-pro-preview",
-    prompt: str,
+    gemini_api_key: str = "",
+    prompt: str = "",
     duration_seconds: int,
     negative_prompt: str = "",
     seed: int | None = None,
     lyrics: str = "",
 ) -> AudioResult:
-    model_id = assert_music_model(model)
+    model_id = assert_music_model(model, gemini=bool(gemini_api_key))
     if duration_seconds <= 0 or duration_seconds > MAX_DURATION_SECONDS:
         raise InvalidGenerationRequest(
-            f"Lyria 3 Pro genera canciones de hasta {MAX_DURATION_SECONDS} s. "
+            f"Lyria genera canciones de hasta {MAX_DURATION_SECONDS} s. "
             f"Se pidio {duration_seconds}."
         )
 
@@ -84,7 +89,10 @@ def generate_song(
     texto = _con_duracion(prompt, duration_seconds, lyrics, negative_prompt)
     payload: dict[str, Any] = {"model": model_id, "input": [{"type": "text", "text": texto}]}
 
-    response = client.call_interactions(model_id, payload)
+    if gemini_api_key:
+        response = client.call_interactions_gemini_api(model_id, payload, gemini_api_key)
+    else:
+        response = client.call_interactions(model_id, payload)
     audio = _extraer_audio(response)
     if audio is None:
         raise ProviderError(
