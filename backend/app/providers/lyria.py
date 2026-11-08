@@ -1,8 +1,6 @@
-"""Lyria 3.5 (PRD 14).
+"""Lyria 3 Pro (PRD 14).
 
-The only music model in the system. Lyria 3 Pro (lyria-3-pro-preview) is the
-previous generation - Google lists it as legacy and names 3.5 the recommended
-replacement - and Lyria 3 and Lyria 2 make 30 second clips,
+The only music model in the system. Lyria 3 and Lyria 2 make 30 second clips,
 so they are not in the selector and the orchestrator is forbidden from reaching
 for them, including as a fallback after a failure. ``assert_music_model`` runs
 on every call, which is why that rule cannot be bypassed by passing a different
@@ -50,7 +48,7 @@ class AudioResult:
 def generate_song(
     client: VertexClient,
     *,
-    model: str = "lyria-3.5",
+    model: str = "lyria-3-pro-preview",
     prompt: str,
     duration_seconds: int,
     negative_prompt: str = "",
@@ -60,7 +58,7 @@ def generate_song(
     model_id = assert_music_model(model)
     if duration_seconds <= 0 or duration_seconds > MAX_DURATION_SECONDS:
         raise InvalidGenerationRequest(
-            f"Lyria 3.5 genera canciones de hasta {MAX_DURATION_SECONDS} s. "
+            f"Lyria 3 Pro genera canciones de hasta {MAX_DURATION_SECONDS} s. "
             f"Se pidio {duration_seconds}."
         )
 
