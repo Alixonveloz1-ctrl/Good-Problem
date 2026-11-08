@@ -181,7 +181,7 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
                 )
         duration = payload.get("duration_seconds")
         if duration:
-            sections.append(f"Requested song duration: {duration} seconds (Lyria 3 Pro, max 180).")
+            sections.append(f"Requested song duration: {duration} seconds (Lyria, max 180).")
 
     elif task == "lyrics":
         sections.append(
@@ -468,13 +468,28 @@ Hunt, in this order:
   same sound, which read mechanical;
 - generics — the world, the city, destiny — standing where a concrete
   detail from this song's story belongs;
+- slogans and declarations standing where a scene belongs: an
+  attitude announced as a motto instead of shown inside a concrete
+  moment;
+- the temperature lowered below the concept's: a draft that cleaned
+  up, softened or skipped the sensual register the concept and its
+  reference ask for — insinuation and graphic, audible sex are both
+  legitimate ends of the range, and the concept's end is the one
+  that must come back;
+- a sketch where the song asks for a complete song: verses of four
+  lines, no pre-chorus, no room for a bridge, no third verse —
+  complete the architecture instead of polishing the sketch;
+- a section with no audible rhyme at its line endings;
 - a section that adds nothing new;
 - slang dropped in forced or wrong: the natural-slang rule applies to
   this rewrite exactly as it applied to the draft.
 
-Keep the song: same concept, same story, same structure and section
-order as the draft, and the chorus recognisably the same hook —
-repair a chorus line only where it fails a check above. Return the
+Keep the song: same concept, same story, and the chorus
+recognisably the same hook — repair a chorus line only where it
+fails a check above. Keep the draft's section order, but when its
+architecture is thinner than the song calls for, complete it (the
+pre-chorus, the bridge, the third verse the form needs) instead of
+polishing a sketch. Return the
 FULL revised lyric with its section marks. If the draft already
 passes every check, return it unchanged: a review that invents
 changes is as bad as one that misses defects.
