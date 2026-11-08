@@ -119,3 +119,114 @@ def contar_palabras(letra: str) -> int:
             continue
         total += len(linea.split())
     return total
+
+
+# --- El BPM del dueno y los tres minutos ------------------------------------
+#
+# El dueno pidio el mando el 2026-11-07: un selector de BPM en la
+# cancion, escogido ANTES de generar la letra, y ese numero es la
+# velocidad de la voz que se le pide a Lyria. La duracion ya no es un
+# numero fijo que la app imponga: nace de la letra y de ese BPM. Y
+# una restriccion suya: ninguna letra puede pasar de tres minutos ni
+# cantada a la velocidad mas alta — porque Lyria entrega hasta tres
+# minutos, y una cancion mas larga no se generaria completa.
+
+BPM_MINIMO = 60
+BPM_MAXIMO = 180
+DURACION_MAXIMA_SEGUNDOS = 180
+"""Lo que Lyria entrega de una vez: el techo de la cancion."""
+
+TECHO_PALABRAS = (
+    max(t.palabras_por_minuto for t in GENERO_TEMPO.values())
+    * DURACION_MAXIMA_SEGUNDOS
+    // 60
+    // 10
+) * 10
+"""El techo absoluto de una letra: 550 palabras.
+
+Son las que caben en tres minutos al paso mas rapido de la tabla
+(el rap, 185 por minuto). Ni cantada a toda velocidad, una letra de
+la app se pasa de los tres minutos.
+"""
+
+
+def bpm_natural(generos: list[str] | None) -> int | None:
+    """El BPM de la tabla para el genero principal, si lo hay."""
+    tempo = tempo_de_la_cancion(generos)
+    return tempo.bpm if tempo is not None else None
+
+
+def bpm_efectivo(generos: list[str] | None, bpm_usuario: int | None) -> int | None:
+    """El BPM que manda: el del dueno si lo puso; si no, el natural."""
+    if bpm_usuario:
+        return max(BPM_MINIMO, min(BPM_MAXIMO, int(bpm_usuario)))
+    return bpm_natural(generos)
+
+
+def paso_efectivo(generos: list[str] | None, bpm: int | None) -> float:
+    """Palabras cantadas por minuto al BPM dado.
+
+    El paso del genero escalado en la misma proporcion que el BPM se
+    mueve del suyo natural: si el dueno baja el BPM a la mitad, en un
+    minuto cabe la mitad de palabras. Sin genero de la tabla, el paso
+    por defecto, sin escalar: no hay natural contra el que medir.
+    """
+    tempo = tempo_de_la_cancion(generos)
+    if tempo is None or not bpm:
+        return float(tempo.palabras_por_minuto if tempo is not None else PASO_POR_DEFECTO)
+    return tempo.palabras_por_minuto * bpm / tempo.bpm
+
+
+def duracion_estimada_segundos(
+    palabras: int, generos: list[str] | None, bpm: int | None
+) -> int:
+    """El largo natural de esa letra a ese BPM, en segundos."""
+    if palabras <= 0:
+        return 0
+    return round(palabras / paso_efectivo(generos, bpm) * 60)
+
+
+def presupuesto_para_letra(generos: list[str] | None, bpm: int | None) -> int:
+    """Las palabras que la app puede escribir para esta cancion.
+
+    Las que caben en tres minutos al BPM escogido, y nunca mas del
+    techo absoluto: la letra nace para no pasarse ni a su velocidad
+    ni a ninguna.
+    """
+    caben = paso_efectivo(generos, bpm) * DURACION_MAXIMA_SEGUNDOS / 60
+    return max(60, min(TECHO_PALABRAS, round(caben / 10) * 10))
+
+
+def linea_tempo_cancion(generos: list[str] | None, bpm_usuario: int | None) -> str:
+    """La linea de tempo del encargo: manda el BPM del dueno."""
+    tempo = tempo_de_la_cancion(generos)
+    bpm = bpm_efectivo(generos, bpm_usuario)
+    if bpm is None:
+        return ""
+    if bpm_usuario:
+        frase = tempo.frase if tempo is not None else "the genre's natural phrasing"
+        return (
+            f"Tempo: {bpm} BPM — the tempo the owner chose for the singing "
+            f"voice. Delivery: {frase}."
+        )
+    return linea_tempo(generos)
+
+
+def calculo_de_la_cancion(cancion: dict, generos: list[str] | None) -> dict:
+    """Lo que la pantalla enseña: BPM vigente, cuenta y aviso.
+
+    ``pasa_de_tres_minutos`` es el aviso del dueno: con la letra que
+    hay y al BPM que hay, la cancion no se generaria completa.
+    """
+    bpm = bpm_efectivo(generos, cancion.get("bpm_usuario"))
+    palabras = contar_palabras(cancion.get("lyrics") or "")
+    estimada = duracion_estimada_segundos(palabras, generos, bpm)
+    return {
+        "bpm_efectivo": bpm,
+        "bpm_natural": bpm_natural(generos),
+        "palabras_letra": palabras,
+        "duracion_estimada_segundos": estimada,
+        "pasa_de_tres_minutos": bool(
+            palabras and estimada > DURACION_MAXIMA_SEGUNDOS
+        ),
+    }
