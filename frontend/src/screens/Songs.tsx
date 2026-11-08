@@ -17,14 +17,12 @@ export function SongsScreen() {
   const borrado = useAction()
   const [creating, setCreating] = useState(false)
   const [title, setTitle] = useState('')
-  const [duration, setDuration] = useState('150')
   const action = useAction()
 
   const create = async () => {
     const created = await action.run(() =>
       api.post<Song>(`/api/universes/${universeId}/songs`, {
         title: title.trim(),
-        requested_duration_seconds: Number(duration) || 150,
       }),
     )
     if (created) {
@@ -67,9 +65,7 @@ export function SongsScreen() {
                   <strong>{song.title || 'Sin titulo'}</strong>
                 </div>
                 <div className="muted">{song.genre || 'sin genero'}</div>
-                <div className="muted">
-                  {song.versions.length} version(es) · {song.requested_duration_seconds}s
-                </div>
+                <div className="muted">{song.versions.length} version(es)</div>
               </Link>
               <DeleteButton
                 busy={borrado.busy}
@@ -88,12 +84,9 @@ export function SongsScreen() {
       {creating && (
         <Sheet title="Nueva cancion" onClose={() => setCreating(false)}>
           <Field label="Titulo provisional" value={title} onChange={setTitle} />
-          <Field
-            label="Duracion en segundos (Lyria 3 Pro, hasta 180)"
-            value={duration}
-            onChange={setDuration}
-            type="number"
-          />
+          <p className="muted" style={{ margin: 0 }}>
+            Sin duracion fija: la cancion dura lo que su letra pida al BPM que tu escojas.
+          </p>
           <ErrorNote error={action.error} onDismiss={action.clearError} />
           <button className="btn primary block" onClick={create} disabled={action.busy}>
             Crear
@@ -102,6 +95,12 @@ export function SongsScreen() {
       )}
     </>
   )
+}
+
+/** Segundos a «m:ss», para enseñar largos estimados sin decimales. */
+function mmss(segundos: number): string {
+  const s = Math.max(0, Math.round(segundos))
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
 export function SongScreen() {
@@ -115,6 +114,7 @@ export function SongScreen() {
   const action = useAction()
   const [jobId, setJobId] = useState<string | null>(null)
   const [lyrics, setLyrics] = useState('')
+  const [bpmTexto, setBpmTexto] = useState('')
   const [brief, setBrief] = useState('')
   const [genreOverride, setGenreOverride] = useState('')
   const [generos, setGeneros] = useState<string[]>([])
@@ -129,6 +129,7 @@ export function SongScreen() {
   useEffect(() => {
     if (!data) return
     setLyrics(data.lyrics ?? '')
+    setBpmTexto(data.bpm_efectivo ? String(data.bpm_efectivo) : '')
     setGeneros(data.genres ?? [])
     setMezcla(data.genre_free ?? '')
     setResumen(data.inspiration_summary ?? '')
@@ -144,6 +145,21 @@ export function SongScreen() {
     const hecho = await action.run(() => api.patch(base, { genres: g, genre_free: m }))
     if (hecho) setAvisoGeneros(true)
     return Boolean(hecho)
+  }
+
+  // El BPM del dueno: se guarda en el acto, como los generos. Con el
+  // campo vacio vuelve al tempo natural del genero (bpm_usuario null).
+  const guardarBpm = async (valor: number | null) => {
+    const hecho = await action.run(() => api.patch(base, { bpm_usuario: valor }))
+    if (hecho) await reload()
+    return Boolean(hecho)
+  }
+
+  const cambiarBpm = async (delta: number) => {
+    const actual = Number(bpmTexto) || data?.bpm_efectivo || data?.bpm_natural || 90
+    const nuevo = Math.max(60, Math.min(180, actual + delta))
+    setBpmTexto(String(nuevo))
+    await guardarBpm(nuevo)
   }
 
   const analizarEnlace = async () => {
@@ -318,6 +334,98 @@ export function SongScreen() {
                 ))}
             </Card>
 
+            {/* El BPM del dueno: se escoge ANTES de la letra. La letra
+                nace medida para tres minutos a este BPM; si con la
+                letra que hay la cuenta se pasa, el aviso sale aqui y
+                generar la musica queda en pausa. */}
+            <Card>
+              <div className="row between">
+                <h3>Velocidad de la voz (BPM)</h3>
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                Tu escoges la velocidad a la que canta la voz, y esa es la que se le pide a
+                Lyria. Escógela antes de generar la letra: la letra nace para durar tres
+                minutos o menos a este BPM, y la canción dura lo que la letra pida a esta
+                velocidad — no hay una duración fija.
+                {data.bpm_natural
+                  ? ` El tempo natural de tu género es ${data.bpm_natural} BPM.`
+                  : ''}
+              </p>
+              <div className="row">
+                <button
+                  className="btn small"
+                  disabled={action.busy}
+                  onClick={() => void cambiarBpm(-5)}
+                >
+                  −5
+                </button>
+                <button
+                  className="btn small"
+                  disabled={action.busy}
+                  onClick={() => void cambiarBpm(-1)}
+                >
+                  −
+                </button>
+                <div className="grow">
+                  <Field
+                    label="BPM (60 a 180)"
+                    value={bpmTexto}
+                    onChange={setBpmTexto}
+                    type="number"
+                  />
+                </div>
+                <button
+                  className="btn small"
+                  disabled={action.busy}
+                  onClick={() => void cambiarBpm(1)}
+                >
+                  +
+                </button>
+                <button
+                  className="btn small"
+                  disabled={action.busy}
+                  onClick={() => void cambiarBpm(5)}
+                >
+                  +5
+                </button>
+              </div>
+              <div className="btn-grid">
+                <button
+                  className="btn"
+                  disabled={action.busy}
+                  onClick={() => {
+                    const n = Number(bpmTexto)
+                    void guardarBpm(bpmTexto.trim() && Number.isFinite(n) ? n : null)
+                  }}
+                >
+                  Guardar el BPM
+                </button>
+                {data.bpm_usuario != null && (
+                  <button
+                    className="btn ghost"
+                    disabled={action.busy}
+                    onClick={() => void guardarBpm(null)}
+                  >
+                    Volver al natural ({data.bpm_natural})
+                  </button>
+                )}
+              </div>
+              {hayLetra && !!data.duracion_estimada_segundos && (
+                <p className="muted" style={{ margin: 0 }}>
+                  Con la letra guardada ({data.palabras_letra} palabras), a{' '}
+                  {data.bpm_efectivo} BPM la canción dura unos{' '}
+                  {mmss(data.duracion_estimada_segundos)}.
+                </p>
+              )}
+              {data.pasa_de_tres_minutos && (
+                <div className="error" role="alert">
+                  A {data.bpm_efectivo} BPM, esta letra dura unos{' '}
+                  {mmss(data.duracion_estimada_segundos ?? 0)} — más de tres minutos: la
+                  canción no se generaría completa. Sube el BPM o regenera la letra.
+                </div>
+              )}
+            </Card>
+
             {/* 2. Lyrics */}
             <Card>
               <div className="row between">
@@ -381,7 +489,11 @@ export function SongScreen() {
                 <span className="badge accent">Sin selector</span>
               </div>
               <p className="muted" style={{ margin: 0 }}>
-                Cancion completa a la duracion pedida ({data.requested_duration_seconds}s).{' '}
+                Cancion completa: dura lo que la letra pida a tu BPM
+                {data.duracion_estimada_segundos
+                  ? ` (con esta letra, unos ${mmss(data.duracion_estimada_segundos)})`
+                  : ''}
+                .{' '}
                 {conClave
                   ? 'Canta Lyria 3.5, con tu clave de Gemini puesta en el servicio.'
                   : 'Canta Lyria 3 Pro. Con tu clave de Gemini puesta en el servicio cantaria Lyria 3.5.'}{' '}
@@ -391,12 +503,11 @@ export function SongScreen() {
               </p>
               <button
                 className="btn primary block"
-                disabled={action.busy || !hayLetra}
+                disabled={action.busy || !hayLetra || !!data.pasa_de_tres_minutos}
                 onClick={async () => {
                   await guardarGenerosAhora(generos, mezcla)
                   run(() =>
                     api.post(`${base}/generate`, {
-                      duration_seconds: data.requested_duration_seconds,
                       idempotency_key: newIdempotencyKey('song'),
                     }),
                   )
@@ -408,6 +519,12 @@ export function SongScreen() {
                 <div className="muted">
                   Lyria canta sobre la letra guardada: escribe la tuya o pide que la escriba el
                   Director, y guardala.
+                </div>
+              )}
+              {!!data.pasa_de_tres_minutos && (
+                <div className="muted">
+                  En pausa: esta letra a {data.bpm_efectivo} BPM pasa de tres minutos y no se
+                  generaria completa. Sube el BPM en la tarjeta de arriba o regenera la letra.
                 </div>
               )}
             </Card>
