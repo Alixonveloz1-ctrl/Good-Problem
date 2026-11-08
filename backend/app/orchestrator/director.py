@@ -141,8 +141,9 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
         sections.append(
             "Develop a song concept for this artist: title, concept, hook, genre, BPM, mood, "
             "structure, production and vocal interpretation. Then write the prompt that will be "
-            "sent to Lyria 3 Pro in US English, including the artist's singing voice "
-            "description verbatim and the requested duration."
+            "sent to Lyria in US English, including the artist's singing voice "
+            "description verbatim. Do NOT fix a duration in the prompt: the song "
+            "lasts what its lyric takes at the BPM the owner chooses."
         )
         sections.extend(_fixed_music_blocks(payload, task))
         if brief:
@@ -180,9 +181,12 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
                     "return a generic or half-told concept for lack of "
                     "one."
                 )
-        duration = payload.get("duration_seconds")
-        if duration:
-            sections.append(f"Requested song duration: {duration} seconds (Lyria, max 180).")
+        if payload.get("duration_seconds"):
+            sections.append(
+                "The song's length is not fixed and no duration is requested: "
+                "it lasts what its lyric takes at the BPM the owner chooses "
+                "for the voice, and never more than three minutes."
+            )
 
     elif task == "lyrics":
         sections.append(
@@ -193,24 +197,26 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
         concept = payload.get("concept") or {}
         if concept:
             sections.append(f"APPROVED CONCEPT\n{_kv(concept)}")
-        # La medida de la letra: cuantas palabras caben cantadas bien
-        # en los segundos pedidos al paso del genero. Sin esta cuenta,
-        # la letra nacia con la estructura completa de siempre — unas
-        # 650 palabras, 4-5 minutos cantados con calma — para una
-        # duracion de 180 segundos, y Lyria lo resolvia acelerando.
-        duracion = payload.get("duration_seconds")
-        if duracion:
-            tempo = tempo_domain.tempo_de_la_cancion(payload.get("genre_keys"))
-            presupuesto = tempo_domain.presupuesto_palabras(int(duracion), tempo)
-            paso = tempo.paso if tempo is not None else "medio"
+        # La medida de la letra: el BPM lo escoge el dueno ANTES de
+        # la letra, y la letra nace para caber en tres minutos a ese
+        # BPM — con el techo absoluto de palabras detras. Sin esta
+        # cuenta, la letra nacia con la estructura completa de
+        # siempre sin mirar la velocidad, y o salia corrida o salia
+        # cortada.
+        generos_letra = payload.get("genre_keys")
+        bpm_letra = tempo_domain.bpm_efectivo(generos_letra, payload.get("bpm_usuario"))
+        presupuesto = tempo_domain.presupuesto_para_letra(generos_letra, bpm_letra)
+        if bpm_letra:
             sections.append(
-                f"THE MEASURE OF THIS LYRIC: the song lasts {int(duracion)} seconds "
-                f"and is sung at this genre's natural pace ({paso}). At that pace "
-                f"about {presupuesto} words fit, sung well. Write the complete "
-                "lyric INSIDE that measure: keep the full architecture and scale "
-                "the sections to fit — shorter verses, fewer written chorus "
-                "repetitions — instead of writing a long lyric that can only be "
-                "sung rushed. A lyric over the measure is a failed lyric."
+                f"THE MEASURE OF THIS LYRIC: the owner has set the singing "
+                f"tempo at {bpm_letra} BPM, and a song here lasts at most "
+                f"three minutes. At that pace about {presupuesto} words fit "
+                "inside the three minutes. Write the complete lyric INSIDE "
+                "that measure: keep the full architecture and scale the "
+                "sections to fit — shorter verses, fewer written chorus "
+                "repetitions — instead of writing a long lyric that can "
+                "only be sung rushed or delivered cut off. A lyric over "
+                "the measure is a failed lyric."
             )
 
     elif task == "lyrics_analysis":
@@ -550,22 +556,23 @@ def _revisar_borrador_de_letra(
         sections.append(f"APPROVED CONCEPT\n{_kv(concept)}")
     sections.append(f"DRAFT LYRIC TO REVIEW\n{texto}")
     # La revision tambien mide: si el borrador se pasa de las palabras
-    # que caben en la duracion al paso del genero, lo recorta ella —
+    # que caben en tres minutos al BPM del dueno, lo recorta ella —
     # con el gancho, la arquitectura, las rimas y la temperatura
-    # intactos — en vez de dejar que Lyria lo cante corriendo.
-    duracion = payload.get("duration_seconds")
-    if duracion:
-        tempo = tempo_domain.tempo_de_la_cancion(payload.get("genre_keys"))
-        presupuesto = tempo_domain.presupuesto_palabras(int(duracion), tempo)
+    # intactos — en vez de dejar que Lyria la cante corriendo o la
+    # entregue cortada.
+    generos_rev = payload.get("genre_keys")
+    bpm_rev = tempo_domain.bpm_efectivo(generos_rev, payload.get("bpm_usuario"))
+    if bpm_rev:
+        presupuesto = tempo_domain.presupuesto_para_letra(generos_rev, bpm_rev)
         palabras = tempo_domain.contar_palabras(texto)
         sections.append(
-            f"THE MEASURE: this draft has {palabras} sung words; the measure "
-            f"for {int(duracion)} seconds at this genre's pace is about "
-            f"{presupuesto}. If the draft is over the measure, TRIM it to "
-            "fit — shorten verses, drop a written chorus repetition — "
-            "keeping the hook, the architecture, the rhymes and the "
+            f"THE MEASURE: this draft has {palabras} sung words; at the "
+            f"owner's {bpm_rev} BPM, the three-minute measure is about "
+            f"{presupuesto} words. If the draft is over the measure, TRIM "
+            "it to fit — shorten verses, drop a written chorus repetition "
+            "— keeping the hook, the architecture, the rhymes and the "
             "temperature. Never hand back an over-measure lyric: it would "
-            "be sung rushed."
+            "be sung rushed or delivered cut off."
         )
     revision = gemini_text.generate(
         studio.vertex,
