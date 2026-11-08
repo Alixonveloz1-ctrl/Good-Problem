@@ -27,6 +27,7 @@ from ..db.repositories import (
     Repository,
 )
 from ..domain import artist as artist_domain
+from ..domain import tempo as tempo_domain
 from ..domain.enums import CanonStatus, CreativeRole, LyricsAuthor
 from ..domain.guards import resolve_clip_duration
 from ..domain.pricing import estimate_images, estimate_song, estimate_text
@@ -810,12 +811,22 @@ def _compose_music_prompt(
     parts = [base.strip()] if base.strip() else []
     descriptors = [
         f"Genre: {song.get('genre') or concept.get('genre', '')}",
-        f"BPM: {song.get('bpm') or concept.get('bpm', '')}",
         f"Mood: {song.get('mood') or concept.get('mood', '')}",
         f"Production: {concept.get('production', '')}",
         f"Structure: {', '.join(song.get('structure') or concept.get('structure') or [])}",
     ]
     parts.extend(d for d in descriptors if not d.endswith(": "))
+    # El tempo REAL: el del genero principal que el dueno escogio, de
+    # la tabla de tempo natural. El BPM que el Director inventaba en
+    # el concepto ya NO viaja: era un numero sin relacion con el
+    # genero ni con el fraseo, y la cancion salia a la velocidad que
+    # saliera. Sin genero de la tabla (solo texto libre), no se manda
+    # ningun numero: manda la orden de ritmo del proveedor.
+    linea_tempo = tempo_domain.linea_tempo(
+        song.get("genres") or (bible.music_genres if bible is not None else None)
+    )
+    if linea_tempo:
+        parts.append(linea_tempo)
     # The artist's genre combination, fixed on the Bible and adjustable per
     # song, goes in as its own line so Lyria hears the mix, not one genre.
     generos = artist_domain.genres_text(
