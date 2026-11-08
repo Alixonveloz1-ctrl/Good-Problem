@@ -122,8 +122,25 @@ def _con_duracion(prompt: str, segundos: int, lyrics: str, negative_prompt: str)
     """
     partes = [prompt.strip()]
     partes.append(
-        f"LENGTH: this piece must last about {segundos} seconds. "
-        "Do NOT stop early and do NOT deliver a 30-second clip."
+        f"LENGTH: sung at the tempo above, this lyric naturally lasts about "
+        f"{segundos} seconds. Deliver the whole song at that natural length: "
+        "do NOT cut it short, do NOT deliver a 30-second clip and do NOT "
+        "stretch it with filler."
+    )
+    # Ritmo: sin esta orden, Lyria resolvía el choque entre una letra
+    # larga y la duración pedida ACELERANDO — la canción salía «a mil
+    # por hora» escogiera el dueño el género que escogiera (reporte
+    # del 2026-11-07). La orden fija el tempo del género como ley: si
+    # el material no cabe a ese tempo, se repite menos el coro; no se
+    # canta más rápido. Y si el género ES rápido, rápido canta — pero
+    # con el tempo firme, no a la desesperada.
+    partes.append(
+        "PACING: hold the song's tempo steady from the first line to the "
+        "last, with the genre's natural phrasing and its pauses. Never speed "
+        "up, compress lines or rush syllables to make the lyrics fit the "
+        "length: if the material does not fit at that tempo, repeat the "
+        "chorus fewer times instead of singing faster. Sing fast only "
+        "where the genre itself is fast — the tempo never moves."
     )
     # Diccion: el cantante comprime silabas para caber en el ritmo y se come
     # letras («cuando» sale «cundo»), unas cinco veces por cancion segun el
