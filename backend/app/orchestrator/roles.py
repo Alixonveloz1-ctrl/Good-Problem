@@ -114,6 +114,62 @@ How slang works in anything sung:
   way their people really use it, is welcome.
 """
 
+# The craft base for writing a lyric, distilled from how the great
+# songwriters build songs — a concrete situation carrying the whole
+# song (Arjona, Franco De Vita), images that survive being pictured,
+# rhyme and internal play serving the sense and never the other way
+# round (Canserbero), lines that sound like a person speaking to
+# someone (Alejandro Sanz, Bad Bunny) — and ordered by the owner after
+# reading a lyric that repeated ONE idea in every section, hung lines
+# on words chosen only because they rhymed ("mi única balanza", "que
+# el tráfico se ahogue en el cristal") and chained a single rhyme sound
+# line after line (-ando, then -ión) until it sounded mechanical. The
+# composers are named here, in the comment, and deliberately NOT in the
+# block: the base rules the HOW of writing, never the WHAT — topic,
+# story, world and voice come only from the artist's identity and the
+# song's concept, and imitating any of those writers would break the
+# guardrail the block itself ends with. It rides with the song tasks in
+# the same channel as _JERGA_NATURAL: it governs how sung text is
+# written, so image, video and storyboard tasks never see it.
+_OFICIO_DE_LA_LETRA = """
+The craft of writing the lyric — these rules govern HOW it is written,
+never WHAT it is about:
+- A STORY THAT MOVES. Every section adds something new: a scene, a
+  fact, a memory, a turn. The premise is stated ONCE; saying the same
+  idea again in different words is forbidden. Whoever sings ends the
+  song in a different emotional place from where they started.
+- CONCRETE BEFORE ABSTRACT. Specific, visible things — an object, a
+  street, a gesture, an hour — instead of generics like the world, the
+  city or destiny, which only earn their place when a concrete scene
+  carries them. One concrete situation can hold a whole song.
+- IMAGES THAT HOLD UP. Every comparison or metaphor must still make
+  sense read literally; if the image collapses when you picture it,
+  it is out. One strong image per section beats five decorative ones.
+- RHYME SERVES MEANING. Never a word chosen only because it rhymes:
+  if the last word of a line is there only for the rhyme, the line is
+  rewritten. Vary the rhyme sounds — long chains on a single ending,
+  line after line landing on the same sound, read mechanical and are
+  forbidden. Internal rhyme and rhythmic play only count while the
+  line still says something true.
+- THE CHORUS IS THE HOOK. Short, singable, the emotional heart in the
+  plainest words, and repeated word for word — that is its job. The
+  verses do NOT repeat the chorus's idea: they bring the story and
+  the details that make the chorus land.
+- A PERSON'S VOICE. The lines must sound like something a real person
+  would say or sing to someone — a conversation, a letter, a
+  confession. Wordplay and double meanings only when they fall
+  naturally.
+- SHOW, DO NOT DECLARE. Instead of naming the feeling, give the scene
+  or the gesture that proves it.
+- DETAILS WITH AN OWNER. The concrete details come from THIS artist's
+  world and THIS song's story — its concept and its identity. Filler
+  that would fit any song is out.
+- This craft base governs only how the lyric is written. The WHAT —
+  topic, story, world, voice — comes only from the artist's identity
+  and the song's concept. It imposes no one's themes and no one's
+  style.
+"""
+
 # Tasks whose output IS a song or is written from one. Video tasks are not
 # here: they adapt a song that already exists, and the visual forbidden
 # elements still guard what gets generated on screen.
@@ -174,8 +230,9 @@ def system_instruction(
 
     ``reparto_canciones`` swaps the coherence/censorship block for the song
     split (the reference sets the form; the Bible gives the artist and never
-    vetoes) and adds the slang-naturalness rule (_JERGA_NATURAL), which
-    governs sung text only. Only the song tasks pass it — see
+    vetoes) and adds the slang-naturalness rule (_JERGA_NATURAL) and the
+    lyric craft base (_OFICIO_DE_LA_LETRA), which govern sung text only.
+    Only the song tasks pass it — see
     TAREAS_DE_CANCION and director.run.
 
     ``reescritura_biblia`` is the Bible generation's own split, and it is
@@ -187,7 +244,13 @@ def system_instruction(
     if reescritura_biblia:
         reglas = _REESCRITURA_BIBLIA
     elif reparto_canciones:
-        reglas = _REPARTO_CANCIONES.strip() + "\n\n" + _JERGA_NATURAL.strip()
+        reglas = (
+            _REPARTO_CANCIONES.strip()
+            + "\n\n"
+            + _JERGA_NATURAL.strip()
+            + "\n\n"
+            + _OFICIO_DE_LA_LETRA.strip()
+        )
     else:
         reglas = _COHERENCIA
     parts = [_ROLE_INSTRUCTIONS[role].strip(), _BASE.strip(), reglas.strip()]

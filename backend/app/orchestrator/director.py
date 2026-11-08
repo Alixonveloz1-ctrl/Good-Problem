@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..domain.enums import CreativeRole
-from ..errors import InvalidGenerationRequest
+from ..errors import InvalidGenerationRequest, ProviderError
 from ..providers import gemini_text
 from ..services.context import (
     load_bible,
@@ -450,6 +450,98 @@ def _secciones_reescritura(studio, universe_id: str, bible) -> list[str]:
     return ["\n".join(lineas), borrador]
 
 
+_REVISION_DE_LA_LETRA = """
+REVIEW THE DRAFT LYRIC BEFORE IT IS SAVED. The draft below was just
+written for this song in a single pass, and lyrics written in one pass
+come back with one idea repeated in every section, images that
+collapse when you picture them and words that exist only because
+they rhyme. Read the draft against the craft base and the
+natural-slang rule in your instructions and REWRITE it clean.
+
+Hunt, in this order:
+- the same idea restated in more than one section: the premise is
+  said once, and every section must bring something new — a scene, a
+  fact, a memory, a turn;
+- lines whose image does not survive being read literally;
+- words that are in a line only because they rhyme;
+- long chains riding a single rhyme ending, line after line on the
+  same sound, which read mechanical;
+- generics — the world, the city, destiny — standing where a concrete
+  detail from this song's story belongs;
+- a section that adds nothing new;
+- slang dropped in forced or wrong: the natural-slang rule applies to
+  this rewrite exactly as it applied to the draft.
+
+Keep the song: same concept, same story, same structure and section
+order as the draft, and the chorus recognisably the same hook —
+repair a chorus line only where it fails a check above. Return the
+FULL revised lyric with its section marks. If the draft already
+passes every check, return it unchanged: a review that invents
+changes is as bad as one that misses defects.
+"""
+
+
+def _revisar_borrador_de_letra(
+    studio, model_id: str, instruction: str, payload: dict[str, Any], borrador
+):
+    """La segunda pasada del trabajo de letra: revisar antes de guardar.
+
+    La letra se escribia de una sola pasada y se guardaba tal como
+    salia — asi llego «Madera y Neón», con la misma idea en todas las
+    partes y frases puestas por la rima. Ahora el mismo trabajo hace
+    una segunda llamada, de texto, que lee el borrador contra la base
+    de oficio y la regla de la jerga (ambas ya viajan en la instruccion
+    de sistema de las tareas de cancion: la revision las cita una sola
+    vez, no las duplica) y lo reescribe limpio. LO QUE SE GUARDA es la
+    letra revisada: el resultado que devuelve esta funcion es el que
+    la rama de ``lyrics`` aplica.
+
+    Dos bordes, con la doctrina de la casa — fallo visible antes que
+    exito fingido:
+    - Borrador vacio: no hay nada que revisar; se devuelve tal cual y
+      la guardia de siempre («El Director no devolvió la letra») lo
+      convierte en fallo al aplicar, sin tocar la letra que hubiera.
+    - Revision vacia o inutilizable: ProviderError aqui mismo, antes
+      de aplicar nada — el trabajo queda FAILED con el motivo y la
+      letra anterior de la cancion queda intacta.
+    """
+    datos = borrador.data or {}
+    texto = str(datos.get("lyrics") or "").strip()
+    if not texto:
+        return borrador
+    sections = [_REVISION_DE_LA_LETRA.strip()]
+    concept = payload.get("concept") or {}
+    if concept:
+        sections.append(f"APPROVED CONCEPT\n{_kv(concept)}")
+    sections.append(f"DRAFT LYRIC TO REVIEW\n{texto}")
+    revision = gemini_text.generate(
+        studio.vertex,
+        model_id,
+        system_instruction=instruction,
+        prompt="\n\n".join(sections),
+        schema=TASK_SCHEMAS["lyrics"],
+        # Una edicion pide mano mas firme que la invencion: misma
+        # cancion, mismos hechos, solo limpieza de oficio.
+        temperature=0.7,
+    )
+    datos_revision = revision.data or {}
+    if not str(datos_revision.get("lyrics") or "").strip():
+        raise ProviderError(
+            "La revisión de la letra no devolvió una letra utilizable: "
+            "vuelve a intentarlo."
+        )
+    if not datos_revision.get("title"):
+        datos_revision = {**datos_revision, "title": datos.get("title", "")}
+    return gemini_text.TextResult(
+        text=revision.text,
+        data=datos_revision,
+        model=revision.model,
+        prompt_tokens=borrador.prompt_tokens + revision.prompt_tokens,
+        output_tokens=borrador.output_tokens + revision.output_tokens,
+        raw=revision.raw,
+    )
+
+
 def run(studio, universe_id: str, model_id: str, payload: dict[str, Any]):
     """Execute one Director task and return the raw TextResult."""
     task = payload.get("task", "")
@@ -492,7 +584,7 @@ def run(studio, universe_id: str, model_id: str, payload: dict[str, Any]):
         reparto_canciones=task in TAREAS_DE_CANCION,
     )
     prompt = build_prompt(task, payload)
-    return gemini_text.generate(
+    result = gemini_text.generate(
         studio.vertex,
         model_id,
         system_instruction=instruction,
@@ -500,3 +592,11 @@ def run(studio, universe_id: str, model_id: str, payload: dict[str, Any]):
         schema=TASK_SCHEMAS[task],
         temperature=float(payload.get("temperature", 0.9)),
     )
+    if task == "lyrics":
+        # La letra no se guarda de una sola pasada: el propio trabajo la
+        # revisa contra la base de oficio antes de devolverla, y lo que
+        # el handler aplica —lo que la cancion guarda— es la revision.
+        result = _revisar_borrador_de_letra(
+            studio, model_id, instruction, payload, result
+        )
+    return result
