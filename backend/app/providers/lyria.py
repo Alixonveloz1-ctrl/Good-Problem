@@ -121,26 +121,32 @@ def _con_duracion(prompt: str, segundos: int, lyrics: str, negative_prompt: str)
     no pare antes, entrega treinta segundos y se queda tan ancho.
     """
     partes = [prompt.strip()]
+    # Actuacion y largo en UN solo parrafo musical. Antes eran dos
+    # bloques de ordenes (LENGTH y PACING) en lenguaje de reglamento
+    # —«mantén el tempo firme, nunca aceleres»— y el veredicto del
+    # dueno del 2026-11-08, tras probarlo en vivo, fue que Lyria los
+    # obedecia al pie de la letra: con el BPM bajo la voz salia en
+    # camara lenta, con el BPM alto salia acelerada, y el sonido
+    # entero se aplanaba a «musica de videojuegos» porque el encargo
+    # sonaba a instrucciones y no a musica, tapando la descripcion de
+    # produccion que es la que manda en como suena. Ahora el tempo es
+    # el de la PISTA y la voz actua encima con el fraseo natural del
+    # genero: una actuacion real a ese tempo, sin camara lenta ni voz
+    # acelerada. El largo natural se sigue pidiendo —sin el, Lyria
+    # entrega treinta segundos y se queda tan ancho—, pero dicho
+    # como musica. Y si el material aprieta, se repite menos el coro:
+    # nunca se canta mas rapido para caber.
     partes.append(
-        f"LENGTH: sung at the tempo above, this lyric naturally lasts about "
-        f"{segundos} seconds. Deliver the whole song at that natural length: "
-        "do NOT cut it short, do NOT deliver a 30-second clip and do NOT "
-        "stretch it with filler."
-    )
-    # Ritmo: sin esta orden, Lyria resolvía el choque entre una letra
-    # larga y la duración pedida ACELERANDO — la canción salía «a mil
-    # por hora» escogiera el dueño el género que escogiera (reporte
-    # del 2026-11-07). La orden fija el tempo del género como ley: si
-    # el material no cabe a ese tempo, se repite menos el coro; no se
-    # canta más rápido. Y si el género ES rápido, rápido canta — pero
-    # con el tempo firme, no a la desesperada.
-    partes.append(
-        "PACING: hold the song's tempo steady from the first line to the "
-        "last, with the genre's natural phrasing and its pauses. Never speed "
-        "up, compress lines or rush syllables to make the lyrics fit the "
-        "length: if the material does not fit at that tempo, repeat the "
-        "chorus fewer times instead of singing faster. Sing fast only "
-        "where the genre itself is fast — the tempo never moves."
+        "PERFORMANCE: a real performance at the tempo above — the beat "
+        "belongs to the track and the voice sings over it the way this "
+        "genre is sung: phrasing natural and musical, with its breaths "
+        "and pauses, never dragged into slow motion and never rushed "
+        "into a sped-up voice. Sung at that pace, this lyric lasts "
+        f"about {segundos} seconds: deliver the whole song at that "
+        "natural length — do not cut it short, do not deliver a "
+        "30-second clip and do not stretch it with filler. If the "
+        "material feels long at this tempo, repeat the chorus fewer "
+        "times instead of singing faster."
     )
     # Diccion: el cantante comprime silabas para caber en el ritmo y se come
     # letras («cuando» sale «cundo»), unas cinco veces por cancion segun el

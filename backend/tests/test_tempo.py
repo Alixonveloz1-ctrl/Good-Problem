@@ -104,7 +104,13 @@ def test_la_instruccion_de_la_letra_lleva_su_medida():
 def test_el_bpm_del_dueno_manda_en_el_encargo():
     linea = tempo_domain.linea_tempo_cancion(["regueton"], 100)
     assert "Tempo: 100 BPM" in linea
-    assert "the owner chose" in linea
+    # El numero es el tempo de la PISTA, no la velocidad de la voz:
+    # la voz canta encima con el fraseo del genero, sin camara lenta
+    # ni voz acelerada (correccion del dueno del 2026-11-08).
+    assert "the tempo of the track" in linea
+    assert "the beat the owner chose" in linea
+    assert "never a slow-motion voice" in linea
+    assert "for the singing voice" not in linea
     # Sin su numero, la linea es la del genero, sin marca de dueno.
     assert "the owner chose" not in tempo_domain.linea_tempo_cancion(["regueton"], None)
 
@@ -184,6 +190,13 @@ def test_el_texto_de_lyria_lleva_la_orden_de_ritmo(client, studio):
 
     llamada = [c for c in studio.calls.all() if c.method == "interactions"][-1]
     texto = llamada.payload["input"][0]["text"]
-    assert "PACING:" in texto
-    assert "Never speed up" in texto
-    assert "the tempo never moves" in texto
+    # Un solo parrafo musical de actuacion: el bloque rigido PACING
+    # desaparecio (Lyria lo obedecia al pie de la letra y la voz
+    # salia en camara lenta o acelerada).
+    assert "PERFORMANCE:" in texto
+    assert "PACING:" not in texto
+    assert "slow motion" in texto
+    assert "repeat the chorus fewer times" in texto
+    # La diccion queda intacta, palabra por palabra: es la orden que
+    # curo los cortes de palabras en la 3.5.
+    assert "DICTION:" in texto

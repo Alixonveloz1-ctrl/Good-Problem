@@ -124,12 +124,20 @@ def contar_palabras(letra: str) -> int:
 # --- El BPM del dueno y los tres minutos ------------------------------------
 #
 # El dueno pidio el mando el 2026-11-07: un selector de BPM en la
-# cancion, escogido ANTES de generar la letra, y ese numero es la
-# velocidad de la voz que se le pide a Lyria. La duracion ya no es un
+# cancion, escogido ANTES de generar la letra, y ese numero es el
+# tempo de la pista que se le pide a Lyria. La duracion ya no es un
 # numero fijo que la app imponga: nace de la letra y de ese BPM. Y
 # una restriccion suya: ninguna letra puede pasar de tres minutos ni
 # cantada a la velocidad mas alta — porque Lyria entrega hasta tres
 # minutos, y una cancion mas larga no se generaria completa.
+#
+# Correccion del dueno del 2026-11-08, tras probarlo en vivo: cuando
+# el numero viajaba como «la velocidad de la voz» y con ordenes
+# rigidas de ritmo, Lyria lo tomaba al pie de la letra — con el BPM
+# bajo la voz salia en camara lenta y con el BPM alto salia
+# acelerada. El numero manda el tempo de la PISTA; la voz canta
+# encima con el fraseo natural del genero, como una actuacion real
+# a ese tempo.
 
 BPM_MINIMO = 60
 BPM_MAXIMO = 180
@@ -206,8 +214,10 @@ def linea_tempo_cancion(generos: list[str] | None, bpm_usuario: int | None) -> s
     if bpm_usuario:
         frase = tempo.frase if tempo is not None else "the genre's natural phrasing"
         return (
-            f"Tempo: {bpm} BPM — the tempo the owner chose for the singing "
-            f"voice. Delivery: {frase}."
+            f"Tempo: {bpm} BPM — the tempo of the track, the beat the "
+            f"owner chose. The lead voice sings over that beat with "
+            f"{frase}: a real, natural performance at this tempo — "
+            "never a slow-motion voice, never a sped-up voice."
         )
     return linea_tempo(generos)
 

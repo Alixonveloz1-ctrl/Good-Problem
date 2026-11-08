@@ -185,7 +185,7 @@ never WHAT it is about:
   architecture is written smaller, never amputated.
 - SIZED TO THE SONG. The lyric is written to a measure: the task
   states how many words fit inside three minutes at the BPM the
-  owner chose for the voice, and the complete architecture is scaled
+  owner chose for the song, and the complete architecture is scaled
   INSIDE that measure — shorter verses, fewer written chorus
   repetitions, whatever it takes. A long lyric crammed into a short
   song can only be sung rushed, and a rushed lyric is a failed
