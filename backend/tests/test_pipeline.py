@@ -1,1 +1,226 @@
-IiIiQWNjZXB0YW5jZSB3YWxrLXRocm91Z2ggKFBSRCA1MyksIGVuZCB0byBlbmQsIGluIGRyeSBydW4uCgpFdmVyeSBzdGVwIGhlcmUgbWFwcyB0byBhIG51bWJlcmVkIHN0ZXAgb2YgdGhlIGFjY2VwdGFuY2UgdGVzdC4gSWYgYSBzdGVwIG5lZWRlZAphIGNvbXB1dGVyLCBpdCB3b3VsZCBub3QgYmUgYW4gSFRUUCBjYWxsLgoiIiIKCmZyb20gX19mdXR1cmVfXyBpbXBvcnQgYW5ub3RhdGlvbnMKCmZyb20gYXBwLmRvbWFpbi5lbnVtcyBpbXBvcnQgQ2Fub25TdGF0dXMsIEpvYlN0YXRlCgoKZGVmIF9ydW4oY2xpZW50LCBzdHVkaW8sIG1ldGhvZDogc3RyLCB1cmw6IHN0ciwgKiprd2FyZ3MpOgogICAgcmVzcG9uc2UgPSBnZXRhdHRyKGNsaWVudCwgbWV0aG9kKSh1cmwsICoqa3dhcmdzKQogICAgYXNzZXJ0IHJlc3BvbnNlLnN0YXR1c19jb2RlID09IDIwMCwgZiJ7dXJsfSAtPiB7cmVzcG9uc2Uuc3RhdHVzX2NvZGV9IHtyZXNwb25zZS50ZXh0fSIKICAgIGJvZHkgPSByZXNwb25zZS5qc29uKCkKICAgIGlmIGlzaW5zdGFuY2UoYm9keSwgZGljdCkgYW5kIGJvZHkuZ2V0KCJzdGF0ZSIpIGluIHtKb2JTdGF0ZS5RVUVVRUQudmFsdWUsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgSm9iU3RhdGUuUFJPQ0VTU0lORy52YWx1ZX06CiAgICAgICAgc3R1ZGlvLmpvYnMud2FpdF9mb3JfaWRsZSgzMCkKICAgICAgICBqb2IgPSBjbGllbnQuZ2V0KAogICAgICAgICAgICBmIi9hcGkvdW5pdmVyc2VzL3tib2R5Wyd1bml2ZXJzZV9pZCddfS9qb2JzL3tib2R5WydpZCddfSIKICAgICAgICApLmpzb24oKQogICAgICAgIGFzc2VydCBqb2JbInN0YXRlIl0gPT0gSm9iU3RhdGUuUkVBRFkudmFsdWUsIGpvYi5nZXQoImVycm9yIikKICAgICAgICByZXR1cm4gam9iCiAgICByZXR1cm4gYm9keQoKCmRlZiB0ZXN0X2Z1bGxfcHJvZHVjdGlvbl9mcm9tX2FfcGhvbmUoY2xpZW50LCBzdHVkaW8pOgogICAgIyAxLTIuIENyZWFyIFVuaXZlcnNlIHkgYXJ0aXN0YS4KICAgIHVuaXZlcnNlID0gX3J1bihjbGllbnQsIHN0dWRpbywgInBvc3QiLCAiL2FwaS91bml2ZXJzZXMiLCBqc29uPXsibmFtZSI6ICJOb3ZhIn0pCiAgICB1aWQgPSB1bml2ZXJzZVsiaWQiXQoKICAgICMgMy4gQ3JlYXIgQXJ0aXN0IEJpYmxlLgogICAgam9iID0gX3J1bigKICAgICAgICBjbGllbnQsIHN0dWRpbywgInBvc3QiLCBmIi9hcGkvdW5pdmVyc2VzL3t1aWR9L2JpYmxlL2dlbmVyYXRlIiwKICAgICAgICBqc29uPXsiYnJpZWYiOiAiQ2FudGFudGUgZGUgc3ludGggcG9wIG5vY3R1cm5vIn0sCiAgICApCiAgICBhc3NlcnQgam9iWyJyZXN1bHQiXVsiYXBwbGllZCJdWyJlbnRpdHkiXSA9PSAiYXJ0aXN0X2JpYmxlIgogICAgIyBMYSB2b3ogY2FudGFkYSBmaWphIGRlbCBhcnRpc3RhOiB1biBzb2xvIHRleHRvIHF1ZSB2aWFqYXJhIHBhbGFicmEgcG9yCiAgICAjIHBhbGFicmEgZW4gY2FkYSBlbmNhcmdvIGEgTHlyaWEuCiAgICBfcnVuKGNsaWVudCwgc3R1ZGlvLCAicHV0IiwgZiIvYXBpL3VuaXZlcnNlcy97dWlkfS9iaWJsZS9zaW5naW5nLXZvaWNlIiwKICAgICAgICAganNvbj17InNleCI6ICJNdWplciIsICJhcHBhcmVudF9hZ2UiOiAiMjUiLCAicGl0Y2giOiAiTWVkaWEiLAogICAgICAgICAgICAgICAidGltYnJlIjogIkNhbGlkYSwgY29uIGFpcmUiLCAibGFuZ3VhZ2VfYWNjZW50IjogIkVzcGFub2wgbmV1dHJvIiwKICAgICAgICAgICAgICAgInNpbmdpbmdfc3R5bGUiOiAiSW50aW1hIn0pCiAgICBfcnVuKGNsaWVudCwgc3R1ZGlvLCAicG9zdCIsIGYiL2FwaS91bml2ZXJzZXMve3VpZH0vYmlibGUvYXBwcm92ZSIpCgogICAgIyA0LTUuIENoYXJhY3RlciBNYXN0ZXIuIEVsIGFydGlzdGEgeWEgZXhpc3RlOiBuYWNpbyBjb24gZWwgdW5pdmVyc28sIHkKICAgICMgZXMgZWwgdW5pY28gcGVyc29uYWplIHBvc2libGUuIExhIGxsYW1hZGEgYSBhcHJvYmFyIGVzIGhveSB1biBuby1vcCBkZQogICAgIyBjb21wYXRpYmlsaWRhZDogbGEgaW1hZ2VuIGdlbmVyYWRhIHlhIG5hY2lvIGFwcm9iYWRhIHkgZW4gdXNvLgogICAgY2hhcmFjdGVyID0gY2xpZW50LmdldChmIi9hcGkvdW5pdmVyc2VzL3t1aWR9L2NoYXJhY3RlcnMiKS5qc29uKClbMF0KICAgIGFzc2VydCBjaGFyYWN0ZXJbImlkIl0gPT0gdW5pdmVyc2VbImxlYWRfY2hhcmFjdGVyX2lkIl0KICAgIF9ydW4oY2xpZW50LCBzdHVkaW8sICJwb3N0IiwKICAgICAgICAgZiIvYXBpL3VuaXZlcnNlcy97dWlkfS9jaGFyYWN0ZXJzL3tjaGFyYWN0ZXJbJ2lkJ119L21hc3Rlci9wb3J0cmFpdCIsCiAgICAgICAgIGpzb249eyJwcm9tcHQiOiAicG9ydHJhaXQgb2YgTm92YSJ9KQogICAgYXBwcm92ZWQgPSBfcnVuKGNsaWVudCwgc3R1ZGlvLCAicG9zdCIsCiAgICAgICAgICAgICAgICAgICAgZiIvYXBpL3VuaXZlcnNlcy97dWlkfS9jaGFyYWN0ZXJzL3tjaGFyYWN0ZXJbJ2lkJ119L2FwcHJvdmUiKQogICAgYXNzZXJ0IGFwcHJvdmVkWyJzdGF0dXMiXSA9PSBDYW5vblN0YXR1cy5BUFBST1ZFRC52YWx1ZQogICAgYXNzZXJ0IGFwcHJvdmVkWyJyZWZlcmVuY2VfaW1hZ2VfcGF0aHMiXSwgImVsIG1hc3RlciBhcHJvYmFkbyBhbGltZW50YSBsYXMgcmVmZXJlbmNpYXMiCgogICAgIyA4LiBDb25jZXB0byBtdXNpY2FsLgogICAgc29uZyA9IF9ydW4oY2xpZW50LCBzdHVkaW8sICJwb3N0IiwgZiIvYXBpL3VuaXZlcnNlcy97dWlkfS9zb25ncyIsCiAgICAgICAgICAgICAgICBqc29uPXsidGl0bGUiOiAiTmVvbiIsICJyZXF1ZXN0ZWRfZHVyYXRpb25fc2Vjb25kcyI6IDE1MH0pCiAgICBzaWQgPSBzb25nWyJpZCJdCiAgICBfcnVuKGNsaWVudCwgc3R1ZGlvLCAicG9zdCIsIGYiL2FwaS91bml2ZXJzZXMve3VpZH0vc29uZ3Mve3NpZH0vY29uY2VwdCIsCiAgICAgICAgIGpzb249eyJicmllZiI6ICJVbmEgbm9jaGUgcXVlIG5vIHRlcm1pbmEifSkKCiAgICAjIDEwLiBDYW1iaWFyIGVsIGdlbmVybyBxdWUgcHJvcHVzbyBlbCBEaXJlY3RvciB5IHZlciBxdWUgcmVoYWNlIGxhIHByb3B1ZXN0YS4KICAgIHJlYnVpbHQgPSBfcnVuKGNsaWVudCwgc3R1ZGlvLCAicG9zdCIsIGYiL2FwaS91bml2ZXJzZXMve3VpZH0vc29uZ3Mve3NpZH0vY29uY2VwdCIsCiAgICAgICAgICAgICAgICAgICBqc29uPXsib3ZlcnJpZGVzIjogeyJnZW5yZSI6ICJoaXAgaG9wIn19KQogICAgcHJvbXB0X3NlbnQgPSBzdHVkaW8uY2FsbHMuYWxsKClbLTFdLnBheWxvYWRbImNvbnRlbnRzIl1bMF1bInBhcnRzIl1bMF1bInRleHQiXQogICAgYXNzZXJ0ICJVU0VSIE9WRVJSSURFUyIgaW4gcHJvbXB0X3NlbnQgYW5kICJoaXAgaG9wIiBpbiBwcm9tcHRfc2VudAogICAgYXNzZXJ0IHJlYnVpbHRbInN0YXRlIl0gPT0gSm9iU3RhdGUuUkVBRFkudmFsdWUKCiAgICBfcnVuKGNsaWVudCwgc3R1ZGlvLCAicG9zdCIsIGYiL2FwaS91bml2ZXJzZXMve3VpZH0vc29uZ3Mve3NpZH0vY29uY2VwdC9hcHByb3ZlIikKCiAgICAjIDkuIExldHJhIHByb3BpYS4KICAgIF9ydW4oY2xpZW50LCBzdHVkaW8sICJwdXQiLCBmIi9hcGkvdW5pdmVyc2VzL3t1aWR9L3NvbmdzL3tzaWR9L2x5cmljcyIsCiAgICAgICAgIGpzb249eyJseXJpY3MiOiAiW1ZlcnNlIDFdXG5MdWNlcyBkZSBuZW9uIiwgImF1dGhvciI6ICJ1c2VyIn0pCiAgICBfcnVuKGNsaWVudCwgc3R1ZGlvLCAicG9zdCIsIGYiL2FwaS91bml2ZXJzZXMve3VpZH0vc29uZ3Mve3NpZH0vbHlyaWNzL2FuYWx5emUiLCBqc29uPXt9KQoKICAgICMgMTEuIExhIGxldHJhIGd1YXJkYWRhIHlhIGVzIGxhIHF1ZSB2YWxlIChsYSBsbGFtYWRhIGEgYXByb2JhciBlcyB1bgogICAgIyBuby1vcCBkZSBjb21wYXRpYmlsaWRhZCkuCiAgICBfcnVuKGNsaWVudCwgc3R1ZGlvLCAicG9zdCIsIGYiL2FwaS91bml2ZXJzZXMve3VpZH0vc29uZ3Mve3NpZH0vbHlyaWNzL2FwcHJvdmUiKQoKICAgICMgMTIuIEdlbmVyYXIgY2FuY2lvbiBjb24gTHlyaWEgMy41IGEgbGEgZHVyYWNpb24gcGVkaWRhLgogICAgbXVzaWNfam9iID0gX3J1bihjbGllbnQsIHN0dWRpbywgInBvc3QiLCBmIi9hcGkvdW5pdmVyc2VzL3t1aWR9L3NvbmdzL3tzaWR9L2dlbmVyYXRlIiwKICAgICAgICAgICAgICAgICAgICAganNvbj17ImR1cmF0aW9uX3NlY29uZHMiOiAxNTB9KQogICAgYXNzZXJ0IG11c2ljX2pvYlsibW9kZWwiXSA9PSAibHlyaWEtMy41IgogICAgYXNzZXJ0IG11c2ljX2pvYlsicmVzdWx0Il1bImR1cmF0aW9uX3NlY29uZHMiXSA9PSAxNTAKCiAgICAjIDE1LiBMYSB2ZXJzaW9uIGdlbmVyYWRhIHlhIGVzIGVsIG1hc3RlcjogZWwgaGFuZGxlciBsYSBkZWpvIHZpZ2VudGUKICAgICMgYWwgZ2VuZXJhcmxhLCB5IGxhIHZpZWphIGxsYW1hZGEgYSBhcHJvYmFybGEgbm8gY2FtYmlhIG5hZGEuCiAgICBhcHByb3ZlZF9zb25nID0gX3J1bihjbGllbnQsIHN0dWRpbywgInBvc3QiLAogICAgICAgICAgICAgICAgICAgICAgICAgZiIvYXBpL3VuaXZlcnNlcy97dWlkfS9zb25ncy97c2lkfS92ZXJzaW9ucy8xL2FwcHJvdmUiKQogICAgYXNzZXJ0IGFwcHJvdmVkX3NvbmdbImFwcHJvdmVkX21hc3Rlcl9wYXRoIl0KCiAgICAjIDE2LiBTb2xpY2l0YXIgcHJvcHVlc3RhIGRlIHZpZGVvY2xpcC4KICAgIHByb2plY3QgPSBfcnVuKGNsaWVudCwgc3R1ZGlvLCAicG9zdCIsIGYiL2FwaS91bml2ZXJzZXMve3VpZH0vdmlkZW8tcHJvamVjdHMiLAogICAgICAgICAgICAgICAgICAganNvbj17InNvbmdfaWQiOiBzaWQsICJ2aWRlb190eXBlIjogIm5hcnJhdGl2ZSJ9KQogICAgcGlkID0gcHJvamVjdFsiaWQiXQogICAgX3J1bihjbGllbnQsIHN0dWRpbywgInBvc3QiLCBmIi9hcGkvdW5pdmVyc2VzL3t1aWR9L3ZpZGVvLXByb2plY3RzL3twaWR9L2NvbmNlcHQiLCBqc29uPXt9KQoKICAgICMgMTcuIExhIGhpc3RvcmlhIGVzY3JpdGEgeWEgZXMgbGEgcXVlIHZhbGUgKGFwcm9iYXJsYSBlcyB1biBuby1vcCkuCiAgICBzdHVkaW8uZGIudXBkYXRlKAogICAgICAgIGYidW5pdmVyc2VzL3t1aWR9L3ZpZGVvX3Byb2plY3RzL3twaWR9IiwKICAgICAgICB7InN0b3J5IjogeyJwcmVtaXNlIjogIlVuYSBub2NoZSIsICJzdGF0dXMiOiBDYW5vblN0YXR1cy5EUkFGVC52YWx1ZX19LAogICAgKQogICAgX3J1bihjbGllbnQsIHN0dWRpbywgInBvc3QiLCBmIi9hcGkvdW5pdmVyc2VzL3t1aWR9L3ZpZGVvLXByb2plY3RzL3twaWR9L3N0b3J5L2FwcHJvdmUiKQoKICAgICMgMTgtMTkuIE5vIGhheSBwYXNvIGRlIHJlcGFydG86IGVsIHByb3llY3RvIG5hY2UgY29uIGVsIGFydGlzdGEgZGVudHJvLAogICAgIyB5IGVsIHZlc3R1YXJpbyB5IGxvcyBzaXRpb3MgdmFuIGVzY3JpdG9zIGVuIGxhcyBlc2NlbmFzIGRlbCBzdG9yeWJvYXJkLgogICAgYXNzZXJ0IHByb2plY3RbImNoYXJhY3Rlcl9pZHMiXSA9PSBbY2hhcmFjdGVyWyJpZCJdXQoKICAgICMgMjAuIFN0b3J5Ym9hcmQgY29uIHRvbWFzIHJldXRpbGl6YWRhcy4KICAgIF9zZWVkX3N0b3J5Ym9hcmQoc3R1ZGlvLCB1aWQsIHBpZCkKICAgIF9ydW4oY2xpZW50LCBzdHVkaW8sICJwb3N0IiwgZiIvYXBpL3VuaXZlcnNlcy97dWlkfS92aWRlby1wcm9qZWN0cy97cGlkfS9zdG9yeWJvYXJkL2FwcHJvdmUiKQoKICAgIHNjZW5lcyA9IGNsaWVudC5nZXQoZiIvYXBpL3VuaXZlcnNlcy97dWlkfS92aWRlby1wcm9qZWN0cy97cGlkfSIpLmpzb24oKVsic2NlbmVzIl0KICAgIGFzc2VydCBsZW4oc2NlbmVzKSA9PSAzCiAgICBnZW5lcmF0ZWQgPSBbcyBmb3IgcyBpbiBzY2VuZXMgaWYgbm90IHNbInJldXNlc19zY2VuZV9pZCJdXQogICAgYXNzZXJ0IGxlbihnZW5lcmF0ZWQpID09IDIsICJ1bmEgdG9tYSBzZSByZXV0aWxpemEiCgogICAgIyAyMS0yNC4gSW1hZ2VuZXMgZGUgZXNjZW5hLCBjb24gZWxlY2Npb24gZGUgbW9kZWxvLiBOYWNlbiBlbiB1c286IGxhCiAgICAjIGxsYW1hZGEgYSBhcHJvYmFyIGNhZGEgdW5hIGVzIHVuIG5vLW9wIGRlIGNvbXBhdGliaWxpZGFkLgogICAgZm9yIGluZGV4LCBzY2VuZSBpbiBlbnVtZXJhdGUoZ2VuZXJhdGVkKToKICAgICAgICBtb2RlbCA9ICJnZW1pbmktMy4xLWZsYXNoLWltYWdlIiBpZiBpbmRleCA9PSAwIGVsc2UgImdlbWluaS0zLXByby1pbWFnZSIKICAgICAgICBpbWFnZV9qb2IgPSBfcnVuKGNsaWVudCwgc3R1ZGlvLCAicG9zdCIsCiAgICAgICAgICAgICAgICAgICAgICAgICBmIi9hcGkvdW5pdmVyc2VzL3t1aWR9L3NjZW5lcy97c2NlbmVbJ2lkJ119L2ltYWdlIiwKICAgICAgICAgICAgICAgICAgICAgICAgIGpzb249eyJtb2RlbCI6IG1vZGVsLCAidmFyaWFudCI6ICIxSyJ9KQogICAgICAgIGFzc2VydCBpbWFnZV9qb2JbIm1vZGVsIl0gPT0gbW9kZWwgICMgMjIuIGNhbWJpYXIgZWwgbW9kZWxvIGVuIHVuYSBnZW5lcmFjaW9uIGNvbmNyZXRhCiAgICAgICAgX3J1bihjbGllbnQsIHN0dWRpbywgInBvc3QiLCBmIi9hcGkvdW5pdmVyc2VzL3t1aWR9L3NjZW5lcy97c2NlbmVbJ2lkJ119L2ltYWdlL2FwcHJvdmUiKQoKICAgICMgMjUtMjkuIENsaXBzIGNvbiBWZW8geSBjYW1iaW8gZGUgbW9kZWxvLiBOYWNlbiBlbiB1c28sIGNvbW8gbGFzIGltYWdlbmVzLgogICAgZm9yIGluZGV4LCBzY2VuZSBpbiBlbnVtZXJhdGUoZ2VuZXJhdGVkKToKICAgICAgICBtb2RlbCA9ICJ2ZW8tMy4xLWZhc3QtZ2VuZXJhdGUtMDAxIiBpZiBpbmRleCA9PSAwIGVsc2UgInZlby0zLjEtbGl0ZS1nZW5lcmF0ZS0wMDEiCiAgICAgICAgY2xpcF9qb2IgPSBfcnVuKGNsaWVudCwgc3R1ZGlvLCAicG9zdCIsCiAgICAgICAgICAgICAgICAgICAgICAgIGYiL2FwaS91bml2ZXJzZXMve3VpZH0vc2NlbmVzL3tzY2VuZVsnaWQnXX0vY2xpcCIsCiAgICAgICAgICAgICAgICAgICAgICAgIGpzb249eyJtb2RlbCI6IG1vZGVsLCAidmFyaWFudCI6ICIxMDgwcCJ9KQogICAgICAgIGFzc2VydCBjbGlwX2pvYlsibW9kZWwiXSA9PSBtb2RlbAogICAgICAgIGFzc2VydCBjbGlwX2pvYlsicmVzdWx0Il1bImdlbmVyYXRlX2F1ZGlvIl0gaXMgRmFsc2UKICAgICAgICBfcnVuKGNsaWVudCwgc3R1ZGlvLCAicG9zdCIsIGYiL2FwaS91bml2ZXJzZXMve3VpZH0vc2NlbmVzL3tzY2VuZVsnaWQnXX0vY2xpcC9hcHByb3ZlIikKCiAgICAjIDI3LiBDb21wcm9iYXIgZW4gbG9zIGxvZ3MgcXVlIG5pbmd1bmEgbGxhbWFkYSBhIFZlbyBwaWRpbyBhdWRpby4KICAgIGRpYWdub3N0aWNzID0gY2xpZW50LmdldCgiL2FwaS9kaWFnbm9zdGljcy92ZXJ0ZXgtY2FsbHM/cHJlZml4PXZlbyIpLmpzb24oKQogICAgYXNzZXJ0IGRpYWdub3N0aWNzWyJjb3VudCJdID49IDIKICAgIGFzc2VydCBkaWFnbm9zdGljc1siY2FsbHNfcmVxdWVzdGluZ19hdWRpbyJdID09IDAKICAgIGZvciBjYWxsIGluIGRpYWdub3N0aWNzWyJjYWxscyJdOgogICAgICAgIGlmIGNhbGxbIm1ldGhvZCJdID09ICJwcmVkaWN0TG9uZ1J1bm5pbmciOgogICAgICAgICAgICBhc3NlcnQgY2FsbFsicGF5bG9hZCJdWyJwYXJhbWV0ZXJzIl1bImdlbmVyYXRlQXVkaW8iXSBpcyBGYWxzZQoKICAgICMgMzAtMzIuIEVuc2FtYmxhamUgeSBmb3JtYXRvcy4KICAgIGFzc2VtYmx5ID0gX3J1bihjbGllbnQsIHN0dWRpbywgInBvc3QiLAogICAgICAgICAgICAgICAgICAgIGYiL2FwaS91bml2ZXJzZXMve3VpZH0vdmlkZW8tcHJvamVjdHMve3BpZH0vYXNzZW1ibGUiLAogICAgICAgICAgICAgICAgICAgIGpzb249eyJmb3JtYXRzIjogWyIxNjo5IiwgIjk6MTYiXX0pCiAgICBhc3NlcnQgYXNzZW1ibHlbInJlc3VsdCJdWyJjbGlwcyJdID09IDMKICAgIGFzc2VydCBhc3NlbWJseVsicmVzdWx0Il1bInJldXNlZCJdID09IDEKCiAgICAjIDMzLiBObyBoYXkgcHJveWVjdG8gcXVlIGFwcm9iYXI6IGVzdGEgdGVybWluYWRvIGN1YW5kbyBzdSBNUDQgZXhpc3RlLgogICAgIyBFbiBzZWNvIGVsIG1vbnRhamUgc29sbyBwcm9kdWNlIGVsIHBsYW4gKEVETCksIGFzaSBxdWUgZWwgcHJveWVjdG8KICAgICMgc2lndWUgc2luIG1hc3RlciwgeSBlbCB2aWVqbyBlbmRwb2ludCBkZSBhcHJvYmFyIGVzIHVuIG5vLW9wIHF1ZSBubwogICAgIyBsbyBkYSBwb3IgdGVybWluYWRvIG5pIG1hcmNhIG5hZGEuCiAgICBzaW5fcmVuZGVyID0gY2xpZW50LnBvc3QoZiIvYXBpL3VuaXZlcnNlcy97dWlkfS92aWRlby1wcm9qZWN0cy97cGlkfS9hcHByb3ZlIikKICAgIGFzc2VydCBzaW5fcmVuZGVyLnN0YXR1c19jb2RlID09IDIwMAogICAgcHJveWVjdG8gPSBjbGllbnQuZ2V0KGYiL2FwaS91bml2ZXJzZXMve3VpZH0vdmlkZW8tcHJvamVjdHMve3BpZH0iKS5qc29uKCkKICAgIGFzc2VydCBub3QgcHJveWVjdG8uZ2V0KCJtYXN0ZXJfMTZ4OV9wYXRoIikKICAgIGFzc2VydCBwcm95ZWN0b1sic3RhdHVzIl0gIT0gQ2Fub25TdGF0dXMuQVBQUk9WRUQudmFsdWUKCiAgICAjIDM1LiBFbCBlc3R1ZGlvIG5vIGxsZXZhIGN1ZW50YXM6IGVsIGdhc3RvIHNlIG1pcmEgZW4gR29vZ2xlIENsb3VkLiBMbyBxdWUKICAgICMgc2kgcXVlZGEgZXMgbG8gcXVlIGNvc3RvIGNhZGEgcGllemEsIGNvbW8gcGFydGUgZGUgc3UgcHJvY2VkZW5jaWEgKFBSRCA0NikuCiAgICBhc3NlcnQgY2xpZW50LmdldChmIi9hcGkvdW5pdmVyc2VzL3t1aWR9L3NwZW5kIikuc3RhdHVzX2NvZGUgIT0gMjAwCiAgICBqb2JzID0gY2xpZW50LmdldChmIi9hcGkvdW5pdmVyc2VzL3t1aWR9L2pvYnM/bGltaXQ9MTAwIikuanNvbigpCiAgICBiaWxsZWQgPSBbaiBmb3IgaiBpbiBqb2JzIGlmIGpbImFjdHVhbF9jb3N0X3VzZCJdID4gMF0KICAgIGFzc2VydCBiaWxsZWQsICJjYWRhIGdlbmVyYWNpb24gZGVqYSBjb25zdGFuY2lhIGRlIGxvIHF1ZSBjb3N0byIKICAgIGZvciBqb2IgaW4gYmlsbGVkOgogICAgICAgIGFzc2VydCBqb2JbImVzdGltYXRlZF9jb3N0X3VzZCJdID49IDAKCiAgICAjIDM2LTM3LiBFeHBvcnRhciB5IGRlc2Nhcmdhci4KICAgIGV4cG9ydCA9IF9ydW4oY2xpZW50LCBzdHVkaW8sICJwb3N0IiwgZiIvYXBpL3VuaXZlcnNlcy97dWlkfS9leHBvcnRzL3NvbmdzL3tzaWR9IikKICAgIG5hbWVzID0ge2ZbIm5hbWUiXSBmb3IgZiBpbiBleHBvcnRbImZpbGVzIl19CiAgICBhc3NlcnQgIm1ldGFkYXRhLmpzb24iIGluIG5hbWVzIGFuZCAic29uZ19pbmZvLnR4dCIgaW4gbmFtZXMKICAgIGFzc2VydCBhbnkoZlsiZm9sZGVyIl0gPT0gIkFVRElPIiBmb3IgZiBpbiBleHBvcnRbImZpbGVzIl0pCiAgICBhc3NlcnQgZXhwb3J0WyJhcmNoaXZlX3VybCJdLCAiZWwgcGFxdWV0ZSBzZSBkZXNjYXJnYSBjb21vIHVuIHNvbG8gYXJjaGl2byBkZXNkZSBlbCBpUGhvbmUiCgoKZGVmIF9zZWVkX3N0b3J5Ym9hcmQoc3R1ZGlvLCB1aWQsIHBpZCk6CiAgICAiIiJUaGUgRGlyZWN0b3IncyBkcnkgcnVuIGNhbm5vdCBpbnZlbnQgc2NlbmVzLCBzbyB0aGUgc3Rvcnlib2FyZCBpcyB3cml0dGVuCiAgICBkaXJlY3RseSBoZXJlIGluIHRoZSBzaGFwZSBpdHMgaGFuZGxlciBwcm9kdWNlcy4iIiIKICAgIGZyb20gYXBwLm9yY2hlc3RyYXRvci5oYW5kbGVycyBpbXBvcnQgX2FwcGx5X3N0b3J5Ym9hcmQKCiAgICBfYXBwbHlfc3Rvcnlib2FyZCgKICAgICAgICBzdHVkaW8sCiAgICAgICAgdWlkLAogICAgICAgIHBpZCwKICAgICAgICB7CiAgICAgICAgICAgICJub3RlcyI6ICJFbCBlc3RyaWJpbGxvIHJlcGl0ZSBlbCBwbGFubyAwLiIsCiAgICAgICAgICAgICJzY2VuZXMiOiBbCiAgICAgICAgICAgICAgICB7CiAgICAgICAgICAgICAgICAgICAgImluZGV4IjogMCwgImFjdGlvbiI6ICJOb3ZhIG1pcmEgbGEgY2l1ZGFkIiwgImNhbWVyYSI6ICJ3aWRlIiwKICAgICAgICAgICAgICAgICAgICAiY2hhcmFjdGVyX25hbWVzIjogWyJOb3ZhIl0sCiAgICAgICAgICAgICAgICAgICAgImxvY2F0aW9uX2Rlc2NyaXB0aW9uIjogIkF6b3RlYSBkZSBub2NoZSwgbHVjZXMgZGUgbGEgY2l1ZGFkIiwKICAgICAgICAgICAgICAgICAgICAid2FyZHJvYmVfZGVzY3JpcHRpb24iOiAiQWJyaWdvIG5lZ3JvIGRlIGZpcm1hIiwKICAgICAgICAgICAgICAgICAgICAicGxhbm9zIjogWyJQbGFubyBnZW5lcmFsOiBOb3ZhIGVudHJhIGNhbnRhbmRvIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICJQcmltZXIgcGxhbm8gYSBsb3MgNCBzZWd1bmRvcyJdLAogICAgICAgICAgICAgICAgICAgICJpbWFnZV9wcm9tcHQiOiAiTm92YSBvbiBhIHJvb2Z0b3AgYXQgbmlnaHQiLAogICAgICAgICAgICAgICAgICAgICJ2aWRlb19wcm9tcHQiOiAic2xvdyBwdXNoIGluIiwgInJldXNlc19zY2VuZV9pbmRleCI6IC0xLAogICAgICAgICAgICAgICAgfSwKICAgICAgICAgICAgICAgIHsKICAgICAgICAgICAgICAgICAgICAiaW5kZXgiOiAxLCAiYWN0aW9uIjogIlByaW1lciBwbGFubyIsICJjYW1lcmEiOiAiY2xvc2UgdXAiLAogICAgICAgICAgICAgICAgICAgICJjaGFyYWN0ZXJfbmFtZXMiOiBbIk5vdmEiXSwKICAgICAgICAgICAgICAgICAgICAibG9jYXRpb25fZGVzY3JpcHRpb24iOiAiTGEgbWlzbWEgYXpvdGVhIiwKICAgICAgICAgICAgICAgICAgICAid2FyZHJvYmVfZGVzY3JpcHRpb24iOiAiQWJyaWdvIG5lZ3JvIGRlIGZpcm1hIiwKICAgICAgICAgICAgICAgICAgICAicGxhbm9zIjogWyJQcmltZXIgcGxhbm8gY2FudGFuZG8iXSwKICAgICAgICAgICAgICAgICAgICAiaW1hZ2VfcHJvbXB0IjogImNsb3NlIHVwIG9mIE5vdmEiLCAidmlkZW9fcHJvbXB0IjogImhhbmRoZWxkIiwKICAgICAgICAgICAgICAgICAgICAicmV1c2VzX3NjZW5lX2luZGV4IjogLTEsCiAgICAgICAgICAgICAgICB9LAogICAgICAgICAgICAgICAgewogICAgICAgICAgICAgICAgICAgICJpbmRleCI6IDIsICJhY3Rpb24iOiAiUmVwaXRlIGVsIHBsYW5vIGRlbCBlc3RyaWJpbGxvIiwgImNhbWVyYSI6ICJ3aWRlIiwKICAgICAgICAgICAgICAgICAgICAiY2hhcmFjdGVyX25hbWVzIjogWyJOb3ZhIl0sCiAgICAgICAgICAgICAgICAgICAgImxvY2F0aW9uX2Rlc2NyaXB0aW9uIjogIkF6b3RlYSBkZSBub2NoZSIsCiAgICAgICAgICAgICAgICAgICAgIndhcmRyb2JlX2Rlc2NyaXB0aW9uIjogIkFicmlnbyBuZWdybyBkZSBmaXJtYSIsCiAgICAgICAgICAgICAgICAgICAgInBsYW5vcyI6IFsiUGxhbm8gZ2VuZXJhbCBkZWwgZXN0cmliaWxsbyJdLAogICAgICAgICAgICAgICAgICAgICJpbWFnZV9wcm9tcHQiOiAiIiwgInZpZGVvX3Byb21wdCI6ICIiLCAicmV1c2VzX3NjZW5lX2luZGV4IjogMCwKICAgICAgICAgICAgICAgICAgICAicmV1c2Vfbm90ZSI6ICJNaXNtbyBlbmN1YWRyZSBxdWUgbGEgZXNjZW5hIDAiLAogICAgICAgICAgICAgICAgfSwKICAgICAgICAgICAgXSwKICAgICAgICB9LAogICAgKQo=
+"""Acceptance walk-through (PRD 53), end to end, in dry run.
+
+Every step here maps to a numbered step of the acceptance test. If a step needed
+a computer, it would not be an HTTP call.
+"""
+
+from __future__ import annotations
+
+from app.domain.enums import CanonStatus, JobState
+
+
+def _run(client, studio, method: str, url: str, **kwargs):
+    response = getattr(client, method)(url, **kwargs)
+    assert response.status_code == 200, f"{url} -> {response.status_code} {response.text}"
+    body = response.json()
+    if isinstance(body, dict) and body.get("state") in {JobState.QUEUED.value,
+                                                        JobState.PROCESSING.value}:
+        studio.jobs.wait_for_idle(30)
+        job = client.get(
+            f"/api/universes/{body['universe_id']}/jobs/{body['id']}"
+        ).json()
+        assert job["state"] == JobState.READY.value, job.get("error")
+        return job
+    return body
+
+
+def test_full_production_from_a_phone(client, studio):
+    # 1-2. Crear Universe y artista.
+    universe = _run(client, studio, "post", "/api/universes", json={"name": "Nova"})
+    uid = universe["id"]
+
+    # 3. Crear Artist Bible.
+    job = _run(
+        client, studio, "post", f"/api/universes/{uid}/bible/generate",
+        json={"brief": "Cantante de synth pop nocturno"},
+    )
+    assert job["result"]["applied"]["entity"] == "artist_bible"
+    # La voz cantada fija del artista: un solo texto que viajara palabra por
+    # palabra en cada encargo a Lyria.
+    _run(client, studio, "put", f"/api/universes/{uid}/bible/singing-voice",
+         json={"sex": "Mujer", "apparent_age": "25", "pitch": "Media",
+               "timbre": "Calida, con aire", "language_accent": "Espanol neutro",
+               "singing_style": "Intima"})
+    _run(client, studio, "post", f"/api/universes/{uid}/bible/approve")
+
+    # 4-5. Character Master. El artista ya existe: nacio con el universo, y
+    # es el unico personaje posible. La llamada a aprobar es hoy un no-op de
+    # compatibilidad: la imagen generada ya nacio aprobada y en uso.
+    character = client.get(f"/api/universes/{uid}/characters").json()[0]
+    assert character["id"] == universe["lead_character_id"]
+    _run(client, studio, "post",
+         f"/api/universes/{uid}/characters/{character['id']}/master/portrait",
+         json={"prompt": "portrait of Nova"})
+    approved = _run(client, studio, "post",
+                    f"/api/universes/{uid}/characters/{character['id']}/approve")
+    assert approved["status"] == CanonStatus.APPROVED.value
+    assert approved["reference_image_paths"], "el master aprobado alimenta las referencias"
+
+    # 8. Concepto musical.
+    song = _run(client, studio, "post", f"/api/universes/{uid}/songs",
+                json={"title": "Neon", "requested_duration_seconds": 150})
+    sid = song["id"]
+    _run(client, studio, "post", f"/api/universes/{uid}/songs/{sid}/concept",
+         json={"brief": "Una noche que no termina"})
+
+    # 10. Cambiar el genero que propuso el Director y ver que rehace la propuesta.
+    rebuilt = _run(client, studio, "post", f"/api/universes/{uid}/songs/{sid}/concept",
+                   json={"overrides": {"genre": "hip hop"}})
+    prompt_sent = studio.calls.all()[-1].payload["contents"][0]["parts"][0]["text"]
+    assert "USER OVERRIDES" in prompt_sent and "hip hop" in prompt_sent
+    assert rebuilt["state"] == JobState.READY.value
+
+    _run(client, studio, "post", f"/api/universes/{uid}/songs/{sid}/concept/approve")
+
+    # 9. Letra propia.
+    _run(client, studio, "put", f"/api/universes/{uid}/songs/{sid}/lyrics",
+         json={"lyrics": "[Verse 1]\nLuces de neon", "author": "user"})
+    _run(client, studio, "post", f"/api/universes/{uid}/songs/{sid}/lyrics/analyze", json={})
+
+    # 11. La letra guardada ya es la que vale (la llamada a aprobar es un
+    # no-op de compatibilidad).
+    _run(client, studio, "post", f"/api/universes/{uid}/songs/{sid}/lyrics/approve")
+
+    # 12. Generar cancion con Lyria 3.5 a la duracion pedida.
+    music_job = _run(client, studio, "post", f"/api/universes/{uid}/songs/{sid}/generate",
+                     json={"duration_seconds": 150})
+    assert music_job["model"] == "lyria-3.5"
+    assert music_job["result"]["duration_seconds"] == 150
+
+    # 15. La version generada ya es el master: el handler la dejo vigente
+    # al generarla, y la vieja llamada a aprobarla no cambia nada.
+    approved_song = _run(client, studio, "post",
+                         f"/api/universes/{uid}/songs/{sid}/versions/1/approve")
+    assert approved_song["approved_master_path"]
+
+    # 16. Solicitar propuesta de videoclip.
+    project = _run(client, studio, "post", f"/api/universes/{uid}/video-projects",
+                   json={"song_id": sid, "video_type": "narrative"})
+    pid = project["id"]
+    _run(client, studio, "post", f"/api/universes/{uid}/video-projects/{pid}/concept", json={})
+
+    # 17. La historia escrita ya es la que vale (aprobarla es un no-op).
+    studio.db.update(
+        f"universes/{uid}/video_projects/{pid}",
+        {"story": {"premise": "Una noche", "status": CanonStatus.DRAFT.value}},
+    )
+    _run(client, studio, "post", f"/api/universes/{uid}/video-projects/{pid}/story/approve")
+
+    # 18-19. No hay paso de reparto: el proyecto nace con el artista dentro,
+    # y el vestuario y los sitios van escritos en las escenas del storyboard.
+    assert project["character_ids"] == [character["id"]]
+
+    # 20. Storyboard con tomas reutilizadas.
+    _seed_storyboard(studio, uid, pid)
+    _run(client, studio, "post", f"/api/universes/{uid}/video-projects/{pid}/storyboard/approve")
+
+    scenes = client.get(f"/api/universes/{uid}/video-projects/{pid}").json()["scenes"]
+    assert len(scenes) == 3
+    generated = [s for s in scenes if not s["reuses_scene_id"]]
+    assert len(generated) == 2, "una toma se reutiliza"
+
+    # 21-24. Imagenes de escena, con eleccion de modelo. Nacen en uso: la
+    # llamada a aprobar cada una es un no-op de compatibilidad.
+    for index, scene in enumerate(generated):
+        model = "gemini-3.1-flash-image" if index == 0 else "gemini-3-pro-image"
+        image_job = _run(client, studio, "post",
+                         f"/api/universes/{uid}/scenes/{scene['id']}/image",
+                         json={"model": model, "variant": "1K"})
+        assert image_job["model"] == model  # 22. cambiar el modelo en una generacion concreta
+        _run(client, studio, "post", f"/api/universes/{uid}/scenes/{scene['id']}/image/approve")
+
+    # 25-29. Clips con Veo y cambio de modelo. Nacen en uso, como las imagenes.
+    for index, scene in enumerate(generated):
+        model = "veo-3.1-fast-generate-001" if index == 0 else "veo-3.1-lite-generate-001"
+        clip_job = _run(client, studio, "post",
+                        f"/api/universes/{uid}/scenes/{scene['id']}/clip",
+                        json={"model": model, "variant": "1080p"})
+        assert clip_job["model"] == model
+        assert clip_job["result"]["generate_audio"] is False
+        _run(client, studio, "post", f"/api/universes/{uid}/scenes/{scene['id']}/clip/approve")
+
+    # 27. Comprobar en los logs que ninguna llamada a Veo pidio audio.
+    diagnostics = client.get("/api/diagnostics/vertex-calls?prefix=veo").json()
+    assert diagnostics["count"] >= 2
+    assert diagnostics["calls_requesting_audio"] == 0
+    for call in diagnostics["calls"]:
+        if call["method"] == "predictLongRunning":
+            assert call["payload"]["parameters"]["generateAudio"] is False
+
+    # 30-32. Ensamblaje y formatos.
+    assembly = _run(client, studio, "post",
+                    f"/api/universes/{uid}/video-projects/{pid}/assemble",
+                    json={"formats": ["16:9", "9:16"]})
+    assert assembly["result"]["clips"] == 3
+    assert assembly["result"]["reused"] == 1
+
+    # 33. No hay proyecto que aprobar: esta terminado cuando su MP4 existe.
+    # En seco el montaje solo produce el plan (EDL), asi que el proyecto
+    # sigue sin master, y el viejo endpoint de aprobar es un no-op que no
+    # lo da por terminado ni marca nada.
+    sin_render = client.post(f"/api/universes/{uid}/video-projects/{pid}/approve")
+    assert sin_render.status_code == 200
+    proyecto = client.get(f"/api/universes/{uid}/video-projects/{pid}").json()
+    assert not proyecto.get("master_16x9_path")
+    assert proyecto["status"] != CanonStatus.APPROVED.value
+
+    # 35. El estudio no lleva cuentas: el gasto se mira en Google Cloud. Lo que
+    # si queda es lo que costo cada pieza, como parte de su procedencia (PRD 46).
+    assert client.get(f"/api/universes/{uid}/spend").status_code != 200
+    jobs = client.get(f"/api/universes/{uid}/jobs?limit=100").json()
+    billed = [j for j in jobs if j["actual_cost_usd"] > 0]
+    assert billed, "cada generacion deja constancia de lo que costo"
+    for job in billed:
+        assert job["estimated_cost_usd"] >= 0
+
+    # 36-37. Exportar y descargar.
+    export = _run(client, studio, "post", f"/api/universes/{uid}/exports/songs/{sid}")
+    names = {f["name"] for f in export["files"]}
+    assert "metadata.json" in names and "song_info.txt" in names
+    assert any(f["folder"] == "AUDIO" for f in export["files"])
+    assert export["archive_url"], "el paquete se descarga como un solo archivo desde el iPhone"
+
+
+def _seed_storyboard(studio, uid, pid):
+    """The Director's dry run cannot invent scenes, so the storyboard is written
+    directly here in the shape its handler produces."""
+    from app.orchestrator.handlers import _apply_storyboard
+
+    _apply_storyboard(
+        studio,
+        uid,
+        pid,
+        {
+            "notes": "El estribillo repite el plano 0.",
+            "scenes": [
+                {
+                    "index": 0, "action": "Nova mira la ciudad", "camera": "wide",
+                    "character_names": ["Nova"],
+                    "location_description": "Azotea de noche, luces de la ciudad",
+                    "wardrobe_description": "Abrigo negro de firma",
+                    "planos": ["Plano general: Nova entra cantando",
+                               "Primer plano a los 4 segundos"],
+                    "image_prompt": "Nova on a rooftop at night",
+                    "video_prompt": "slow push in", "reuses_scene_index": -1,
+                },
+                {
+                    "index": 1, "action": "Primer plano", "camera": "close up",
+                    "character_names": ["Nova"],
+                    "location_description": "La misma azotea",
+                    "wardrobe_description": "Abrigo negro de firma",
+                    "planos": ["Primer plano cantando"],
+                    "image_prompt": "close up of Nova", "video_prompt": "handheld",
+                    "reuses_scene_index": -1,
+                },
+                {
+                    "index": 2, "action": "Repite el plano del estribillo", "camera": "wide",
+                    "character_names": ["Nova"],
+                    "location_description": "Azotea de noche",
+                    "wardrobe_description": "Abrigo negro de firma",
+                    "planos": ["Plano general del estribillo"],
+                    "image_prompt": "", "video_prompt": "", "reuses_scene_index": 0,
+                    "reuse_note": "Mismo encuadre que la escena 0",
+                },
+            ],
+        },
+    )
