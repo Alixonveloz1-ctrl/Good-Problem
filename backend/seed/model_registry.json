@@ -1,6 +1,6 @@
 {
-  "schema_version": 5,
-  "note": "Los identificadores son los que Vertex AI reconoce, no los nombres comerciales. Al subir schema_version, la aplicacion reescribe este documento en el arranque siguiente. Precios revalidados contra la documentacion oficial de Google el 2026-11-05: todos los identificadores siguen existiendo; se corrigieron el precio de texto de Gemini 3.1 Pro (2,00/12,00 por millon) y los de Nano Banana 2 a 512 px y 4K. Chirp salio del registro al eliminar la voz hablada clonada. El 2026-11-07 la musica paso a Lyria 3.5 (lyria-3.5), la generacion que Google recomienda en lugar de lyria-3-pro-preview, y el encargo a Lyria lleva una orden de diccion: palabra completa, silaba a silaba, sin recortar para caber en el ritmo.",
+  "schema_version": 6,
+  "note": "Los identificadores son los que Vertex AI reconoce, no los nombres comerciales. Al subir schema_version, la aplicacion reescribe este documento en el arranque siguiente. Precios revalidados contra la documentacion oficial de Google el 2026-11-05: todos los identificadores siguen existiendo; se corrigieron el precio de texto de Gemini 3.1 Pro (2,00/12,00 por millon) y los de Nano Banana 2 a 512 px y 4K. Chirp salio del registro al eliminar la voz hablada clonada. El 2026-11-07 la musica paso a Lyria 3.5 (lyria-3.5), la generacion que Google recomienda en lugar de lyria-3-pro-preview, y el encargo a Lyria lleva una orden de diccion: palabra completa, silaba a silaba, sin recortar para caber en el ritmo. La prueba con una cancion real el mismo dia demostro que Vertex contesta 400: Lyria 3.5 no esta soportada por su API de interacciones, asi que la musica se queda en Lyria 3 Pro con la orden de diccion puesta.",
   "currency": "USD",
   "models": [
     {
@@ -106,9 +106,9 @@
       }
     },
     {
-      "id": "lyria-3.5",
+      "id": "lyria-3-pro-preview",
       "kind": "music",
-      "label": "Lyria 3.5",
+      "label": "Lyria 3 Pro",
       "status": "active",
       "default_variant": "song",
       "variants": [
