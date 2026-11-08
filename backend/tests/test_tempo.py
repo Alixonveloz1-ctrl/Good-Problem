@@ -72,18 +72,98 @@ def test_el_encargo_lleva_el_tempo_del_genero_y_no_el_inventado():
 
 
 def test_la_instruccion_de_la_letra_lleva_su_medida():
+    # Sin BPM del dueno, manda el natural del genero: regueton a 88,
+    # 420 palabras en tres minutos.
     prompt = director.build_prompt(
         "lyrics",
         {
             "concept": {"title": "Neon"},
-            "duration_seconds": 180,
             "genre_keys": ["regueton"],
             "genres_text": "Reguetón",
         },
     )
     assert "THE MEASURE OF THIS LYRIC" in prompt
+    assert "88 BPM" in prompt
     assert "420 words" in prompt
-    assert "sung rushed" in prompt
+    assert "cut off" in prompt
+
+    # Con su BPM puesto, la medida se calcula a SU velocidad.
+    prompt = director.build_prompt(
+        "lyrics",
+        {
+            "concept": {"title": "Neon"},
+            "genre_keys": ["regueton"],
+            "genres_text": "Reguetón",
+            "bpm_usuario": 70,
+        },
+    )
+    assert "70 BPM" in prompt
+    assert "330 words" in prompt
+
+
+def test_el_bpm_del_dueno_manda_en_el_encargo():
+    linea = tempo_domain.linea_tempo_cancion(["regueton"], 100)
+    assert "Tempo: 100 BPM" in linea
+    assert "the owner chose" in linea
+    # Sin su numero, la linea es la del genero, sin marca de dueno.
+    assert "the owner chose" not in tempo_domain.linea_tempo_cancion(["regueton"], None)
+
+
+def test_el_presupuesto_de_letra_y_el_techo_absoluto():
+    # Regueton a su natural (88 BPM, 140 por minuto): 420 en 3 minutos.
+    assert tempo_domain.presupuesto_para_letra(["regueton"], 88) == 420
+    # A 180 BPM cabria mucho mas, pero el techo absoluto manda: 550.
+    assert tempo_domain.presupuesto_para_letra(["regueton"], 180) == 550
+    assert tempo_domain.TECHO_PALABRAS == 550
+    # La cuenta del aviso: 500 palabras a 88 BPM se pasan de 3 minutos.
+    assert tempo_domain.duracion_estimada_segundos(500, ["regueton"], 88) > 180
+    assert tempo_domain.duracion_estimada_segundos(420, ["regueton"], 88) == 180
+
+
+def test_el_selector_guarda_el_bpm_y_la_ficha_lo_calcula(client, studio):
+    creado = client.post("/api/universes", json={"name": "Nova"}).json()
+    studio.jobs.wait_for_idle(20)
+    uid = creado["id"]
+    cancion = client.post(
+        f"/api/universes/{uid}/songs",
+        json={"title": "Neon", "genres": ["regueton"]},
+    ).json()
+    sid = cancion["id"]
+
+    fuera = client.patch(
+        f"/api/universes/{uid}/songs/{sid}", json={"bpm_usuario": 300}
+    )
+    assert fuera.status_code == 400, fuera.text
+
+    puesta = client.patch(
+        f"/api/universes/{uid}/songs/{sid}", json={"bpm_usuario": 70}
+    )
+    assert puesta.status_code == 200, puesta.text
+    ficha = client.get(f"/api/universes/{uid}/songs/{sid}").json()
+    assert ficha["bpm_usuario"] == 70
+    assert ficha["bpm_efectivo"] == 70
+    assert ficha["bpm_natural"] == 88
+
+    # Una letra larga a 70 BPM se pasa: el aviso viene en la ficha.
+    letra_larga = "\n".join(f"palabra{i} otra mas aqui" for i in range(120))
+    client.put(
+        f"/api/universes/{uid}/songs/{sid}/lyrics",
+        json={"lyrics": letra_larga, "author": "user"},
+    )
+    ficha = client.get(f"/api/universes/{uid}/songs/{sid}").json()
+    assert ficha["palabras_letra"] == 480
+    assert ficha["pasa_de_tres_minutos"] is True
+
+    # Y generar la musica con esa cuenta falla a la vista, sin gastar
+    # la llamada: el contador de llamadas de musica no se mueve.
+    antes = len([c for c in studio.calls.all() if c.method == "interactions"])
+    respuesta = client.post(f"/api/universes/{uid}/songs/{sid}/generate", json={})
+    assert respuesta.status_code == 200, respuesta.text
+    studio.jobs.wait_for_idle(20)
+    despues = len([c for c in studio.calls.all() if c.method == "interactions"])
+    assert despues == antes
+    ficha = client.get(f"/api/universes/{uid}/songs/{sid}").json()
+    assert ficha["versions"] == []
 
 
 def test_el_texto_de_lyria_lleva_la_orden_de_ritmo(client, studio):
