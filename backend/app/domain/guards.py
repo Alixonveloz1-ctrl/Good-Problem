@@ -1,1 +1,144 @@
-IiIiSW52YXJpYW50cyB0aGF0IG5vIGNvbmZpZ3VyYXRpb24gY2hhbmdlIGNhbiB1bmRvLgoKVGhlIG1vZGVsIHJlZ2lzdHJ5IGxpdmVzIGluIEZpcmVzdG9yZSBzbyBwcmljZXMgYW5kIGF2YWlsYWJpbGl0eSBjYW4gYmUgZWRpdGVkCmZyb20gYSBwaG9uZSB3aXRob3V0IGEgZGVwbG95IChQUkQgNDEpLiBUaGF0IGZsZXhpYmlsaXR5IG11c3Qgbm90IGJlIGFibGUgdG8KcmVpbnRyb2R1Y2UgdGhlIGZvdXIgbWlzdGFrZXMgdGhlIFBSRCB2Mi4xIGV4aXN0cyB0byBjb3JyZWN0LCBzbyB0aG9zZSBydWxlcyBhcmUKaGFyZGNvZGVkIGhlcmUgYW5kIHRoZSByZWdpc3RyeSBpcyB2YWxpZGF0ZWQgYWdhaW5zdCB0aGVtIG9uIGxvYWQuCgogIDEuIE11c2ljIGlzIEx5cmlhIDMuNSBhbmQgbm90aGluZyBlbHNlLCBub3QgZXZlbiBhcyBhIGZhbGxiYWNrIGFmdGVyIGEKICAgICBmYWlsdXJlIChQUkQgMTQpLgogIDIuIFZlbyBpcyBhbHdheXMgY2FsbGVkIHdpdGggYXVkaW8gZGlzYWJsZWQsIGluIGV2ZXJ5IGZvcm1hdCAoUFJEIDUsIDI2KS4KICAzLiBWZW8gY2xpcHMgbGFzdCA0LCA2IG9yIDggc2Vjb25kcywgYW5kIDggaXMgbWFuZGF0b3J5IHdoZW5ldmVyIHRoZSByZXF1ZXN0CiAgICAgYXNrcyBmb3IgMTA4MHAsIDRLIG9yIHJlZmVyZW5jZSBpbWFnZXMsIHdoaWNoIGlzIGFsd2F5cyB0aGUgY2FzZSBoZXJlCiAgICAgKFBSRCAyMywgMjYpLgogIDQuIEEgZmFpbGVkIGpvYiByZXRyaWVzIHdpdGggdGhlIHNhbWUgbW9kZWwgdGhhdCB3YXMgcmVxdWVzdGVkLiBUaGUgc3lzdGVtCiAgICAgbmV2ZXIgc3Vic3RpdHV0ZXMgYSBkaWZmZXJlbnQgb3Igd2Vha2VyIG1vZGVsIChQUkQgMzcpLgoiIiIKCmZyb20gX19mdXR1cmVfXyBpbXBvcnQgYW5ub3RhdGlvbnMKCmZyb20gLi5lcnJvcnMgaW1wb3J0IEludmFsaWRHZW5lcmF0aW9uUmVxdWVzdCwgTW9kZWxOb3RBbGxvd2VkCgojIC0tLSAxLiBNdXNpYyAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQoKTVVTSUNfTU9ERUxfSUQgPSAibHlyaWEtMy41IgoKQkFOTkVEX01PREVMX0lEUzogZnJvemVuc2V0W3N0cl0gPSBmcm96ZW5zZXQoCiAgICB7CiAgICAgICAgIyAzMCBzZWNvbmQgY2xpcCBtb2RlbHMuIEV4Y2x1ZGVkIGZyb20gdGhlIHNlbGVjdG9yIGFuZCBmcm9tIGZhbGxiYWNrLgogICAgICAgICJseXJpYS0zLWNsaXAtcHJldmlldyIsCiAgICAgICAgImx5cmlhLTMiLAogICAgICAgICJseXJpYS0yIiwKICAgICAgICAibHlyaWEtMDAyIiwKICAgICAgICAjIEltYWdlbiBuZXZlciBhY2NlcHRlZCByZWZlcmVuY2UgaW1hZ2VzIGFuZCB0aGUgZW5kcG9pbnRzIHdlcmUgc2h1dAogICAgICAgICMgZG93biBvbiAyMDI2LTA4LTE3LgogICAgICAgICJpbWFnZW4tMy4wLWdlbmVyYXRlLTAwMSIsCiAgICAgICAgImltYWdlbi0zLjAtZ2VuZXJhdGUtMDAyIiwKICAgICAgICAiaW1hZ2VuLTQuMC1nZW5lcmF0ZS0wMDEiLAogICAgICAgICJpbWFnZW4tNC4wLWZhc3QtZ2VuZXJhdGUtMDAxIiwKICAgICAgICAiaW1hZ2VuLTQuMC11bHRyYS1nZW5lcmF0ZS0wMDEiLAogICAgfQopCgpCQU5ORURfUkVBU09OUzogZGljdFtzdHIsIHN0cl0gPSB7CiAgICAibHlyaWEtMy1jbGlwLXByZXZpZXciOiAiR2VuZXJhIGNsaXBzIGRlIDMwIHMuIFNvbG8gc2UgdXNhIEx5cmlhIDMuNS4iLAogICAgImx5cmlhLTMiOiAiR2VuZXJhIGNsaXBzIGRlIDMwIHMuIFNvbG8gc2UgdXNhIEx5cmlhIDMuNS4iLAogICAgImx5cmlhLTIiOiAiR2VuZXJhIGNsaXBzIGRlIDMwIHMuIFNvbG8gc2UgdXNhIEx5cmlhIDMuNS4iLAogICAgImx5cmlhLTAwMiI6ICJHZW5lcmEgY2xpcHMgZGUgMzAgcy4gU29sbyBzZSB1c2EgTHlyaWEgMy41LiIsCn0KCiMgLS0tIDIuIFZpZGVvIGF1ZGlvIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCgpWSURFT19BVURJT19BTFdBWVNfRElTQUJMRUQgPSBUcnVlCiIiIlRoZSBwaXN0YSBjb21lcyBmcm9tIEx5cmlhLiBHZW5lcmF0aW5nIGF1ZGlvIGluIFZlbyB3b3VsZCBkb3VibGUgdGhlIHByaWNlCnBlciBzZWNvbmQgZm9yIHNvbWV0aGluZyB0aGUgZWRpdCB0aHJvd3MgYXdheS4iIiIKCiMgLS0tIDMuIFZpZGVvIGR1cmF0aW9ucyAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCgpWQUxJRF9DTElQX0RVUkFUSU9OUzogdHVwbGVbaW50LCAuLi5dID0gKDQsIDYsIDgpCk1BTkRBVE9SWV84U19SRVNPTFVUSU9OUzogZnJvemVuc2V0W3N0cl0gPSBmcm96ZW5zZXQoeyIxMDgwcCIsICI0SyJ9KQpERUZBVUxUX0NMSVBfRFVSQVRJT04gPSA4Ck1BWF9SRUZFUkVOQ0VfSU1BR0VTID0gMwpWQUxJRF9BU1BFQ1RfUkFUSU9TOiBmcm96ZW5zZXRbc3RyXSA9IGZyb3plbnNldCh7IjE2OjkiLCAiOToxNiJ9KQoKCmRlZiBhc3NlcnRfbm90X2Jhbm5lZChtb2RlbF9pZDogc3RyKSAtPiBOb25lOgogICAga2V5ID0gKG1vZGVsX2lkIG9yICIiKS5zdHJpcCgpCiAgICBpZiBrZXkgaW4gQkFOTkVEX01PREVMX0lEUzoKICAgICAgICByZWFzb24gPSBCQU5ORURfUkVBU09OUy5nZXQoa2V5LCAiTW9kZWxvIGV4Y2x1aWRvIGRlbCBzaXN0ZW1hLiIpCiAgICAgICAgcmFpc2UgTW9kZWxOb3RBbGxvd2VkKGYie2tleX0gZXN0YSBwcm9oaWJpZG8gZW4gZXN0ZSBzaXN0ZW1hLiB7cmVhc29ufSIpCgoKZGVmIGFzc2VydF9tdXNpY19tb2RlbChtb2RlbF9pZDogc3RyKSAtPiBzdHI6CiAgICAiIiJNdXNpYyBnZW5lcmF0aW9uIG9ubHkgZXZlciByZWFjaGVzIEx5cmlhIDMuNS4iIiIKICAgIGtleSA9IChtb2RlbF9pZCBvciAiIikuc3RyaXAoKSBvciBNVVNJQ19NT0RFTF9JRAogICAgYXNzZXJ0X25vdF9iYW5uZWQoa2V5KQogICAgaWYga2V5ICE9IE1VU0lDX01PREVMX0lEOgogICAgICAgIHJhaXNlIE1vZGVsTm90QWxsb3dlZCgKICAgICAgICAgICAgZiJMYSBtdXNpY2Egc2UgZ2VuZXJhIHVuaWNhbWVudGUgY29uIHtNVVNJQ19NT0RFTF9JRH0uIFNlIHBpZGlvICd7a2V5fScuIgogICAgICAgICkKICAgIHJldHVybiBrZXkKCgpkZWYgZW5mb3JjZV92aWRlb19hdWRpb19kaXNhYmxlZChwYXJhbWV0ZXJzOiBkaWN0KSAtPiBkaWN0OgogICAgIiIiUmV0dXJuIHBhcmFtZXRlcnMgd2l0aCBhdWRpbyBzd2l0Y2hlZCBvZmYsIHJlZnVzaW5nIGFuIGV4cGxpY2l0IHJlcXVlc3QKICAgIHRvIHN3aXRjaCBpdCBvbi4gQ2FsbGVkIG9uIGV2ZXJ5IHNpbmdsZSBWZW8gcmVxdWVzdC4iIiIKICAgIHJlcXVlc3RlZCA9IHBhcmFtZXRlcnMuZ2V0KCJnZW5lcmF0ZUF1ZGlvIiwgcGFyYW1ldGVycy5nZXQoImdlbmVyYXRlX2F1ZGlvIiwgRmFsc2UpKQogICAgaWYgcmVxdWVzdGVkOgogICAgICAgIHJhaXNlIEludmFsaWRHZW5lcmF0aW9uUmVxdWVzdCgKICAgICAgICAgICAgIlZlbyBzZSBsbGFtYSBzaWVtcHJlIHNpbiBhdWRpby4gTGEgcGlzdGEgc2FsZSBkZSBMeXJpYS4iCiAgICAgICAgKQogICAgY2xlYW5lZCA9IHtrOiB2IGZvciBrLCB2IGluIHBhcmFtZXRlcnMuaXRlbXMoKSBpZiBrIG5vdCBpbiB7ImdlbmVyYXRlX2F1ZGlvIn19CiAgICBjbGVhbmVkWyJnZW5lcmF0ZUF1ZGlvIl0gPSBGYWxzZQogICAgcmV0dXJuIGNsZWFuZWQKCgpkZWYgcmVzb2x2ZV9jbGlwX2R1cmF0aW9uKAogICAgZHVyYXRpb25fc2Vjb25kczogaW50IHwgTm9uZSwKICAgICosCiAgICByZXNvbHV0aW9uOiBzdHIsCiAgICByZWZlcmVuY2VfaW1hZ2VfY291bnQ6IGludCA9IDAsCikgLT4gaW50OgogICAgIiIiVmFsaWRhdGUgYSBjbGlwIGxlbmd0aCBhZ2FpbnN0IHdoYXQgVmVvIGFjdHVhbGx5IGFjY2VwdHMuIiIiCiAgICBuZWVkc19laWdodCA9IHJlc29sdXRpb24gaW4gTUFOREFUT1JZXzhTX1JFU09MVVRJT05TIG9yIHJlZmVyZW5jZV9pbWFnZV9jb3VudCA+IDAKICAgIGlmIGR1cmF0aW9uX3NlY29uZHMgaXMgTm9uZToKICAgICAgICAjIFNjZW5lcyBhcmUgZGVzaWduZWQgaW4gOCBzZWNvbmQgYmxvY2tzIChQUkQgMjMpLgogICAgICAgIHJldHVybiBERUZBVUxUX0NMSVBfRFVSQVRJT04KICAgIGlmIGR1cmF0aW9uX3NlY29uZHMgbm90IGluIFZBTElEX0NMSVBfRFVSQVRJT05TOgogICAgICAgIHJhaXNlIEludmFsaWRHZW5lcmF0aW9uUmVxdWVzdCgKICAgICAgICAgICAgZiJWZW8gZ2VuZXJhIGNsaXBzIGRlIHtWQUxJRF9DTElQX0RVUkFUSU9OU30gc2VndW5kb3MuIFNlIHBpZGlvIHtkdXJhdGlvbl9zZWNvbmRzfS4iCiAgICAgICAgKQogICAgaWYgbmVlZHNfZWlnaHQgYW5kIGR1cmF0aW9uX3NlY29uZHMgIT0gODoKICAgICAgICB3aHkgPSAoCiAgICAgICAgICAgIGYibGEgcmVzb2x1Y2lvbiB7cmVzb2x1dGlvbn0iCiAgICAgICAgICAgIGlmIHJlc29sdXRpb24gaW4gTUFOREFUT1JZXzhTX1JFU09MVVRJT05TCiAgICAgICAgICAgIGVsc2UgImVsIHVzbyBkZSBpbWFnZW5lcyBkZSByZWZlcmVuY2lhIgogICAgICAgICkKICAgICAgICByYWlzZSBJbnZhbGlkR2VuZXJhdGlvblJlcXVlc3QoCiAgICAgICAgICAgIGYiT2NobyBzZWd1bmRvcyBlcyBvYmxpZ2F0b3JpbyBjb24ge3doeX0uIFNlIHBpZGlvIHtkdXJhdGlvbl9zZWNvbmRzfS4iCiAgICAgICAgKQogICAgcmV0dXJuIGR1cmF0aW9uX3NlY29uZHMKCgpkZWYgYXNzZXJ0X3JlZmVyZW5jZV9pbWFnZXMoY291bnQ6IGludCwgKiwgbWF4aW11bTogaW50ID0gTUFYX1JFRkVSRU5DRV9JTUFHRVMpIC0+IE5vbmU6CiAgICBpZiBjb3VudCA+IG1heGltdW06CiAgICAgICAgcmFpc2UgSW52YWxpZEdlbmVyYXRpb25SZXF1ZXN0KAogICAgICAgICAgICBmIlZlbyBhY2VwdGEgaGFzdGEge21heGltdW19IGltYWdlbmVzIGRlIHJlZmVyZW5jaWEgcG9yIGdlbmVyYWNpb24uIFNlIHBhc2Fyb24ge2NvdW50fS4iCiAgICAgICAgKQoKCmRlZiBhc3NlcnRfYXNwZWN0X3JhdGlvKGFzcGVjdF9yYXRpbzogc3RyKSAtPiBzdHI6CiAgICBpZiBhc3BlY3RfcmF0aW8gbm90IGluIFZBTElEX0FTUEVDVF9SQVRJT1M6CiAgICAgICAgcmFpc2UgSW52YWxpZEdlbmVyYXRpb25SZXF1ZXN0KAogICAgICAgICAgICBmIlZlbyBzb2xvIGdlbmVyYSB7c29ydGVkKFZBTElEX0FTUEVDVF9SQVRJT1MpfS4gU2UgcGlkaW8gJ3thc3BlY3RfcmF0aW99Jy4iCiAgICAgICAgKQogICAgcmV0dXJuIGFzcGVjdF9yYXRpbwoKCmRlZiBhc3NlcnRfc2FtZV9tb2RlbF9vbl9yZXRyeShyZXF1ZXN0ZWRfbW9kZWw6IHN0ciwgcmV0cnlfbW9kZWw6IHN0cikgLT4gTm9uZToKICAgICIiIlBSRCAzNzogYSBmYWlsZWQgam9iIHJldHJpZXMgd2l0aCB0aGUgbW9kZWwgdGhhdCB3YXMgYXNrZWQgZm9yLiIiIgogICAgaWYgcmVxdWVzdGVkX21vZGVsICE9IHJldHJ5X21vZGVsOgogICAgICAgIHJhaXNlIE1vZGVsTm90QWxsb3dlZCgKICAgICAgICAgICAgIlVuIHJlaW50ZW50byBubyBwdWVkZSBjYW1iaWFyIGRlIG1vZGVsby4gIgogICAgICAgICAgICBmIlNlIHBpZGlvICd7cmVxdWVzdGVkX21vZGVsfScgeSBzZSBpbnRlbnRvICd7cmV0cnlfbW9kZWx9Jy4iCiAgICAgICAgKQo=
+"""Invariants that no configuration change can undo.
+
+The model registry lives in Firestore so prices and availability can be edited
+from a phone without a deploy (PRD 41). That flexibility must not be able to
+reintroduce the four mistakes the PRD v2.1 exists to correct, so those rules are
+hardcoded here and the registry is validated against them on load.
+
+  1. Music is Lyria 3.5 and nothing else, not even as a fallback after a
+     failure (PRD 14).
+  2. Veo is always called with audio disabled, in every format (PRD 5, 26).
+  3. Veo clips last 4, 6 or 8 seconds, and 8 is mandatory whenever the request
+     asks for 1080p, 4K or reference images, which is always the case here
+     (PRD 23, 26).
+  4. A failed job retries with the same model that was requested. The system
+     never substitutes a different or weaker model (PRD 37).
+"""
+
+from __future__ import annotations
+
+from ..errors import InvalidGenerationRequest, ModelNotAllowed
+
+# --- 1. Music --------------------------------------------------------------
+
+MUSIC_MODEL_ID = "lyria-3.5"
+
+BANNED_MODEL_IDS: frozenset[str] = frozenset(
+    {
+        # 30 second clip models. Excluded from the selector and from fallback.
+        "lyria-3-clip-preview",
+        "lyria-3",
+        "lyria-2",
+        "lyria-002",
+        # Imagen never accepted reference images and the endpoints were shut
+        # down on 2026-08-17.
+        "imagen-3.0-generate-001",
+        "imagen-3.0-generate-002",
+        "imagen-4.0-generate-001",
+        "imagen-4.0-fast-generate-001",
+        "imagen-4.0-ultra-generate-001",
+    }
+)
+
+BANNED_REASONS: dict[str, str] = {
+    "lyria-3-clip-preview": "Genera clips de 30 s. Solo se usa Lyria 3.5.",
+    "lyria-3": "Genera clips de 30 s. Solo se usa Lyria 3.5.",
+    "lyria-2": "Genera clips de 30 s. Solo se usa Lyria 3.5.",
+    "lyria-002": "Genera clips de 30 s. Solo se usa Lyria 3.5.",
+}
+
+# --- 2. Video audio --------------------------------------------------------
+
+VIDEO_AUDIO_ALWAYS_DISABLED = True
+"""The pista comes from Lyria. Generating audio in Veo would double the price
+per second for something the edit throws away."""
+
+# --- 3. Video durations ----------------------------------------------------
+
+VALID_CLIP_DURATIONS: tuple[int, ...] = (4, 6, 8)
+MANDATORY_8S_RESOLUTIONS: frozenset[str] = frozenset({"1080p", "4K"})
+DEFAULT_CLIP_DURATION = 8
+MAX_REFERENCE_IMAGES = 3
+VALID_ASPECT_RATIOS: frozenset[str] = frozenset({"16:9", "9:16"})
+
+
+def assert_not_banned(model_id: str) -> None:
+    key = (model_id or "").strip()
+    if key in BANNED_MODEL_IDS:
+        reason = BANNED_REASONS.get(key, "Modelo excluido del sistema.")
+        raise ModelNotAllowed(f"{key} esta prohibido en este sistema. {reason}")
+
+
+def assert_music_model(model_id: str) -> str:
+    """Music generation only ever reaches Lyria 3.5."""
+    key = (model_id or "").strip() or MUSIC_MODEL_ID
+    assert_not_banned(key)
+    if key != MUSIC_MODEL_ID:
+        raise ModelNotAllowed(
+            f"La musica se genera unicamente con {MUSIC_MODEL_ID}. Se pidio '{key}'."
+        )
+    return key
+
+
+def enforce_video_audio_disabled(parameters: dict) -> dict:
+    """Return parameters with audio switched off, refusing an explicit request
+    to switch it on. Called on every single Veo request."""
+    requested = parameters.get("generateAudio", parameters.get("generate_audio", False))
+    if requested:
+        raise InvalidGenerationRequest(
+            "Veo se llama siempre sin audio. La pista sale de Lyria."
+        )
+    cleaned = {k: v for k, v in parameters.items() if k not in {"generate_audio"}}
+    cleaned["generateAudio"] = False
+    return cleaned
+
+
+def resolve_clip_duration(
+    duration_seconds: int | None,
+    *,
+    resolution: str,
+    reference_image_count: int = 0,
+) -> int:
+    """Validate a clip length against what Veo actually accepts."""
+    needs_eight = resolution in MANDATORY_8S_RESOLUTIONS or reference_image_count > 0
+    if duration_seconds is None:
+        # Scenes are designed in 8 second blocks (PRD 23).
+        return DEFAULT_CLIP_DURATION
+    if duration_seconds not in VALID_CLIP_DURATIONS:
+        raise InvalidGenerationRequest(
+            f"Veo genera clips de {VALID_CLIP_DURATIONS} segundos. Se pidio {duration_seconds}."
+        )
+    if needs_eight and duration_seconds != 8:
+        why = (
+            f"la resolucion {resolution}"
+            if resolution in MANDATORY_8S_RESOLUTIONS
+            else "el uso de imagenes de referencia"
+        )
+        raise InvalidGenerationRequest(
+            f"Ocho segundos es obligatorio con {why}. Se pidio {duration_seconds}."
+        )
+    return duration_seconds
+
+
+def assert_reference_images(count: int, *, maximum: int = MAX_REFERENCE_IMAGES) -> None:
+    if count > maximum:
+        raise InvalidGenerationRequest(
+            f"Veo acepta hasta {maximum} imagenes de referencia por generacion. Se pasaron {count}."
+        )
+
+
+def assert_aspect_ratio(aspect_ratio: str) -> str:
+    if aspect_ratio not in VALID_ASPECT_RATIOS:
+        raise InvalidGenerationRequest(
+            f"Veo solo genera {sorted(VALID_ASPECT_RATIOS)}. Se pidio '{aspect_ratio}'."
+        )
+    return aspect_ratio
+
+
+def assert_same_model_on_retry(requested_model: str, retry_model: str) -> None:
+    """PRD 37: a failed job retries with the model that was asked for."""
+    if requested_model != retry_model:
+        raise ModelNotAllowed(
+            "Un reintento no puede cambiar de modelo. "
+            f"Se pidio '{requested_model}' y se intento '{retry_model}'."
+        )
