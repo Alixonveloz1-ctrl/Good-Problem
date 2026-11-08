@@ -95,6 +95,7 @@ export function Field({
   label,
   value,
   onChange,
+  onBlur,
   placeholder,
   multiline,
   type = 'text',
@@ -102,6 +103,7 @@ export function Field({
   label: string
   value: string
   onChange: (value: string) => void
+  onBlur?: () => void
   placeholder?: string
   multiline?: boolean
   type?: string
@@ -114,6 +116,7 @@ export function Field({
           value={value}
           placeholder={placeholder}
           onChange={(event) => onChange(event.target.value)}
+          onBlur={onBlur}
         />
       ) : (
         <input
@@ -121,6 +124,7 @@ export function Field({
           value={value}
           placeholder={placeholder}
           onChange={(event) => onChange(event.target.value)}
+          onBlur={onBlur}
         />
       )}
     </div>
