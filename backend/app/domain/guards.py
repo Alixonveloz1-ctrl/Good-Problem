@@ -5,8 +5,10 @@ from a phone without a deploy (PRD 41). That flexibility must not be able to
 reintroduce the four mistakes the PRD v2.1 exists to correct, so those rules are
 hardcoded here and the registry is validated against them on load.
 
-  1. Music is Lyria 3 Pro and nothing else, not even as a fallback after a
-     failure (PRD 14).
+  1. Music is full-song Lyria through exactly two sanctioned doors:
+     Lyria 3 Pro via the project's own Vertex door, or Lyria 3.5 via
+     the Gemini API when the owner has set his API key. Nothing else,
+     not even as a fallback after a failure (PRD 14).
   2. Veo is always called with audio disabled, in every format (PRD 5, 26).
   3. Veo clips last 4, 6 or 8 seconds, and 8 is mandatory whenever the request
      asks for 1080p, 4K or reference images, which is always the case here
@@ -22,6 +24,11 @@ from ..errors import InvalidGenerationRequest, ModelNotAllowed
 # --- 1. Music --------------------------------------------------------------
 
 MUSIC_MODEL_ID = "lyria-3-pro-preview"
+
+MUSIC_MODEL_ID_GEMINI = "lyria-3.5"
+"""La otra puerta: la API de Gemini con la clave del dueno. Por Vertex
+este modelo no existe (400 probado el 2026-11-07); por esta puerta es
+el que canta en la aplicacion de Gemini."""
 
 BANNED_MODEL_IDS: frozenset[str] = frozenset(
     {
@@ -41,10 +48,10 @@ BANNED_MODEL_IDS: frozenset[str] = frozenset(
 )
 
 BANNED_REASONS: dict[str, str] = {
-    "lyria-3-clip-preview": "Genera clips de 30 s. Solo se usa Lyria 3 Pro.",
-    "lyria-3": "Genera clips de 30 s. Solo se usa Lyria 3 Pro.",
-    "lyria-2": "Genera clips de 30 s. Solo se usa Lyria 3 Pro.",
-    "lyria-002": "Genera clips de 30 s. Solo se usa Lyria 3 Pro.",
+    "lyria-3-clip-preview": "Genera clips de 30 s. Solo se usan los modelos de cancion completa de Lyria.",
+    "lyria-3": "Genera clips de 30 s. Solo se usan los modelos de cancion completa de Lyria.",
+    "lyria-2": "Genera clips de 30 s. Solo se usan los modelos de cancion completa de Lyria.",
+    "lyria-002": "Genera clips de 30 s. Solo se usan los modelos de cancion completa de Lyria.",
 }
 
 # --- 2. Video audio --------------------------------------------------------
@@ -69,13 +76,18 @@ def assert_not_banned(model_id: str) -> None:
         raise ModelNotAllowed(f"{key} esta prohibido en este sistema. {reason}")
 
 
-def assert_music_model(model_id: str) -> str:
-    """Music generation only ever reaches Lyria 3 Pro."""
-    key = (model_id or "").strip() or MUSIC_MODEL_ID
+def assert_music_model(model_id: str, *, gemini: bool = False) -> str:
+    """Music generation only ever reaches the sanctioned Lyria of the
+    door in use: 3 Pro through Vertex, 3.5 through the owner's Gemini
+    API key."""
+    esperado = MUSIC_MODEL_ID_GEMINI if gemini else MUSIC_MODEL_ID
+    key = (model_id or "").strip() or esperado
     assert_not_banned(key)
-    if key != MUSIC_MODEL_ID:
+    if key != esperado:
+        puerta = "la clave de Gemini" if gemini else "Vertex"
         raise ModelNotAllowed(
-            f"La musica se genera unicamente con {MUSIC_MODEL_ID}. Se pidio '{key}'."
+            f"Con {puerta} la musica se genera unicamente con {esperado}. "
+            f"Se pidio '{key}'."
         )
     return key
 
