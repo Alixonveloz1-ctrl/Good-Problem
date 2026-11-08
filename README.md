@@ -208,7 +208,9 @@ renderizado, un proyecto no se puede aprobar.
   para el BPM puesto, y si el dueño cambia el BPM y la cuenta se
   pasa de tres minutos, la pantalla avisa y generar queda en pausa
   hasta que suba el BPM o regenere la letra. El BPM que el Director
-  inventaba en el concepto ya no llega a Lyria.
+  inventaba en el concepto ya no llega a Lyria. La prueba de oído
+  sigue siendo del dueño: su primera generación con el selector
+  puesto es la que manda.
 - **Música: Lyria por dos puertas.** Sin clave: Lyria 3 Pro
   (`lyria-3-pro-preview`) por Vertex, con la identidad del proyecto.
   Con la clave de Gemini del dueño puesta como variable de entorno
