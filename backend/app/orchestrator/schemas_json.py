@@ -29,7 +29,7 @@ MUSIC_CONCEPT_SCHEMA: dict[str, Any] = {
         "production": _str("Como suena la produccion, en espanol"),
         "interpretation": _str("Como se canta, en espanol"),
         "visual_concept": _str("Idea visual asociada, en espanol"),
-        "music_prompt": _str("Prompt para Lyria 3.5, en ingles de Estados Unidos"),
+        "music_prompt": _str("Prompt para Lyria 3 Pro, en ingles de Estados Unidos"),
     },
     "required": ["title", "concept", "hook", "genre", "bpm", "structure", "music_prompt"],
 }
@@ -54,7 +54,7 @@ LYRICS_ANALYSIS_SCHEMA: dict[str, Any] = {
         "proposed_bpm": {"type": "INTEGER"},
         "proposed_interpretation": _str(),
         "proposed_production": _str(),
-        "music_prompt": _str("Prompt para Lyria 3.5, en ingles de Estados Unidos"),
+        "music_prompt": _str("Prompt para Lyria 3 Pro, en ingles de Estados Unidos"),
         "summary": _str("La propuesta explicada al usuario, en espanol"),
     },
     "required": ["theme", "proposed_genre", "music_prompt", "summary"],
