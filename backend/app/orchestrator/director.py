@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..domain.enums import CreativeRole
+from ..domain import tempo as tempo_domain
 from ..errors import InvalidGenerationRequest, ProviderError
 from ..providers import gemini_text
 from ..services.context import (
@@ -192,6 +193,25 @@ def build_prompt(task: str, payload: dict[str, Any]) -> str:
         concept = payload.get("concept") or {}
         if concept:
             sections.append(f"APPROVED CONCEPT\n{_kv(concept)}")
+        # La medida de la letra: cuantas palabras caben cantadas bien
+        # en los segundos pedidos al paso del genero. Sin esta cuenta,
+        # la letra nacia con la estructura completa de siempre — unas
+        # 650 palabras, 4-5 minutos cantados con calma — para una
+        # duracion de 180 segundos, y Lyria lo resolvia acelerando.
+        duracion = payload.get("duration_seconds")
+        if duracion:
+            tempo = tempo_domain.tempo_de_la_cancion(payload.get("genre_keys"))
+            presupuesto = tempo_domain.presupuesto_palabras(int(duracion), tempo)
+            paso = tempo.paso if tempo is not None else "medio"
+            sections.append(
+                f"THE MEASURE OF THIS LYRIC: the song lasts {int(duracion)} seconds "
+                f"and is sung at this genre's natural pace ({paso}). At that pace "
+                f"about {presupuesto} words fit, sung well. Write the complete "
+                "lyric INSIDE that measure: keep the full architecture and scale "
+                "the sections to fit — shorter verses, fewer written chorus "
+                "repetitions — instead of writing a long lyric that can only be "
+                "sung rushed. A lyric over the measure is a failed lyric."
+            )
 
     elif task == "lyrics_analysis":
         lyrics = (payload.get("lyrics") or "").strip()
@@ -529,6 +549,24 @@ def _revisar_borrador_de_letra(
     if concept:
         sections.append(f"APPROVED CONCEPT\n{_kv(concept)}")
     sections.append(f"DRAFT LYRIC TO REVIEW\n{texto}")
+    # La revision tambien mide: si el borrador se pasa de las palabras
+    # que caben en la duracion al paso del genero, lo recorta ella —
+    # con el gancho, la arquitectura, las rimas y la temperatura
+    # intactos — en vez de dejar que Lyria lo cante corriendo.
+    duracion = payload.get("duration_seconds")
+    if duracion:
+        tempo = tempo_domain.tempo_de_la_cancion(payload.get("genre_keys"))
+        presupuesto = tempo_domain.presupuesto_palabras(int(duracion), tempo)
+        palabras = tempo_domain.contar_palabras(texto)
+        sections.append(
+            f"THE MEASURE: this draft has {palabras} sung words; the measure "
+            f"for {int(duracion)} seconds at this genre's pace is about "
+            f"{presupuesto}. If the draft is over the measure, TRIM it to "
+            "fit — shorten verses, drop a written chorus repetition — "
+            "keeping the hook, the architecture, the rhymes and the "
+            "temperature. Never hand back an over-measure lyric: it would "
+            "be sung rushed."
+        )
     revision = gemini_text.generate(
         studio.vertex,
         model_id,
