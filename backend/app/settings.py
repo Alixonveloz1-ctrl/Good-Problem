@@ -57,6 +57,16 @@ class Settings(BaseSettings):
     si alguna vez hay que echar a alguien.
     """
 
+    gemini_api_key: str = ""
+    """La clave de Gemini del dueno (AAUS_GEMINI_API_KEY).
+
+    Vive como variable de entorno del servicio, puesta una sola vez por
+    el dueno en la consola de Google Cloud, escribiendola el mismo. Con
+    ella, la musica va por la API de Gemini con Lyria 3.5; sin ella, por
+    Vertex con Lyria 3 Pro. La app no la guarda ni la muestra: ningun
+    GET la devuelve.
+    """
+
     # --- Modes --------------------------------------------------------------
     dry_run: bool = True
     """When true no paid API is called; providers return deterministic stubs.
