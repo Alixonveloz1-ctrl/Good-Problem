@@ -1,1 +1,153 @@
-IiIiTHlyaWEgcG9yIGxhIEFQSSBkZSBpbnRlcmFjY2lvbmVzOiBsZWN0dXJhIGRlbCBhdWRpbyB5IG1vdGl2b3MgZGUgZmFsbG8uCgpFbCBwcm92ZWVkb3Igc2UgcHJ1ZWJhIGNvbnRyYSByZXNwdWVzdGFzIGVzY3JpdGFzIGEgbWFubyBjb24gbGEgZm9ybWEgZGUgbGEKQVBJIHJlYWwg4oCUIGxhIGRlIGxhIGRvY3VtZW50YWNpb24gb2ZpY2lhbCBkZSBMeXJpYSB5IGxhIGRlIGxhIGluc3RhbGFjaW9uCmhlcm1hbmEgcXVlIGdlbmVyYSBwaWV6YXMgbGFyZ2FzIGEgZGlhcmlvIOKAlCB5IG5vIGNvbnRyYSBsYSBmb3JtYSBxdWUgZWwKcHJvcGlvIGNvZGlnbyBlc3BlcmEuIEVzYSBmdWUgZXhhY3RhbWVudGUgbGEgY2VndWVyYSBxdWUgZGVqbyBwYXNhciBlbCBmYWxsbwpkZSBsYSBwcmltZXJhIGdlbmVyYWNpb24gcmVhbDogZW4gc2VjbywgbGEgcmVzcHVlc3RhIHNpbXVsYWRhIHRlbmlhIGxhIG1pc21hCmZvcm1hIGVxdWl2b2NhZGEgcXVlIGVsIGNvZGlnbyBidXNjYWJhLCB5IHRvZG8gcGFyZWNpYSBmdW5jaW9uYXIuCiIiIgoKZnJvbSBfX2Z1dHVyZV9fIGltcG9ydCBhbm5vdGF0aW9ucwoKaW1wb3J0IGJhc2U2NAoKaW1wb3J0IHB5dGVzdAoKZnJvbSBhcHAuZXJyb3JzIGltcG9ydCBQcm92aWRlckVycm9yCmZyb20gYXBwLnByb3ZpZGVycyBpbXBvcnQgbHlyaWEKCk1QMyA9IGIiXHhmZlx4ZmJceDkwXHgwMCIgKyBiIlx4MDAiICogNDEzCk1QM19CNjQgPSBiYXNlNjQuYjY0ZW5jb2RlKE1QMykuZGVjb2RlKCkKCgpjbGFzcyBDbGllbnRlRmFsc286CiAgICAiIiJFbCB0cmFuc3BvcnRlIG1pbmltbyBxdWUgZWwgcHJvdmVlZG9yIG5lY2VzaXRhLCBjb24gbGEgcmVzcHVlc3RhIGRhZGEuIiIiCgogICAgZGVmIF9faW5pdF9fKHNlbGYsIHJlc3B1ZXN0YSk6CiAgICAgICAgc2VsZi5fcmVzcHVlc3RhID0gcmVzcHVlc3RhCiAgICAgICAgc2VsZi5sbGFtYWRhczogbGlzdFt0dXBsZVtzdHIsIGRpY3RdXSA9IFtdCgogICAgZGVmIGNhbGxfaW50ZXJhY3Rpb25zKHNlbGYsIG1vZGVsLCBwYXlsb2FkKToKICAgICAgICBzZWxmLmxsYW1hZGFzLmFwcGVuZCgobW9kZWwsIHBheWxvYWQpKQogICAgICAgIHJldHVybiBzZWxmLl9yZXNwdWVzdGEKCgpkZWYgdGVzdF9lbF9hdWRpb19zZV9sZWVfdGFtYmllbl9kZXNkZV9zdGVwcygpOgogICAgIiIiTGEgZG9jdW1lbnRhY2lvbiBvZmljaWFsIG11ZXN0cmEgc3RlcHMgLT4gY29udGVudDsgRHJhbWEsIG91dHB1dHMuIiIiCiAgICBjbGllbnRlID0gQ2xpZW50ZUZhbHNvKAogICAgICAgIHsKICAgICAgICAgICAgInN0YXR1cyI6ICJjb21wbGV0ZWQiLAogICAgICAgICAgICAic3RlcHMiOiBbCiAgICAgICAgICAgICAgICB7ImNvbnRlbnQiOiBbeyJ0eXBlIjogInRleHQiLCAidGV4dCI6ICJjb21wb25pZW5kbyJ9XX0sCiAgICAgICAgICAgICAgICB7CiAgICAgICAgICAgICAgICAgICAgImNvbnRlbnQiOiBbCiAgICAgICAgICAgICAgICAgICAgICAgIHsidHlwZSI6ICJhdWRpbyIsICJtaW1lX3R5cGUiOiAiYXVkaW8vbXBlZyIsICJkYXRhIjogTVAzX0I2NH0KICAgICAgICAgICAgICAgICAgICBdCiAgICAgICAgICAgICAgICB9LAogICAgICAgICAgICBdLAogICAgICAgIH0KICAgICkKICAgIHJlc3VsdGFkbyA9IGx5cmlhLmdlbmVyYXRlX3NvbmcoY2xpZW50ZSwgcHJvbXB0PSJyYXAgdHJpc3RlIiwgZHVyYXRpb25fc2Vjb25kcz02MCkKICAgIGFzc2VydCByZXN1bHRhZG8uZGF0YSA9PSBNUDMKICAgIGFzc2VydCByZXN1bHRhZG8ubWltZV90eXBlID09ICJhdWRpby9tcGVnIgoKCmRlZiB0ZXN0X2VsX3RleHRvX3F1ZV92aWFqYV9lc19lbF9kZV9zaWVtcHJlKCk6CiAgICAiIiJFbCBhcnJlZ2xvIGNhbWJpYSBsYSBwdWVydGEsIG5vIGVsIGVuY2FyZ286IG1pc21vIHRleHRvIGNvbXB1ZXN0by4iIiIKICAgIGNsaWVudGUgPSBDbGllbnRlRmFsc28oCiAgICAgICAgewogICAgICAgICAgICAic3RhdHVzIjogImNvbXBsZXRlZCIsCiAgICAgICAgICAgICJvdXRwdXRzIjogW3sidHlwZSI6ICJhdWRpbyIsICJtaW1lX3R5cGUiOiAiYXVkaW8vbXBlZyIsICJkYXRhIjogTVAzX0I2NH1dLAogICAgICAgIH0KICAgICkKICAgIGx5cmlhLmdlbmVyYXRlX3NvbmcoCiAgICAgICAgY2xpZW50ZSwKICAgICAgICBwcm9tcHQ9IkJhc2UgZGVsIERpcmVjdG9yIiwKICAgICAgICBkdXJhdGlvbl9zZWNvbmRzPTE4MCwKICAgICAgICBseXJpY3M9IltWZXJzZV1cbk1pIGxldHJhIiwKICAgICAgICBuZWdhdGl2ZV9wcm9tcHQ9ImdyaXRvcyIsCiAgICApCiAgICBtb2RlbG8sIHBheWxvYWQgPSBjbGllbnRlLmxsYW1hZGFzWy0xXQogICAgYXNzZXJ0IG1vZGVsbyA9PSAibHlyaWEtMy41IgogICAgYXNzZXJ0IHBheWxvYWRbIm1vZGVsIl0gPT0gImx5cmlhLTMuNSIKICAgIHRleHRvID0gcGF5bG9hZFsiaW5wdXQiXVswXVsidGV4dCJdCiAgICBhc3NlcnQgIkJhc2UgZGVsIERpcmVjdG9yIiBpbiB0ZXh0bwogICAgYXNzZXJ0ICJhYm91dCAxODAgc2Vjb25kcyIgaW4gdGV4dG8KICAgIGFzc2VydCAiRElDVElPTiIgaW4gdGV4dG8gYW5kICJzeWxsYWJsZSBieSBzeWxsYWJsZSIgaW4gdGV4dG8KICAgIGFzc2VydCAiTFlSSUNTOlxuW1ZlcnNlXVxuTWkgbGV0cmEiIGluIHRleHRvCiAgICBhc3NlcnQgIkFWT0lEOiBncml0b3MiIGluIHRleHRvCgoKZGVmIHRlc3Rfc2luX2F1ZGlvX2VsX2Vycm9yX2RpY2VfZWxfbW90aXZvX3JlYWxfZGVfZ29vZ2xlKCk6CiAgICAiIiJVbiBibG9xdWVvIHNlIGxlZSBjb21vIGJsb3F1ZW8sIG51bmNhIGNvbW8gdW4gInNpbiByZXNwdWVzdGEiIHZhY2lvLiIiIgogICAgY2xpZW50ZSA9IENsaWVudGVGYWxzbygKICAgICAgICB7CiAgICAgICAgICAgICJzdGF0dXMiOiAiY29tcGxldGVkIiwKICAgICAgICAgICAgInByb21wdEZlZWRiYWNrIjogewogICAgICAgICAgICAgICAgImJsb2NrUmVhc29uIjogIlNBRkVUWSIsCiAgICAgICAgICAgICAgICAiYmxvY2tSZWFzb25NZXNzYWdlIjogIlRoZSBwcm9tcHQgd2FzIGJsb2NrZWQgYnkgdGhlIHNhZmV0eSBmaWx0ZXIuIiwKICAgICAgICAgICAgfSwKICAgICAgICAgICAgIm91dHB1dHMiOiBbXSwKICAgICAgICB9CiAgICApCiAgICB3aXRoIHB5dGVzdC5yYWlzZXMoUHJvdmlkZXJFcnJvcikgYXMgZXhjaW5mbzoKICAgICAgICBseXJpYS5nZW5lcmF0ZV9zb25nKGNsaWVudGUsIHByb21wdD0icmFwIGNhbGxlamVybyIsIGR1cmF0aW9uX3NlY29uZHM9MTIwKQogICAgbWVuc2FqZSA9IHN0cihleGNpbmZvLnZhbHVlKQogICAgYXNzZXJ0ICJTQUZFVFkiIGluIG1lbnNhamUgYW5kICJibG9xdWVhZGEiIGluIG1lbnNhamUKICAgIGFzc2VydCAic2luIHJlc3B1ZXN0YSIgbm90IGluIG1lbnNhamUKICAgICMgWSBlbCBleHRyYWN0byBkZSBsYSByZXNwdWVzdGEgdmlhamEgZW4gbG9zIGRldGFsbGVzIGRlbCBlcnJvci4KICAgIGFzc2VydCAiU0FGRVRZIiBpbiBleGNpbmZvLnZhbHVlLmRldGFpbHNbInJlc3BvbnNlIl0KCgpkZWYgdGVzdF91bmFfaW50ZXJhY2Npb25fc2luX2NvbXBsZXRhcl9ub19kZXZ1ZWx2ZV9jYW5jaW9uKCk6CiAgICAiIiJTaSBlbCBlc3RhZG8gbm8gZXMgY29tcGxldGVkLCBubyBoYXkgcGllemEgYXVucXVlIHZpbmllcmEgYWxnbyBkZSBhdWRpby4iIiIKICAgIGNsaWVudGUgPSBDbGllbnRlRmFsc28oCiAgICAgICAgewogICAgICAgICAgICAic3RhdHVzIjogImZhaWxlZCIsCiAgICAgICAgICAgICJlcnJvciI6IHsibWVzc2FnZSI6ICJxdW90YSBleGNlZWRlZCIsICJjb2RlIjogNDI5fSwKICAgICAgICAgICAgIm91dHB1dHMiOiBbeyJ0eXBlIjogImF1ZGlvIiwgIm1pbWVfdHlwZSI6ICJhdWRpby9tcGVnIiwgImRhdGEiOiBNUDNfQjY0fV0sCiAgICAgICAgfQogICAgKQogICAgd2l0aCBweXRlc3QucmFpc2VzKFByb3ZpZGVyRXJyb3IpIGFzIGV4Y2luZm86CiAgICAgICAgbHlyaWEuZ2VuZXJhdGVfc29uZyhjbGllbnRlLCBwcm9tcHQ9InJhcCIsIGR1cmF0aW9uX3NlY29uZHM9NjApCiAgICBtZW5zYWplID0gc3RyKGV4Y2luZm8udmFsdWUpCiAgICBhc3NlcnQgIidmYWlsZWQnIiBpbiBtZW5zYWplIGFuZCAicXVvdGEgZXhjZWVkZWQiIGluIG1lbnNhamUKCgpkZWYgdGVzdF9lbF9kZXRhbGxlX2RlX2xhX3Jlc3B1ZXN0YV9xdWVkYV9ndWFyZGFkb19lbl9lbF90cmFiYWpvKGNsaWVudCwgc3R1ZGlvLCBtb25rZXlwYXRjaCk6CiAgICAiIiJFbCBmYWxsbyBxdWUgZWwgZHVlbm8gbGVlIGVuIGxhIHBhbnRhbGxhIGxsZXZhIGVsIG1vdGl2byBkZSBHb29nbGUuCgogICAgQW50ZXMgZWwgb3JxdWVzdGFkb3IgZ3VhcmRhYmEgc29sbyBlbCB0aXR1bGFyIGRlbCBlcnJvciB5IHRpcmFiYSBsb3MKICAgIGRldGFsbGVzIGRlbCBwcm92ZWVkb3I6IGVsIG1vdGl2byByZWFsIGRlIHVuIGZhbGxvIG5vIHF1ZWRhYmEgZW4gbmluZ3VuCiAgICBzaXRpby4gQXF1aSBlbCBwcm92ZWVkb3IgZmFsbGEgY29uIGRldGFsbGVzLCBjb21vIGZhbGxhIGRlIHZlcmRhZCwgeSBlbAogICAgdHJhYmFqbyBndWFyZGFkbyB0aWVuZSBxdWUgbW9zdHJhcmxvcy4KICAgICIiIgogICAgZnJvbSBhcHAucHJvdmlkZXJzIGltcG9ydCBseXJpYSBhcyBtb2R1bG9fbHlyaWEKCiAgICBkZWYgZmFsbGEoY2xpZW50ZSwgKiprd2FyZ3MpOgogICAgICAgIHJhaXNlIFByb3ZpZGVyRXJyb3IoCiAgICAgICAgICAgICJMeXJpYSBubyBkZXZvbHZpbyBhdWRpbzogbGEgcGV0aWNpb24gZnVlIGJsb3F1ZWFkYSAoYmxvY2tSZWFzb246IFNBRkVUWSkuIiwKICAgICAgICAgICAgZGV0YWlscz17InJlc3BvbnNlIjogInsncHJvbXB0RmVlZGJhY2snOiB7J2Jsb2NrUmVhc29uJzogJ1NBRkVUWSd9fSJ9LAogICAgICAgICkKCiAgICBtb25rZXlwYXRjaC5zZXRhdHRyKG1vZHVsb19seXJpYSwgImdlbmVyYXRlX3NvbmciLCBmYWxsYSkKCiAgICBjcmVhZG8gPSBjbGllbnQucG9zdCgiL2FwaS91bml2ZXJzZXMiLCBqc29uPXsibmFtZSI6ICJOb3ZhIn0pLmpzb24oKQogICAgdWlkID0gY3JlYWRvWyJpZCJdCiAgICBjYW5jaW9uID0gY2xpZW50LnBvc3QoZiIvYXBpL3VuaXZlcnNlcy97dWlkfS9zb25ncyIsIGpzb249eyJ0aXRsZSI6ICJOZW9uIn0pLmpzb24oKQogICAgc2lkID0gY2FuY2lvblsiaWQiXQogICAgY2xpZW50LnB1dCgKICAgICAgICBmIi9hcGkvdW5pdmVyc2VzL3t1aWR9L3NvbmdzL3tzaWR9L2x5cmljcyIsCiAgICAgICAganNvbj17Imx5cmljcyI6ICJbVmVyc2UgMV1cbkx1Y2VzIGRlIG5lb24iLCAiYXV0aG9yIjogInVzZXIifSwKICAgICkKCiAgICByZXNwdWVzdGEgPSBjbGllbnQucG9zdCgKICAgICAgICBmIi9hcGkvdW5pdmVyc2VzL3t1aWR9L3NvbmdzL3tzaWR9L2dlbmVyYXRlIiwganNvbj17ImR1cmF0aW9uX3NlY29uZHMiOiA2MH0KICAgICkKICAgIGFzc2VydCByZXNwdWVzdGEuc3RhdHVzX2NvZGUgPT0gMjAwLCByZXNwdWVzdGEudGV4dAogICAgc3R1ZGlvLmpvYnMud2FpdF9mb3JfaWRsZSgyMCkKICAgIHRyYWJham8gPSBjbGllbnQuZ2V0KGYiL2FwaS91bml2ZXJzZXMve3VpZH0vam9icy97cmVzcHVlc3RhLmpzb24oKVsnaWQnXX0iKS5qc29uKCkKICAgIGFzc2VydCB0cmFiYWpvWyJzdGF0ZSJdID09ICJGQUlMRUQiCiAgICBhc3NlcnQgIlNBRkVUWSIgaW4gdHJhYmFqb1siZXJyb3IiXQogICAgYXNzZXJ0ICJEZXRhbGxlIGRlIGxhIHJlc3B1ZXN0YSBkZSBHb29nbGUiIGluIHRyYWJham9bImVycm9yIl0K
+"""Lyria por la API de interacciones: lectura del audio y motivos de fallo.
+
+El proveedor se prueba contra respuestas escritas a mano con la forma de la
+API real — la de la documentacion oficial de Lyria y la de la instalacion
+hermana que genera piezas largas a diario — y no contra la forma que el
+propio codigo espera. Esa fue exactamente la ceguera que dejo pasar el fallo
+de la primera generacion real: en seco, la respuesta simulada tenia la misma
+forma equivocada que el codigo buscaba, y todo parecia funcionar.
+"""
+
+from __future__ import annotations
+
+import base64
+
+import pytest
+
+from app.errors import ProviderError
+from app.providers import lyria
+
+MP3 = b"\xff\xfb\x90\x00" + b"\x00" * 413
+MP3_B64 = base64.b64encode(MP3).decode()
+
+
+class ClienteFalso:
+    """El transporte minimo que el proveedor necesita, con la respuesta dada."""
+
+    def __init__(self, respuesta):
+        self._respuesta = respuesta
+        self.llamadas: list[tuple[str, dict]] = []
+
+    def call_interactions(self, model, payload):
+        self.llamadas.append((model, payload))
+        return self._respuesta
+
+
+def test_el_audio_se_lee_tambien_desde_steps():
+    """La documentacion oficial muestra steps -> content; Drama, outputs."""
+    cliente = ClienteFalso(
+        {
+            "status": "completed",
+            "steps": [
+                {"content": [{"type": "text", "text": "componiendo"}]},
+                {
+                    "content": [
+                        {"type": "audio", "mime_type": "audio/mpeg", "data": MP3_B64}
+                    ]
+                },
+            ],
+        }
+    )
+    resultado = lyria.generate_song(cliente, prompt="rap triste", duration_seconds=60)
+    assert resultado.data == MP3
+    assert resultado.mime_type == "audio/mpeg"
+
+
+def test_el_texto_que_viaja_es_el_de_siempre():
+    """El arreglo cambia la puerta, no el encargo: mismo texto compuesto."""
+    cliente = ClienteFalso(
+        {
+            "status": "completed",
+            "outputs": [{"type": "audio", "mime_type": "audio/mpeg", "data": MP3_B64}],
+        }
+    )
+    lyria.generate_song(
+        cliente,
+        prompt="Base del Director",
+        duration_seconds=180,
+        lyrics="[Verse]\nMi letra",
+        negative_prompt="gritos",
+    )
+    modelo, payload = cliente.llamadas[-1]
+    assert modelo == "lyria-3.5"
+    assert payload["model"] == "lyria-3.5"
+    texto = payload["input"][0]["text"]
+    assert "Base del Director" in texto
+    assert "about 180 seconds" in texto
+    assert "DICTION" in texto and "syllable by syllable" in texto
+    assert "LYRICS:\n[Verse]\nMi letra" in texto
+    assert "AVOID: gritos" in texto
+
+
+def test_sin_audio_el_error_dice_el_motivo_real_de_google():
+    """Un bloqueo se lee como bloqueo, nunca como un "sin respuesta" vacio."""
+    cliente = ClienteFalso(
+        {
+            "status": "completed",
+            "promptFeedback": {
+                "blockReason": "SAFETY",
+                "blockReasonMessage": "The prompt was blocked by the safety filter.",
+            },
+            "outputs": [],
+        }
+    )
+    with pytest.raises(ProviderError) as excinfo:
+        lyria.generate_song(cliente, prompt="rap callejero", duration_seconds=120)
+    mensaje = str(excinfo.value)
+    assert "SAFETY" in mensaje and "bloqueada" in mensaje
+    assert "sin respuesta" not in mensaje
+    # Y el extracto de la respuesta viaja en los detalles del error.
+    assert "SAFETY" in excinfo.value.details["response"]
+
+
+def test_una_interaccion_sin_completar_no_devuelve_cancion():
+    """Si el estado no es completed, no hay pieza aunque viniera algo de audio."""
+    cliente = ClienteFalso(
+        {
+            "status": "failed",
+            "error": {"message": "quota exceeded", "code": 429},
+            "outputs": [{"type": "audio", "mime_type": "audio/mpeg", "data": MP3_B64}],
+        }
+    )
+    with pytest.raises(ProviderError) as excinfo:
+        lyria.generate_song(cliente, prompt="rap", duration_seconds=60)
+    mensaje = str(excinfo.value)
+    assert "'failed'" in mensaje and "quota exceeded" in mensaje
+
+
+def test_el_detalle_de_la_respuesta_queda_guardado_en_el_trabajo(client, studio, monkeypatch):
+    """El fallo que el dueno lee en la pantalla lleva el motivo de Google.
+
+    Antes el orquestador guardaba solo el titular del error y tiraba los
+    detalles del proveedor: el motivo real de un fallo no quedaba en ningun
+    sitio. Aqui el proveedor falla con detalles, como falla de verdad, y el
+    trabajo guardado tiene que mostrarlos.
+    """
+    from app.providers import lyria as modulo_lyria
+
+    def falla(cliente, **kwargs):
+        raise ProviderError(
+            "Lyria no devolvio audio: la peticion fue bloqueada (blockReason: SAFETY).",
+            details={"response": "{'promptFeedback': {'blockReason': 'SAFETY'}}"},
+        )
+
+    monkeypatch.setattr(modulo_lyria, "generate_song", falla)
+
+    creado = client.post("/api/universes", json={"name": "Nova"}).json()
+    uid = creado["id"]
+    cancion = client.post(f"/api/universes/{uid}/songs", json={"title": "Neon"}).json()
+    sid = cancion["id"]
+    client.put(
+        f"/api/universes/{uid}/songs/{sid}/lyrics",
+        json={"lyrics": "[Verse 1]\nLuces de neon", "author": "user"},
+    )
+
+    respuesta = client.post(
+        f"/api/universes/{uid}/songs/{sid}/generate", json={"duration_seconds": 60}
+    )
+    assert respuesta.status_code == 200, respuesta.text
+    studio.jobs.wait_for_idle(20)
+    trabajo = client.get(f"/api/universes/{uid}/jobs/{respuesta.json()['id']}").json()
+    assert trabajo["state"] == "FAILED"
+    assert "SAFETY" in trabajo["error"]
+    assert "Detalle de la respuesta de Google" in trabajo["error"]
