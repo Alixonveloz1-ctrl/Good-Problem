@@ -10,7 +10,7 @@ import logging
 from typing import Any
 
 from .db.client import Database, build_database
-from .db.repositories import CONFIG_MODELS, CONFIG_SECRETS
+from .db.repositories import CONFIG_MODELS
 from .domain.registry import ModelRegistry, load_seed
 from .providers.storage import Storage, build_storage
 from .providers.vertex import CallLog, VertexClient, build_vertex_client
@@ -95,25 +95,17 @@ class Studio:
         self.db.set(CONFIG_MODELS, document)
         return self.reload_registry()
 
-    # -- secretos del estudio --------------------------------------------------
+    # -- la clave de Gemini del dueno ------------------------------------------
 
     def gemini_api_key(self) -> str:
-        """La clave de Gemini del dueno, si la puso.
+        """La clave de Gemini del dueno, si la puso como variable de entorno.
 
-        Vive en su propio documento, la escribe solo el endpoint de
-        ajustes y de aqui sale unicamente hacia la llamada de musica
-        que la necesita: ningun GET la devuelve, ni siquiera tapada.
+        Vive en la configuracion del servicio (AAUS_GEMINI_API_KEY), no
+        en la base de datos: la escribio el dueno una sola vez en la
+        consola de Google Cloud y de aqui sale unicamente hacia la
+        llamada de musica que la necesita. Ningun GET la devuelve.
         """
-        doc = self.db.get(CONFIG_SECRETS) or {}
-        return str(doc.get("gemini_api_key") or "").strip()
-
-    def set_gemini_api_key(self, key: str) -> None:
-        self.db.set(
-            CONFIG_SECRETS, {"id": "secrets", "gemini_api_key": key.strip()}
-        )
-
-    def clear_gemini_api_key(self) -> None:
-        self.db.set(CONFIG_SECRETS, {"id": "secrets", "gemini_api_key": ""})
+        return self.settings.gemini_api_key.strip()
 
 
 _studio: Studio | None = None
