@@ -180,7 +180,16 @@ never WHAT it is about:
   sketch of four), a pre-chorus that tightens the tension, the
   chorus, room for a spoken bridge, a third verse, and a final
   chorus allowed to change its closing lines. Two quatrains and a
-  hook is a sketch, not a finished song.
+  hook is a sketch, not a finished song. The form is complete at
+  every size: when the song's measure is short, the same
+  architecture is written smaller, never amputated.
+- SIZED TO THE SONG. The lyric is written to a measure: the task
+  states how many words fit, sung well, in the requested seconds at
+  the genre's natural pace, and the complete architecture is scaled
+  INSIDE that measure — shorter verses, fewer written chorus
+  repetitions, whatever it takes. A long lyric crammed into a short
+  song can only be sung rushed, and a rushed lyric is a failed
+  lyric.
 - THE TEMPERATURE IS THE SONG'S. Sensual writing runs the whole
   range: teasing and insinuation at one end, explicit, graphic,
   audible sex between adults at the other — the most famous trap
