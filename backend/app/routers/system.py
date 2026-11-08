@@ -6,7 +6,6 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Body, Query
-from pydantic import BaseModel
 from fastapi.responses import FileResponse, RedirectResponse, Response
 
 from ..container import Studio
@@ -19,7 +18,7 @@ from ..db.repositories import (
     Repository,
 )
 from ..domain.enums import CanonStatus, JobState, StageStatus
-from ..errors import DomainError, NotFound
+from ..errors import NotFound
 from ..providers.storage import LocalStorage
 from ..providers.vertex import redact
 from .deps import OwnerDep, StudioDep
@@ -77,40 +76,13 @@ def reload_models(owner: OwnerDep, studio: StudioDep) -> dict[str, Any]:
 # --- Ajustes del estudio ----------------------------------------------------
 
 
-class GeminiKeyIn(BaseModel):
-    api_key: str
-
-
 @router.get("/settings")
 def get_settings(owner: OwnerDep, studio: StudioDep) -> dict[str, Any]:
     """Lo unico que la pantalla necesita saber de la clave: si esta
-    puesta. La clave en si no sale por ningun GET, ni tapada: quien la
-    quiera tiene que ser el dueno entrando a su cuenta de Google."""
+    puesta. La clave vive como variable de entorno del servicio y no
+    sale por ningun GET, ni tapada: la escribio el dueno una vez en la
+    consola de Google Cloud, y la app no ofrece forma de escribirla."""
     return {"gemini_key_configured": bool(studio.gemini_api_key())}
-
-
-@router.put("/settings/gemini-key")
-def put_gemini_key(
-    owner: OwnerDep, studio: StudioDep, body: GeminiKeyIn
-) -> dict[str, Any]:
-    """El dueno pega su clave de Gemini y la musica pasa a Lyria 3.5.
-
-    La clave es suya, la crea el en Google AI Studio y la pega el en su
-    aplicacion: por el chat no pasa nunca. Queda guardada en el
-    documento de secretos del estudio y solo la lee la llamada de
-    musica que la necesita.
-    """
-    if not body.api_key.strip():
-        raise DomainError("Pega tu clave de Gemini: el campo llego vacio.")
-    studio.set_gemini_api_key(body.api_key)
-    return {"gemini_key_configured": True}
-
-
-@router.delete("/settings/gemini-key")
-def delete_gemini_key(owner: OwnerDep, studio: StudioDep) -> dict[str, Any]:
-    """Sin clave, la musica vuelve a Lyria 3 Pro por Vertex."""
-    studio.clear_gemini_api_key()
-    return {"gemini_key_configured": False}
 
 
 # --- Home (PRD 38) ---------------------------------------------------------
