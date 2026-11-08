@@ -232,6 +232,26 @@ class VertexClient:
             extra_headers={"X-Goog-User-Project": self.project},
         )
 
+    def call_interactions_gemini_api(
+        self, model: str, payload: dict[str, Any], api_key: str
+    ) -> dict[str, Any]:
+        """La otra puerta de la API de interacciones: la API de Gemini
+        con la clave del dueno (cabecera ``x-goog-api-key``).
+
+        Es la puerta donde vive Lyria 3.5: por Vertex contesto 400, no
+        soportada. La clave viaja SOLO en la cabecera — nunca en el
+        cuerpo, que es lo que queda registrado en el registro de
+        llamadas — y el cuerpo compuesto es el mismo de la puerta de
+        Vertex.
+        """
+        return self._call_url(
+            model,
+            "interactions",
+            "https://generativelanguage.googleapis.com/v1beta/interactions",
+            payload,
+            api_key=api_key,
+        )
+
     def _call_url(
         self,
         model: str,
@@ -240,26 +260,36 @@ class VertexClient:
         payload: dict[str, Any],
         *,
         extra_headers: dict[str, str] | None = None,
+        api_key: str = "",
     ) -> dict[str, Any]:
         self.calls.record(VertexCall(model=model, method=method, url=url, payload=payload))
         if self.dry_run:
             return self._simulate(model, method, payload)
+        if api_key:
+            headers = {
+                "x-goog-api-key": api_key,
+                "Content-Type": "application/json",
+                **(extra_headers or {}),
+            }
+        else:
+            headers = {
+                "Authorization": f"Bearer {self._token()}",
+                "Content-Type": "application/json",
+                **(extra_headers or {}),
+            }
         try:
             response = httpx.post(
                 url,
                 json=payload,
                 timeout=self.timeout,
-                headers={
-                    "Authorization": f"Bearer {self._token()}",
-                    "Content-Type": "application/json",
-                    **(extra_headers or {}),
-                },
+                headers=headers,
             )
         except httpx.HTTPError as exc:  # network level
             raise ProviderError(f"No se pudo contactar con Vertex AI: {exc}") from exc
         if response.status_code >= 400:
+            puerta = "La API de Gemini" if api_key else "Vertex AI"
             raise ProviderError(
-                f"Vertex AI devolvio {response.status_code} para {model}:{method}",
+                f"{puerta} devolvio {response.status_code} para {model}:{method}",
                 details={"body": response.text[:2000]},
             )
         return response.json()
