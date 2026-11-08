@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 
 from ..db.repositories import SONGS, Repository
 from ..domain import artist as artist_domain
+from ..domain import tempo as tempo_domain
 from ..domain.enums import CanonStatus, CreativeRole, LyricsAuthor, UserAction
 from ..errors import Conflict, DomainError, NotFound
 from ..ids import new_id
@@ -79,6 +80,7 @@ def _bloques_fijos(studio, universe_id: str, cancion: dict[str, Any]) -> dict[st
         resumenes = (resumenes + "\n\n" + cancion["inspiration_summary"]).strip()
     return {
         "singing_voice_text": bible.singing_voice.text or bible.voice_profile.as_prompt(),
+        "genre_keys": cancion.get("genres") or bible.music_genres or [],
         "genres_text": artist_domain.genres_text(
             cancion.get("genres") or bible.music_genres,
             cancion.get("genre_free") or bible.music_genre_free,
@@ -158,7 +160,12 @@ def get_song(
             {**version, "url": studio.storage.signed_url(version["audio_path"])
              if version.get("audio_path") else None}
         )
-    return {**song, "versions": versions}
+    # El calculo del tempo viaja con la cancion: BPM vigente, el
+    # largo estimado de la letra a ese BPM y el aviso de los tres
+    # minutos, para que la pantalla lo enseñe sin recalcular nada.
+    bible = load_bible(studio.db, universe_id)
+    generos = song.get("genres") or bible.music_genres
+    return {**song, "versions": versions, **tempo_domain.calculo_de_la_cancion(song, generos)}
 
 
 @router.patch("/{song_id}")
@@ -170,10 +177,24 @@ def patch_song(
     allowed = {
         k: v
         for k, v in body.items()
-        if k in {"title", "genre", "genres", "genre_free", "bpm", "mood",
+        if k in {"title", "genre", "genres", "genre_free", "bpm", "bpm_usuario", "mood",
                  "structure", "music_prompt", "requested_duration_seconds",
                  "concept", "metadata", "inspiration_summary"}
     }
+    if "bpm_usuario" in allowed:
+        # El BPM del dueno: su selector manda de 60 a 180, y con null
+        # vuelve al tempo natural del genero.
+        bruto = allowed["bpm_usuario"]
+        if bruto is not None:
+            try:
+                numero = int(bruto)
+            except (TypeError, ValueError):
+                raise DomainError("El BPM tiene que ser un número entero.")
+            if not tempo_domain.BPM_MINIMO <= numero <= tempo_domain.BPM_MAXIMO:
+                raise DomainError(
+                    f"El BPM va de {tempo_domain.BPM_MINIMO} a {tempo_domain.BPM_MAXIMO}."
+                )
+            allowed["bpm_usuario"] = numero
     if "genres" in allowed:
         allowed["genres"] = [
             g for g in allowed["genres"] if g in artist_domain.MUSIC_GENRE_KEYS
@@ -269,6 +290,7 @@ def generate_lyrics(
             payload={
                 "task": "lyrics",
                 "concept": song.get("concept") or {},
+                "bpm_usuario": song.get("bpm_usuario"),
                 "overrides": body.overrides,
                 **_bloques_fijos(studio, universe_id, song),
             },
