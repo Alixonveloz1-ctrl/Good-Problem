@@ -202,7 +202,9 @@ renderizado, un proyecto no se puede aprobar.
   para que quepa la letra — si algo no cabe, se repite menos el coro.
   Y la letra nace medida: la app calcula cuántas palabras caben
   cantadas bien en los segundos pedidos al paso del género, y la
-  escritura y su revisión se quedan dentro de esa medida.
+  escritura y su revisión se quedan dentro de esa medida. (La
+  primera generación del dueño tras este despliegue es la prueba de
+  oído del control.)
 - **Música: Lyria por dos puertas.** Sin clave: Lyria 3 Pro
   (`lyria-3-pro-preview`) por Vertex, con la identidad del proyecto.
   Con la clave de Gemini del dueño puesta como variable de entorno
