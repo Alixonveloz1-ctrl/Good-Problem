@@ -55,7 +55,13 @@ def test_banned_models_cannot_be_re_enabled_from_the_registry():
 
 
 def test_music_selector_offers_exactly_one_model(registry):
-    assert [m.id for m in registry.all(ModelKind.MUSIC)] == ["lyria-3-pro-preview"]
+    """El registro trae los dos modelos sancionados, uno por puerta:
+    Lyria 3 Pro (Vertex) y Lyria 3.5 (la clave de Gemini del dueno).
+    Ningun otro modelo de musica existe en el sistema."""
+    assert [m.id for m in registry.all(ModelKind.MUSIC)] == [
+        "lyria-3-pro-preview",
+        "lyria-3.5",
+    ]
 
 
 def test_music_falls_back_to_nothing(studio):
@@ -663,6 +669,7 @@ COMPROBADOS = {
     "gemini-3.1-flash-image",
     "gemini-2.5-flash-image",
     "lyria-3-pro-preview",
+    "lyria-3.5",
     "veo-3.1-generate-001",
     "veo-3.1-fast-generate-001",
     "veo-3.1-lite-generate-001",
