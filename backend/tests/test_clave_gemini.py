@@ -2,18 +2,23 @@
 
 El dueno oyo la misma letra cantada por la aplicacion de Gemini — sin
 un solo corte — y por su estudio — con la voz cortada — y ordeno abrir
-la segunda puerta: el pone SU clave de Gemini en Ajustes y la musica
-pasa a Lyria 3.5 por la API de Gemini. Sin clave, todo sigue como
-estaba: Lyria 3 Pro por Vertex.
+la segunda puerta: con SU clave de Gemini, la musica pasa a Lyria 3.5
+por la API de Gemini. Sin clave, todo sigue como estaba: Lyria 3 Pro
+por Vertex.
+
+La clave vive como VARIABLE DE ENTORNO del servicio
+(AAUS_GEMINI_API_KEY), puesta una sola vez por el dueno en la consola
+de Google Cloud escribiendola el mismo. Rechazo el campo dentro de la
+app la misma noche en que se construyo: la app no guarda claves, solo
+sabe si la variable esta puesta.
 
 Lo que estas pruebas fijan:
-- la clave se guarda y NO vuelve a salir por ningun GET, ni tapada;
-- con la clave puesta, el trabajo de musica se resuelve y se genera
-  con lyria-3.5, la llamada va a la puerta de Gemini y la clave no
-  viaja en el cuerpo registrado;
-- sin clave (o tras quitarla), la musica vuelve a lyria-3-pro-preview
-  por Vertex;
-- una clave vacia se rechaza a la vista;
+- sin clave en el entorno, la musica es lyria-3-pro-preview por Vertex;
+- con la clave en el entorno, el trabajo se genera con lyria-3.5 por
+  la puerta de Gemini, con el mismo encargo (diccion incluida);
+- la clave NO sale por ningun GET, ni siquiera tapada: los ajustes
+  solo dicen si esta puesta;
+- la app no ofrece forma de escribir la clave (no hay endpoint);
 - el proveedor se niega a mezclar puertas: modelo de una puerta con
   el transporte de la otra es un error, no una sustitucion silenciosa.
 """
@@ -25,7 +30,7 @@ import pytest
 from app.errors import ModelNotAllowed
 from app.providers import lyria
 
-CLAVE = "AIza-clave-de-prueba-del-dueno-1234567890"
+CLAVE = "<redacted>"
 URL_GEMINI = "https://generativelanguage.googleapis.com/v1beta/interactions"
 
 
@@ -70,22 +75,20 @@ def test_sin_clave_la_musica_es_lyria_3_pro_por_vertex(client, studio):
     assert "aiplatform.googleapis.com" in llamada.url
 
 
-def test_con_clave_la_musica_es_lyria_35_por_gemini_y_la_clave_no_sale(
+def test_con_clave_en_el_entorno_la_musica_es_lyria_35_y_la_clave_no_sale(
     client, studio
 ):
+    # La variable de entorno del servicio, como queda en produccion.
+    studio.settings.gemini_api_key = CLAVE
     uid = _universo(client, studio)
     sid = _cancion_con_letra(client, studio, uid)
 
-    puesta = client.put("/api/settings/gemini-key", json={"api_key": CLAVE})
-    assert puesta.status_code == 200, puesta.text
-    assert puesta.json() == {"gemini_key_configured": True}
-    assert CLAVE not in puesta.text
-
-    # La clave no sale por ningun GET: ni en ajustes ni en la cuenta.
+    # Los ajustes solo dicen si esta puesta; la clave no sale por
+    # ningun GET, ni en ajustes ni en la cuenta.
+    assert client.get("/api/settings").json() == {"gemini_key_configured": True}
     for ruta in ("/api/settings", "/api/me", "/api/health"):
         respuesta = client.get(ruta)
         assert CLAVE not in respuesta.text, ruta
-    assert client.get("/api/settings").json() == {"gemini_key_configured": True}
 
     cancion = _generar(client, studio, uid, sid)
     assert cancion["versions"][-1]["model"] == "lyria-3.5"
@@ -99,23 +102,11 @@ def test_con_clave_la_musica_es_lyria_35_por_gemini_y_la_clave_no_sale(
     assert "DICTION:" in texto
 
 
-def test_quitar_la_clave_devuelve_la_musica_a_vertex(client, studio):
-    uid = _universo(client, studio)
-    sid = _cancion_con_letra(client, studio, uid)
-    client.put("/api/settings/gemini-key", json={"api_key": CLAVE})
-    _generar(client, studio, uid, sid)
-
+def test_la_app_no_ofrece_forma_de_escribir_la_clave(client, studio):
+    puesta = client.put("/api/settings/gemini-key", json={"api_key": CLAVE})
+    assert puesta.status_code in (404, 405), puesta.text
     quitada = client.delete("/api/settings/gemini-key")
-    assert quitada.status_code == 200, quitada.text
-    assert quitada.json() == {"gemini_key_configured": False}
-
-    cancion = _generar(client, studio, uid, sid)
-    assert cancion["versions"][-1]["model"] == "lyria-3-pro-preview"
-
-
-def test_clave_vacia_se_rechaza(client, studio):
-    respuesta = client.put("/api/settings/gemini-key", json={"api_key": "   "})
-    assert respuesta.status_code == 400
+    assert quitada.status_code in (404, 405), quitada.text
     assert client.get("/api/settings").json() == {"gemini_key_configured": False}
 
 
