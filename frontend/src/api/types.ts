@@ -228,6 +228,12 @@ export interface Song {
   inspiration_error?: string
   genre: string
   bpm: number | null
+  bpm_usuario?: number | null
+  bpm_efectivo?: number | null
+  bpm_natural?: number | null
+  palabras_letra?: number
+  duracion_estimada_segundos?: number
+  pasa_de_tres_minutos?: boolean
   mood: string
   structure: string[]
   requested_duration_seconds: number
