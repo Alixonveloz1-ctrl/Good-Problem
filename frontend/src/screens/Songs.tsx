@@ -89,7 +89,7 @@ export function SongsScreen() {
         <Sheet title="Nueva cancion" onClose={() => setCreating(false)}>
           <Field label="Titulo provisional" value={title} onChange={setTitle} />
           <Field
-            label="Duracion en segundos (Lyria 3.5, hasta 180)"
+            label="Duracion en segundos (Lyria 3 Pro, hasta 180)"
             value={duration}
             onChange={setDuration}
             type="number"
@@ -368,7 +368,7 @@ export function SongScreen() {
             {/* 3. Lyria */}
             <Card>
               <div className="row between">
-                <h3>3 · Generar con Lyria 3.5</h3>
+                <h3>3 · Generar con Lyria 3 Pro</h3>
                 <span className="badge accent">Sin selector</span>
               </div>
               <p className="muted" style={{ margin: 0 }}>
