@@ -21,7 +21,7 @@ def registry() -> ModelRegistry:
     return ModelRegistry(load_seed())
 
 
-# --- 1. Music is Lyria 3.5, never a 30 second clip model (PRD 14) --------
+# --- 1. Music is Lyria 3 Pro, never a 30 second clip model (PRD 14) --------
 
 
 @pytest.mark.parametrize("banned", ["lyria-3", "lyria-2", "lyria-002"])
@@ -55,7 +55,7 @@ def test_banned_models_cannot_be_re_enabled_from_the_registry():
 
 
 def test_music_selector_offers_exactly_one_model(registry):
-    assert [m.id for m in registry.all(ModelKind.MUSIC)] == ["lyria-3.5"]
+    assert [m.id for m in registry.all(ModelKind.MUSIC)] == ["lyria-3-pro-preview"]
 
 
 def test_music_falls_back_to_nothing(studio):
@@ -64,7 +64,7 @@ def test_music_falls_back_to_nothing(studio):
     resolved = studio.orchestrator.resolve_model(
         GenerationRequest(universe_id="u", kind="music", model=None)
     )
-    assert resolved.spec.id == "lyria-3.5"
+    assert resolved.spec.id == "lyria-3-pro-preview"
     assert resolved.source == "system"
 
 
@@ -662,7 +662,7 @@ COMPROBADOS = {
     "gemini-3-pro-image",
     "gemini-3.1-flash-image",
     "gemini-2.5-flash-image",
-    "lyria-3.5",
+    "lyria-3-pro-preview",
     "veo-3.1-generate-001",
     "veo-3.1-fast-generate-001",
     "veo-3.1-lite-generate-001",
@@ -706,7 +706,7 @@ def test_cada_modelo_se_pide_donde_vive():
 
     cliente = VertexClient("mi-proyecto", location="us-central1", dry_run=True)
 
-    for modelo in ("gemini-3.1-pro-preview", "gemini-3-pro-image", "lyria-3.5"):
+    for modelo in ("gemini-3.1-pro-preview", "gemini-3-pro-image", "lyria-3-pro-preview"):
         url = cliente.model_url(modelo, "generateContent")
         assert url.startswith("https://aiplatform.googleapis.com/"), url
         assert "/locations/global/" in url, url
@@ -745,7 +745,7 @@ def test_lyria_se_pide_por_interactions_como_la_instalacion_que_funciona():
     )
     # El cuerpo es exactamente el de la referencia: modelo y una entrada de texto.
     assert set(llamada.payload) == {"model", "input"}
-    assert llamada.payload["model"] == "lyria-3.5"
+    assert llamada.payload["model"] == "lyria-3-pro-preview"
     assert llamada.payload["input"][0]["type"] == "text"
     texto = llamada.payload["input"][0]["text"]
     assert "95 seconds" in texto and "cumbia triste" in texto
@@ -962,7 +962,7 @@ def test_los_ids_son_los_que_vertex_quiere(registry):
         "gemini-3.1-pro-preview",
         "gemini-3-pro-image",
         "gemini-3.1-flash-image",
-        "lyria-3.5",
+        "lyria-3-pro-preview",
         "veo-3.1-generate-001",
         "veo-3.1-fast-generate-001",
         "veo-3.1-lite-generate-001",
