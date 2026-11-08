@@ -69,8 +69,8 @@ def test_el_texto_que_viaja_es_el_de_siempre():
         negative_prompt="gritos",
     )
     modelo, payload = cliente.llamadas[-1]
-    assert modelo == "lyria-3.5"
-    assert payload["model"] == "lyria-3.5"
+    assert modelo == "lyria-3-pro-preview"
+    assert payload["model"] == "lyria-3-pro-preview"
     texto = payload["input"][0]["text"]
     assert "Base del Director" in texto
     assert "about 180 seconds" in texto
