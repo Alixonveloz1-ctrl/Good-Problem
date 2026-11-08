@@ -6,6 +6,14 @@ for them, including as a fallback after a failure. ``assert_music_model`` runs
 on every call, which is why that rule cannot be bypassed by passing a different
 id from anywhere else in the code.
 
+Lyria 3.5 is NOT an option here, and that is proven, not assumed: on
+2026-11-07 the system was switched to ``lyria-3.5`` for one real test song
+and Vertex answered 400, "Model 'lyria-3.5' is not supported by the
+Interactions API". The model exists on Google's other door (the Gemini API
+with an API key), which this studio does not use (PRD 40: no API keys, only
+the project's own identity). The switch was reverted the same day; what
+stayed is the diction order in the text sent to Lyria (see ``_con_duracion``).
+
 Lyria accepts text and reference images but not reference audio, so there is no
 way to pin a sung voice. The Voice Profile is text that travels with every
 request; it is the best the MVP can do and the PRD accepts that (PRD 4).
