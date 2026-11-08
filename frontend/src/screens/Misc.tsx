@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAction, useResource } from '../hooks/useApi'
 import type { ExportPackage, Registry, Song } from '../api/types'
-import { Card, Empty, ErrorNote, Field, Loading, TopBar } from '../components/ui'
+import { Card, Empty, ErrorNote, Loading, TopBar } from '../components/ui'
 
 export function CanonScreen() {
   const { universeId = '' } = useParams()
@@ -278,42 +278,25 @@ function RegistroDeModelos() {
  * se presta el movil, y sin un boton la unica forma seria esperar treinta dias
  * a que caduque la sesion.
  */
-/** La clave de Gemini del dueño: la puerta de Lyria 3.5.
+/** La clave de Gemini del dueño: vive en el servicio, no en la app.
  *
- * La clave se escribe una vez y no se vuelve a ver: la pantalla solo
- * sabe si está puesta, nunca la muestra. Quitarla devuelve la música
- * a Lyria 3 Pro por la puerta de siempre.
+ * La puso el dueño una sola vez como variable de entorno del
+ * servicio, escribiéndola él mismo en la consola de Google Cloud.
+ * Esta tarjeta solo informa el estado: la clave no se escribe ni se
+ * ve desde la aplicación.
  */
 function ClaveGemini() {
   const ajustes = useResource<{ gemini_key_configured: boolean }>('/api/settings')
-  const action = useAction()
-  const [clave, setClave] = useState('')
   const puesta = ajustes.data?.gemini_key_configured ?? false
-
-  const guardar = async () => {
-    const hecho = await action.run(() =>
-      api.put('/api/settings/gemini-key', { api_key: clave }),
-    )
-    if (hecho) {
-      setClave('')
-      await ajustes.reload()
-    }
-  }
-
-  const quitar = async () => {
-    const hecho = await action.run(() => api.del('/api/settings/gemini-key'))
-    if (hecho) await ajustes.reload()
-  }
 
   return (
     <Card>
       <h3>Clave de Gemini · Lyria 3.5</h3>
       <p className="muted" style={{ margin: 0 }}>
-        Con tu clave de Gemini puesta, la música la canta <strong>Lyria 3.5</strong>, el
-        modelo de la aplicación de Gemini. Sin clave, la canta Lyria 3 Pro, como hasta
-        ahora. La clave la creas tú, gratis, en Google AI Studio (aistudio.google.com,
-        botón «Get API key») y la pegas aquí: queda guardada en tu aplicación y no se
-        vuelve a mostrar.
+        La clave vive guardada en la configuración del servicio, como variable de
+        entorno: se puso una sola vez y no hay que escribirla al entrar. Con la clave
+        puesta, la música la canta <strong>Lyria 3.5</strong>, el modelo de la
+        aplicación de Gemini; sin clave, la canta Lyria 3 Pro, como hasta ahora.
       </p>
       <p className="muted" style={{ margin: 0 }}>
         Estado:{' '}
@@ -321,27 +304,6 @@ function ClaveGemini() {
           {puesta ? 'Clave puesta — canta Lyria 3.5' : 'Sin clave — canta Lyria 3 Pro'}
         </strong>
       </p>
-      <Field
-        label="Tu clave de Gemini"
-        value={clave}
-        onChange={setClave}
-        placeholder="AIza…"
-      />
-      <ErrorNote error={action.error} onDismiss={action.clearError} />
-      <div className="btn-grid">
-        <button
-          className="btn primary"
-          onClick={guardar}
-          disabled={action.busy || !clave.trim()}
-        >
-          Guardar la clave
-        </button>
-        {puesta && (
-          <button className="btn" onClick={quitar} disabled={action.busy}>
-            Quitar la clave
-          </button>
-        )}
-      </div>
     </Card>
   )
 }
